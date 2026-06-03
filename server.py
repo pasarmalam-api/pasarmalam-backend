@@ -29,6 +29,7 @@ def init_db():
               condition TEXT NOT NULL CHECK(condition IN ('New','Used')),
               price_mode TEXT NOT NULL CHECK(price_mode IN ('Fixed','Negotiable')),
               description TEXT DEFAULT '',
+              image_url TEXT DEFAULT '',
               created_at INTEGER NOT NULL
             );
 
@@ -67,6 +68,9 @@ def init_db():
             );
             """
         )
+        product_columns = [row["name"] for row in con.execute("PRAGMA table_info(products)")]
+        if "image_url" not in product_columns:
+            con.execute("ALTER TABLE products ADD COLUMN image_url TEXT DEFAULT ''")
         count = con.execute("SELECT COUNT(*) AS c FROM products").fetchone()["c"]
         if count == 0:
             seed_products(con)
@@ -75,20 +79,20 @@ def init_db():
 def seed_products(con):
     now = int(time.time())
     rows = [
-        ("Used iPhone 12 128GB", "Mobile Malam", "Phones", 899.00, 3, "Used", "Negotiable", "Verified used phone"),
-        ("USB-C fast charger 30W", "Gerai Gadget", "Chargers", 29.90, 20, "New", "Negotiable", "Fast charging adapter"),
-        ("Bluetooth speaker mini", "Tech Lane", "Electronics", 45.00, 16, "New", "Fixed", "Portable speaker"),
-        ("Used Myvi headlamp", "Auto Parts Corner", "Car Parts", 120.00, 2, "Used", "Negotiable", "Left side headlamp"),
-        ("Running shoes size 42", "Lorong Bundle", "Shoes", 55.00, 6, "Used", "Negotiable", "Clean used shoes"),
-        ("Cotton baju kurung set", "Cantik Craft", "Clothes", 38.00, 18, "New", "Fixed", "Local clothing"),
-        ("Satay ayam set", "Abang Din Satay", "Food", 12.90, 48, "New", "Fixed", "Fresh pasar malam food"),
-        ("Air balang mango float", "Balang Boss", "Drinks", 6.50, 35, "New", "Fixed", "Cold drink"),
+        ("Used iPhone 12 128GB", "Mobile Malam", "Phones", 899.00, 3, "Used", "Negotiable", "Verified used phone", ""),
+        ("USB-C fast charger 30W", "Gerai Gadget", "Chargers", 29.90, 20, "New", "Negotiable", "Fast charging adapter", ""),
+        ("Bluetooth speaker mini", "Tech Lane", "Electronics", 45.00, 16, "New", "Fixed", "Portable speaker", ""),
+        ("Used Myvi headlamp", "Auto Parts Corner", "Car Parts", 120.00, 2, "Used", "Negotiable", "Left side headlamp", ""),
+        ("Running shoes size 42", "Lorong Bundle", "Shoes", 55.00, 6, "Used", "Negotiable", "Clean used shoes", ""),
+        ("Cotton baju kurung set", "Cantik Craft", "Clothes", 38.00, 18, "New", "Fixed", "Local clothing", ""),
+        ("Satay ayam set", "Abang Din Satay", "Food", 12.90, 48, "New", "Fixed", "Fresh pasar malam food", ""),
+        ("Air balang mango float", "Balang Boss", "Drinks", 6.50, 35, "New", "Fixed", "Cold drink", ""),
     ]
     con.executemany(
         """
         INSERT INTO products
-        (name, shop, category, price, stock, condition, price_mode, description, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (name, shop, category, price, stock, condition, price_mode, description, image_url, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [(*row, now) for row in rows],
     )
@@ -192,8 +196,8 @@ class Handler(BaseHTTPRequestHandler):
             cur = con.execute(
                 """
                 INSERT INTO products
-                (name, shop, category, price, stock, condition, price_mode, description, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (name, shop, category, price, stock, condition, price_mode, description, image_url, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     data["name"],
@@ -204,6 +208,7 @@ class Handler(BaseHTTPRequestHandler):
                     data["condition"],
                     data["price_mode"],
                     data.get("description", ""),
+                    data.get("image_url", ""),
                     int(time.time()),
                 ),
             )
