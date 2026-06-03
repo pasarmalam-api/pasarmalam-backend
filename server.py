@@ -115,6 +115,8 @@ def row_to_dict(row):
 
 def read_json(handler):
     length = int(handler.headers.get("Content-Length", "0") or "0")
+    if length > 2_000_000:
+        raise ValueError("Request body too large")
     if length == 0:
         return {}
     raw = handler.rfile.read(length).decode("utf-8")
