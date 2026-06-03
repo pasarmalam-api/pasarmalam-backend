@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PasarMalam Buyer App</title>
+  <style>
+    :root{--brand:#0f9f8f;--purple:#6d5dfc;--pink:#e43f8f;--gold:#f6c85f;--ink:#202124;--muted:#687282;--line:#e6e9ef;--bg:#f5f7fb}
+    *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--ink)}button,input,select{font:inherit}button{cursor:pointer}
+    header{position:sticky;top:0;z-index:10;background:linear-gradient(180deg,var(--brand),var(--purple));color:#fff;box-shadow:0 6px 18px #0002}
+    .utility,.bar,main{max-width:1200px;margin:auto}.utility{display:flex;justify-content:space-between;gap:12px;padding:8px 16px 0;font-size:13px}.utility span{opacity:.95}
+    .bar{display:grid;grid-template-columns:210px minmax(220px,1fr) auto;gap:14px;align-items:center;padding:12px 16px 16px}.brand{display:flex;gap:10px;align-items:center}.logo{width:54px;height:54px;border-radius:13px;background:conic-gradient(from 160deg,var(--brand),var(--purple),var(--pink),var(--brand));display:grid;place-items:center;color:#fff;font-weight:900;font-size:22px;box-shadow:inset 0 0 0 3px #ffffffcc,0 6px 18px #0003}h1{font-size:25px;margin:0}.label,.version{font-size:12px;font-weight:900}.version{display:inline-block;margin-top:5px;border:1px solid #fff8;border-radius:999px;padding:3px 8px}
+    .search{display:flex;background:#fff;border-radius:7px;padding:4px;box-shadow:0 2px 10px #0001}.search input{flex:1;min-width:0;border:0;outline:0;padding:12px}.search button,.cart,.buy,.send,.pillbtn,.lang{border:0;border-radius:6px;background:var(--brand);color:#fff;font-weight:900;padding:0 16px}.cart,.lang{min-height:42px;background:#fff;color:var(--brand);border:1px solid #b8fff5}.quick{display:flex;gap:10px;flex-wrap:wrap;margin-top:7px;font-size:12px}.quick button{border:0;background:transparent;color:#fff;padding:0}
+    main{padding:14px 16px 30px}.hero{display:grid;grid-template-columns:1.7fr .9fr;gap:12px}.hero-main,.promo{border-radius:8px;overflow:hidden;color:#fff}.hero-main{min-height:300px;background:linear-gradient(90deg,#111d,#1117,#1111),url("pasar-malam-real.jpg") center/cover;display:flex;align-items:end;padding:30px}.hero h2{font-size:42px;max-width:760px;margin:0 0 8px}.hero p{max-width:720px;margin:0}.credit{display:block;margin-top:8px;font-size:11px;opacity:.82}.side{display:grid;gap:12px}.promo{padding:18px;display:flex;flex-direction:column;justify-content:center;background:linear-gradient(135deg,var(--brand),var(--purple))}.promo:nth-child(2){background:linear-gradient(135deg,var(--pink),#2563eb)}.promo b{font-size:23px}
+    .services{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:12px 0}.service{background:#fff;border:1px solid var(--line);border-radius:7px;min-height:68px;display:grid;place-items:center;text-align:center;font-size:13px;font-weight:900}
+    .section{background:#fff;border:1px solid var(--line);border-radius:8px;margin-top:12px}.head{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:13px 14px;border-bottom:1px solid var(--line)}.head h3{margin:0;color:var(--brand)}.head span{color:var(--muted);font-size:13px}
+    .cats{display:grid;grid-template-columns:repeat(9,1fr)}.cat{border:0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:#fff;min-height:88px;font-weight:900;display:grid;place-items:center;gap:5px}.cat.active{background:#effdfa;color:var(--brand)}.ico{width:38px;height:38px;border-radius:9px;background:linear-gradient(135deg,#e6fffb,#ecebff);display:grid;place-items:center;color:var(--brand)}
+    .flash,.voucher-row{display:flex;gap:10px;overflow:auto;padding:12px}.deal,.voucher{min-width:175px;border:1px solid #b8fff5;background:#f0fffc;border-radius:7px;padding:10px}.deal b,.voucher b{color:var(--brand)}.barline{height:8px;background:#d9d6ff;border-radius:99px;overflow:hidden}.barline span{display:block;width:70%;height:100%;background:var(--brand)}
+    .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:12px}.card{border:1px solid var(--line);border-radius:7px;overflow:hidden;background:#fff}.card:hover{border-color:#8de7db;box-shadow:0 8px 18px #0001}.photo{aspect-ratio:1/1;background:linear-gradient(135deg,var(--brand),var(--purple));display:grid;place-items:center;color:#fff;font-size:42px;font-weight:900;position:relative;overflow:hidden}.photo img{width:100%;height:100%;object-fit:cover;display:block}.card:nth-child(2n) .photo{background:linear-gradient(135deg,var(--pink),#2563eb)}.badge{position:absolute;top:8px;left:8px;background:var(--gold);color:#222;border-radius:4px;padding:5px 7px;font-size:12px;z-index:1}.body{padding:10px}.name{font-weight:800;min-height:40px}.shop{color:var(--muted);font-size:12px;margin:5px 0}.tag{display:inline-block;border:1px solid #b8fff5;background:#f0fffc;color:var(--brand);border-radius:4px;padding:4px 6px;font-size:12px;font-weight:900;margin:0 5px 6px 0}.used{background:#fff8db;color:#976400;border-color:#f4d58b}.nego{background:#eef2ff;color:#2563eb;border-color:#c7d2fe}.price{color:var(--brand);font-size:20px;font-weight:900;margin:7px 0 0}.sold{float:right;color:var(--muted);font-size:12px}.buy{width:100%;min-height:36px;margin-top:8px}
+    .rates,.chatgrid{display:grid;gap:10px;padding:12px}.rates{grid-template-columns:repeat(4,1fr)}.rate,.chat,.review,.paycard{border:1px solid var(--line);border-radius:7px;padding:12px;background:#fafafa}.rate strong{display:block;color:var(--brand);font-size:22px;margin-top:6px}.chatgrid{grid-template-columns:1fr 1fr}.msg{border:1px solid var(--line);border-radius:6px;background:#fff;padding:10px;margin-top:8px}.msg.me{background:#f0fffc;margin-left:30px}.msg b{color:var(--brand)}.msg span{display:block;color:var(--muted);margin-top:4px}.chatinput{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}.chatinput input{border:1px solid var(--line);border-radius:6px;padding:10px}.stars{color:var(--gold);font-weight:900}.score{font-size:34px;color:var(--brand);font-weight:900}.paygrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px}
+    @media(max-width:950px){.bar,.hero{grid-template-columns:1fr}.services,.cats,.grid,.rates,.paygrid,.chatgrid{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){.services,.cats,.grid,.rates,.paygrid,.chatgrid{grid-template-columns:1fr}.hero h2{font-size:30px}.utility{flex-direction:column}.bar{gap:8px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="utility"><span>Seller Centre | Download App | Follow PasarMalam</span><span>Notifications | Help | Login</span></div>
+    <div class="bar">
+      <div class="brand"><div class="logo">PM</div><div><h1>PasarMalam</h1><div class="label">Buyer App - Customer Marketplace</div><div class="version">UPLOAD CHECK: PM-JUN3-LATEST</div></div></div>
+      <div><div class="search"><input id="search" placeholder="Search phones, chargers, electronics, car parts, shoes, clothes"><button>Search</button></div><div class="quick"><button>phones</button><button>chargers</button><button>car parts</button><button>shoes</button><button>used item</button></div></div>
+      <div style="display:flex;gap:8px;align-items:center"><button class="lang" id="langToggle">English</button><button class="cart">Cart 0</button></div>
+    </div>
+  </header>
+  <main>
+    <section class="hero"><div class="hero-main"><div><h2>PasarMalam marketplace for buyers</h2><p>Marketplace-style shopping with categories, flash deals, vouchers, logistics, reviews and buyer-seller messages.</p><span class="credit">Photo: naim fadil / Wikimedia Commons, CC BY-SA 2.0</span></div></div><div class="side"><div class="promo"><b>Flash Sale Tonight</b><span>Limited deals from nearby sellers</span></div><div class="promo"><b>Free Pickup + Rider Rate</b><span>Compare delivery before checkout</span></div></div></section>
+    <section class="services"><div class="service">Buyer Protection</div><div class="service">Payment Gateway</div><div class="service">Live Chat</div><div class="service">Voucher</div><div class="service">Location API</div><div class="service">Coins</div></section>
+    <section class="section"><div class="head"><h3>Categories</h3><span>Shop by type</span></div><div class="cats" id="cats"></div></section>
+    <section class="section"><div class="head"><h3>Flash Sale</h3><span>Ends in 02:14:09</span></div><div class="flash"><div class="deal"><b>RM29.90</b><p>USB-C charger</p><div class="barline"><span></span></div></div><div class="deal"><b>RM18.00</b><p>Car holder</p><div class="barline"><span></span></div></div><div class="deal"><b>RM55.00</b><p>Used shoes</p><div class="barline"><span></span></div></div><div class="deal"><b>RM38.00</b><p>Baju kurung</p><div class="barline"><span></span></div></div></div></section>
+    <section class="section"><div class="head"><h3>Vouchers</h3><span>Commercial marketplace basics</span></div><div class="voucher-row"><div class="voucher"><b>RM5 off</b><p>Orders above RM50</p></div><div class="voucher"><b>Free pickup</b><p>Nearby sellers</p></div><div class="voucher"><b>Coins reward</b><p>Earn after checkout</p></div></div></section>
+    <section class="section"><div class="head"><h3>Daily Discover</h3><span>New and used items</span></div><div class="grid" id="products"></div></section>
+    <section class="section"><div class="head"><h3>Logistics & Tracking</h3><span>Compare before checkout</span></div><div class="rates"><div class="rate"><b>Stall Pickup</b><span>Collect at seller point</span><strong>RM0.00</strong></div><div class="rate"><b>Standard Rider</b><span>0-6km small parcel</span><strong>RM4.90</strong></div><div class="rate"><b>Express Rider</b><span>Priority same-night</span><strong>RM8.90</strong></div><div class="rate"><b>Bulky Item</b><span>Car parts and heavy goods</span><strong>RM12.90+</strong></div></div></section>
+    <section class="section"><div class="head"><h3>Payment Options</h3><span>Demo checkout methods</span></div><div class="paygrid"><div class="paycard"><b>E-Wallet</b><p>Touch style wallet flow</p></div><div class="paycard"><b>Online Banking</b><p>FPX style transfer</p></div><div class="paycard"><b>Card</b><p>Visa/Mastercard layout</p></div><div class="paycard"><b>Cash Pickup</b><p>Pay at stall</p></div></div></section>
+    <section class="section"><div class="head"><h3>Buyer-Seller Chat & Reviews</h3><span>Demo messages saved in browser</span></div><div class="chatgrid"><div class="chat"><h3>Seller Chat</h3><div id="chatList"></div><div class="chatinput"><input id="chatText" placeholder="Ask seller about price, stock, warranty..."><button class="send" id="sendChat">Send</button></div></div><div class="review"><h3>Customer Reviews</h3><div class="score">4.8</div><div class="stars">★★★★★</div><div class="msg"><b>Fast reply and easy pickup</b><span>Seller answered nego question quickly.</span></div><div class="msg"><b>Delivery fee was clear</b><span>I compared pickup and rider price before paying.</span></div></div></div></section>
+  </main>
+  <script>
+    const categories=["All","Phones","Chargers","Electronics","Car Parts","Shoes","Clothes","Food","Drinks"];
+    const products=[["Used iPhone 12 128GB","Mobile Malam","Phones",899,"Used","Nego","P","Verified"],["USB-C fast charger 30W","Gerai Gadget","Chargers",29.9,"New","Nego","C","Hot"],["Bluetooth speaker mini","Tech Lane","Electronics",45,"New","Fixed","E","Deal"],["Used Myvi headlamp","Auto Parts Corner","Car Parts",120,"Used","Nego","R","Used"],["Car phone holder","Auto Parts Corner","Car Parts",18,"New","Fixed","H","COD"],["Running shoes size 42","Lorong Bundle","Shoes",55,"Used","Nego","S","Bundle"],["Cotton baju kurung set","Cantik Craft","Clothes",38,"New","Fixed","T","Local"],["Satay ayam set","Abang Din Satay","Food",12.9,"New","Fixed","F","Fresh"],["Air balang mango float","Balang Boss","Drinks",6.5,"New","Fixed","D","Tonight"]];
+    let currentLang=localStorage.getItem("pasarmalam-lang")||"ms";const ms={"Seller Centre | Download App | Follow PasarMalam":"Pusat Penjual | Muat Turun Aplikasi | Ikuti PasarMalam","Notifications | Help | Login":"Notifikasi | Bantuan | Log Masuk","Buyer App - Customer Marketplace":"Aplikasi Pembeli - Pasaran Pelanggan","Search":"Cari","Cart 0":"Troli 0","PasarMalam marketplace for buyers":"PasarMalam untuk pembeli","Marketplace-style shopping with categories, flash deals, vouchers, logistics, reviews and buyer-seller messages.":"Beli-belah gaya pasaran dengan kategori, jualan pantas, baucar, logistik, ulasan dan mesej pembeli-penjual.","Flash Sale Tonight":"Jualan Pantas Malam Ini","Limited deals from nearby sellers":"Tawaran terhad daripada penjual berdekatan","Free Pickup + Rider Rate":"Ambil Sendiri Percuma + Kadar Rider","Compare delivery before checkout":"Bandingkan penghantaran sebelum bayar","Buyer Protection":"Perlindungan Pembeli","Payment Gateway":"Gerbang Pembayaran","Live Chat":"Sembang Langsung","Voucher":"Baucar","Location API":"API Lokasi","Coins":"Syiling","Categories":"Kategori","Shop by type":"Beli mengikut jenis","Flash Sale":"Jualan Pantas","Ends in 02:14:09":"Tamat dalam 02:14:09","Vouchers":"Baucar","Commercial marketplace basics":"Ciri asas pasaran komersial","Orders above RM50":"Pesanan melebihi RM50","Free pickup":"Ambil sendiri percuma","Nearby sellers":"Penjual berdekatan","Coins reward":"Ganjaran syiling","Earn after checkout":"Dapat selepas pembayaran","Daily Discover":"Penemuan Harian","New and used items":"Barang baharu dan terpakai","Logistics & Tracking":"Logistik & Penjejakan","Stall Pickup":"Ambil Di Gerai","Collect at seller point":"Ambil di lokasi penjual","Standard Rider":"Rider Standard","0-6km small parcel":"0-6km bungkusan kecil","Express Rider":"Rider Ekspres","Priority same-night":"Keutamaan malam yang sama","Bulky Item":"Barang Besar","Car parts and heavy goods":"Alat ganti kereta dan barang berat","Payment Options":"Pilihan Pembayaran","Demo checkout methods":"Kaedah pembayaran demo","E-Wallet":"E-Dompet","Touch style wallet flow":"Aliran dompet digital","Online Banking":"Perbankan Dalam Talian","FPX style transfer":"Pemindahan gaya FPX","Card":"Kad","Visa/Mastercard layout":"Paparan Visa/Mastercard","Cash Pickup":"Bayar Semasa Ambil","Pay at stall":"Bayar di gerai","Buyer-Seller Chat & Reviews":"Sembang Pembeli-Penjual & Ulasan","Demo messages saved in browser":"Mesej demo disimpan dalam pelayar","Seller Chat":"Sembang Penjual","Ask seller about price, stock, warranty...":"Tanya penjual tentang harga, stok, waranti...","Send":"Hantar","Customer Reviews":"Ulasan Pelanggan","Fast reply and easy pickup":"Balasan pantas dan mudah ambil barang","Seller answered nego question quickly.":"Penjual menjawab soalan nego dengan cepat.","Delivery fee was clear":"Caj penghantaran jelas","I compared pickup and rider price before paying.":"Saya bandingkan ambil sendiri dan harga rider sebelum bayar.","Price can be nego":"Harga boleh nego","Fixed price":"Harga tetap","Add to cart":"Tambah ke troli","sold":"terjual","New":"Baharu","Used":"Terpakai","Nego":"Nego","Fixed":"Tetap","All":"Semua","Phones":"Telefon","Chargers":"Pengecas","Electronics":"Elektronik","Car Parts":"Alat Ganti Kereta","Shoes":"Kasut","Clothes":"Pakaian","Food":"Makanan","Drinks":"Minuman"};function captureLanguage(){document.querySelectorAll("body *").forEach(n=>{if(n.children.length===0&&!n.dataset.en)n.dataset.en=n.textContent.trim()});document.querySelectorAll("input,textarea").forEach(n=>{if(!n.dataset.enPlaceholder)n.dataset.enPlaceholder=n.placeholder})}function applyLanguage(lang){currentLang=lang;localStorage.setItem("pasarmalam-lang",lang);captureLanguage();document.documentElement.lang=lang;document.querySelectorAll("body *").forEach(n=>{if(n.children.length===0&&n.dataset.en)n.textContent=lang==="ms"?(ms[n.dataset.en]||n.dataset.en):n.dataset.en});document.querySelectorAll("input,textarea").forEach(n=>{if(n.dataset.enPlaceholder)n.placeholder=lang==="ms"?(ms[n.dataset.enPlaceholder]||n.dataset.enPlaceholder):n.dataset.enPlaceholder});langToggle.textContent=lang==="ms"?"English":"Malay"}langToggle.onclick=()=>applyLanguage(currentLang==="ms"?"en":"ms");
+    let active="All";const money=v=>`RM${Number(v).toFixed(2)}`;function drawCats(){cats.innerHTML=categories.map(c=>`<button class="cat ${c===active?"active":""}" onclick="active='${c}';drawCats();drawProducts()"><span class="ico">${c[0]}</span>${c}</button>`).join("");applyLanguage(currentLang)}function drawProducts(){const q=search.value.toLowerCase();const list=products.filter(p=>(active==="All"||p[2]===active)&&p.join(" ").toLowerCase().includes(q));productsEl.innerHTML=list.map(p=>`<article class="card"><div class="photo"><span class="badge">${p[7]}</span>${p[6]}</div><div class="body"><div class="name">${p[0]}</div><div class="shop">${p[1]} | ${p[2]}</div><span class="tag ${p[4]==="Used"?"used":""}">${p[4]}</span><span class="tag ${p[5]==="Nego"?"nego":""}">${p[5]==="Nego"?"Price can be nego":"Fixed price"}</span><p class="price">${money(p[3])}<span class="sold">sold</span></p><button class="buy">Add to cart</button></div></article>`).join("");applyLanguage(currentLang)}
+    const productsEl=document.getElementById("products");const chatKey="pasarmalam-buyer-seller-chat";const starters=[{from:"seller",name:"Auto Parts Corner",text:"Yes, price can be nego. Pickup tonight after 8 PM."},{from:"seller",name:"Gerai Gadget",text:"USB-C charger has 7-day shop warranty."}];function getMessages(){return JSON.parse(localStorage.getItem(chatKey)||"null")||starters}function saveMessages(m){localStorage.setItem(chatKey,JSON.stringify(m))}function renderChat(){chatList.innerHTML=getMessages().map(m=>`<div class="msg ${m.from==="buyer"?"me":""}"><b>${m.from==="buyer"?"You":m.name}</b><span>${m.text}</span></div>`).join("");applyLanguage(currentLang)}sendChat.onclick=()=>{const text=chatText.value.trim();if(!text)return;const m=getMessages();m.push({from:"buyer",name:"Buyer",text});saveMessages(m);chatText.value="";renderChat();alert(currentLang==="ms"?"Mesej dihantar kepada penjual":"Message sent to seller")};search.oninput=drawProducts;window.addEventListener("storage",e=>{if(e.key===chatKey)renderChat()});drawCats();drawProducts();renderChat();applyLanguage(currentLang);
+  </script>
+  <script>
+    const API_BASE = "https://pasarmalam-backend.onrender.com";
+    let apiProducts = null;
+
+    function apiProductToCard(product) {
+      const mark = (product.category || "P")[0].toUpperCase();
+      const priceMode = product.price_mode === "Negotiable" ? "Price can be nego" : "Fixed price";
+      const image = product.image_url ? `<img src="${product.image_url}" alt="${product.name}">` : mark;
+      return `<article class="card">
+        <div class="photo"><span class="badge">${product.condition}</span>${image}</div>
+        <div class="body">
+          <div class="name">${product.name}</div>
+          <div class="shop">${product.shop} | ${product.category}</div>
+          <span class="tag ${product.condition === "Used" ? "used" : ""}">${product.condition}</span>
+          <span class="tag ${product.price_mode === "Negotiable" ? "nego" : ""}">${priceMode}</span>
+          <p class="price">${money(product.price)}<span class="sold">sold</span></p>
+          <button class="buy">Add to cart</button>
+        </div>
+      </article>`;
+    }
+
+    async function loadApiProducts() {
+      try {
+        const response = await fetch(`${API_BASE}/api/products`);
+        if (!response.ok) throw new Error("Products API failed");
+        const data = await response.json();
+        apiProducts = data.products;
+        renderApiProducts();
+      } catch (error) {
+        apiProducts = null;
+      }
+    }
+
+    function renderApiProducts() {
+      if (!apiProducts) return;
+      const query = search.value.toLowerCase();
+      const list = apiProducts.filter(product => {
+        const categoryMatch = active === "All" || product.category === active;
+        const searchMatch = `${product.name} ${product.shop} ${product.category}`.toLowerCase().includes(query);
+        return categoryMatch && searchMatch;
+      });
+      productsEl.innerHTML = list.map(apiProductToCard).join("");
+      applyLanguage(currentLang);
+    }
+
+    const staticDrawProducts = drawProducts;
+    drawProducts = function () {
+      if (apiProducts) renderApiProducts();
+      else staticDrawProducts();
+    };
+    search.oninput = drawProducts;
+
+    async function renderApiChat() {
+      try {
+        const response = await fetch(`${API_BASE}/api/messages`);
+        if (!response.ok) throw new Error("Messages API failed");
+        const data = await response.json();
+        if (!data.messages.length) return renderChat();
+        chatList.innerHTML = data.messages.map(message => `<div class="msg ${message.sender_role === "buyer" ? "me" : ""}">
+          <b>${message.sender_role === "buyer" ? "You" : message.seller_name}</b>
+          <span>${message.body}</span>
+        </div>`).join("");
+        applyLanguage(currentLang);
+      } catch (error) {
+        renderChat();
+      }
+    }
+
+    sendChat.onclick = async () => {
+      const text = chatText.value.trim();
+      if (!text) return;
+      try {
+        await fetch(`${API_BASE}/api/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ product_id: 1, buyer_name: "Buyer", seller_name: "PasarMalam Seller", sender_role: "buyer", body: text })
+        });
+        chatText.value = "";
+        await renderApiChat();
+      } catch (error) {
+        const m = getMessages();
+        m.push({ from: "buyer", name: "Buyer", text });
+        saveMessages(m);
+        chatText.value = "";
+        renderChat();
+      }
+      alert(currentLang === "ms" ? "Mesej dihantar kepada penjual" : "Message sent to seller");
+    };
+
+    loadApiProducts();
+    renderApiChat();
+  </script>
+</body>
+</html>
