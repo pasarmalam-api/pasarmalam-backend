@@ -152,6 +152,8 @@ def init_db():
             """
         )
         migrate_products(con)
+        migrate_orders(con)
+        migrate_reviews(con)
         seed(con)
 
 
@@ -171,6 +173,28 @@ def migrate_products(con):
     for name, sql in additions.items():
         if name not in columns:
             con.execute(f"ALTER TABLE products ADD COLUMN {name} {sql}")
+
+
+def migrate_orders(con):
+    columns = {row["name"] for row in con.execute("PRAGMA table_info(orders)")}
+    additions = {
+        "buyer_id": "INTEGER DEFAULT 1",
+        "variant": "TEXT DEFAULT ''",
+        "address": "TEXT DEFAULT ''",
+        "payment_method": "TEXT DEFAULT 'E-Wallet'",
+        "escrow_status": "TEXT DEFAULT 'holding'",
+        "tracking_no": "TEXT DEFAULT ''",
+        "awb_label": "TEXT DEFAULT ''",
+    }
+    for name, sql in additions.items():
+        if name not in columns:
+            con.execute(f"ALTER TABLE orders ADD COLUMN {name} {sql}")
+
+
+def migrate_reviews(con):
+    columns = {row["name"] for row in con.execute("PRAGMA table_info(reviews)")}
+    if "seller_id" not in columns:
+        con.execute("ALTER TABLE reviews ADD COLUMN seller_id INTEGER DEFAULT 1")
 
 
 def seed(con):
