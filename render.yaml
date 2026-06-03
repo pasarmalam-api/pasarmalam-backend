@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: pasarmalam-api
+    env: python
+    plan: free
+    buildCommand: ""
+    startCommand: "python server.py"
+    autoDeploy: false

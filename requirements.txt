@@ -1,0 +1,2 @@
+# No external packages required.
+# The API uses Python standard library modules only.
