@@ -272,6 +272,22 @@ def init_db():
               note TEXT DEFAULT '',
               created_at INTEGER NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS admin_settings (
+              key TEXT PRIMARY KEY,
+              value TEXT NOT NULL,
+              updated_at INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS audit_logs (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              actor_id INTEGER DEFAULT 0,
+              action TEXT NOT NULL,
+              target_type TEXT DEFAULT '',
+              target_id INTEGER DEFAULT 0,
+              note TEXT DEFAULT '',
+              created_at INTEGER NOT NULL
+            );
             """
         )
         migrate_products(con)
@@ -282,6 +298,7 @@ def init_db():
         migrate_passwords(con)
         seed(con)
         ensure_admin(con)
+        ensure_admin_settings(con)
 
 
 def postgres_schema_statements():
@@ -420,6 +437,24 @@ def postgres_schema_statements():
           seller_id INTEGER DEFAULT 1,
           type TEXT NOT NULL,
           amount DOUBLE PRECISION NOT NULL,
+          note TEXT DEFAULT '',
+          created_at INTEGER NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS admin_settings (
+          key TEXT PRIMARY KEY,
+          value TEXT NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS audit_logs (
+          id SERIAL PRIMARY KEY,
+          actor_id INTEGER DEFAULT 0,
+          action TEXT NOT NULL,
+          target_type TEXT DEFAULT '',
+          target_id INTEGER DEFAULT 0,
           note TEXT DEFAULT '',
           created_at INTEGER NOT NULL
         )
@@ -569,6 +604,20 @@ def ensure_admin(con):
     )
 
 
+def ensure_admin_settings(con):
+    defaults = {
+        "commission_rate": "5",
+        "escrow_release": "completed",
+        "return_window_days": "7",
+        "free_shipping_budget": "500",
+        "late_shipment_threshold_days": "2",
+    }
+    for key, value in defaults.items():
+        row = con.execute("SELECT key FROM admin_settings WHERE key = ?", (key,)).fetchone()
+        if not row:
+            con.execute("INSERT INTO admin_settings (key, value, updated_at) VALUES (?, ?, ?)", (key, value, now()))
+
+
 def read_json(handler):
     length = int(handler.headers.get("Content-Length", "0") or "0")
     if length > 2_000_000:
@@ -637,6 +686,11 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/admin/orders": self.admin_orders,
                 "/api/admin/returns": self.admin_returns,
                 "/api/admin/metrics": self.admin_metrics,
+                "/api/admin/analytics": self.admin_analytics,
+                "/api/admin/tickets": self.admin_tickets,
+                "/api/admin/logistics": self.admin_logistics,
+                "/api/admin/settings": self.admin_settings,
+                "/api/admin/audit": self.admin_audit,
             }
             route = routes.get(parsed.path)
             if route:
@@ -698,6 +752,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.admin_update_product_status(data)
             elif parsed.path == "/api/admin/return-status":
                 self.admin_update_return_status(data)
+            elif parsed.path == "/api/admin/settings":
+                self.admin_update_settings(data)
             else:
                 send_json(self, 404, {"error": "Not found"})
         except PermissionError as exc:
@@ -1057,6 +1113,65 @@ class Handler(BaseHTTPRequestHandler):
             },
         )
 
+    def admin_analytics(self):
+        self.require_user("admin")
+        with connect() as con:
+            order_status = [row_to_dict(row) for row in con.execute("SELECT order_status, COUNT(*) AS count, COALESCE(SUM(total),0) AS sales FROM orders GROUP BY order_status ORDER BY count DESC")]
+            product_categories = [row_to_dict(row) for row in con.execute("SELECT category, COUNT(*) AS count, COALESCE(SUM(sold),0) AS sold FROM products GROUP BY category ORDER BY count DESC")]
+            seller_rank = [
+                row_to_dict(row)
+                for row in con.execute(
+                    """
+                    SELECT products.seller_id, products.shop, COUNT(orders.id) AS orders, COALESCE(SUM(orders.total),0) AS sales
+                    FROM products LEFT JOIN orders ON orders.product_id = products.id
+                    GROUP BY products.seller_id, products.shop
+                    ORDER BY sales DESC, orders DESC
+                    LIMIT 10
+                    """
+                )
+            ]
+            return_rate = con.execute("SELECT COUNT(*) AS returns FROM returns").fetchone()
+            orders = con.execute("SELECT COUNT(*) AS orders FROM orders").fetchone()
+        send_json(self, 200, {"order_status": order_status, "product_categories": product_categories, "seller_rank": seller_rank, "return_rate": round((return_rate["returns"] / max(orders["orders"], 1)) * 100, 1)})
+
+    def admin_tickets(self):
+        self.require_user("admin")
+        with connect() as con:
+            messages = [row_to_dict(row) for row in con.execute("SELECT * FROM messages ORDER BY created_at DESC, id DESC LIMIT 100")]
+            returns = [row_to_dict(row) for row in con.execute("SELECT * FROM returns WHERE dispute_status != 'closed' ORDER BY created_at DESC, id DESC LIMIT 100")]
+        send_json(self, 200, {"messages": messages, "open_disputes": returns})
+
+    def admin_logistics(self):
+        self.require_user("admin")
+        rates = [
+            {"method": "In-Store Pickup", "fee": 0, "eta": "Tonight", "tracking": False, "enabled": True},
+            {"method": "Standard Rider", "fee": 4.9, "eta": "1-2 days", "tracking": True, "enabled": True},
+            {"method": "Express Rider", "fee": 8.9, "eta": "Same night", "tracking": True, "enabled": True},
+            {"method": "Bulky Item", "fee": 12.9, "eta": "2-4 days", "tracking": True, "enabled": True},
+            {"method": "Seller Own Fleet", "fee": 6.9, "eta": "Seller arranged", "tracking": False, "enabled": True},
+        ]
+        send_json(self, 200, {"rates": rates, "awb_prefix": "PM-AWB", "mass_shipping": True, "return_shipping_review": True})
+
+    def admin_settings(self):
+        self.require_user("admin")
+        with connect() as con:
+            rows = [row_to_dict(row) for row in con.execute("SELECT * FROM admin_settings ORDER BY key")]
+        send_json(self, 200, {"settings": rows})
+
+    def admin_audit(self):
+        self.require_user("admin")
+        with connect() as con:
+            rows = [row_to_dict(row) for row in con.execute("SELECT * FROM audit_logs ORDER BY created_at DESC, id DESC LIMIT 200")]
+        send_json(self, 200, {"audit": rows})
+
+    def audit(self, action, target_type="", target_id=0, note=""):
+        user = self.current_user() or {"id": 0}
+        with connect() as con:
+            con.execute(
+                "INSERT INTO audit_logs (actor_id, action, target_type, target_id, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (int(user.get("id", 0)), action, target_type, int(target_id or 0), note, now()),
+            )
+
     def admin_update_user_status(self, data):
         self.require_user("admin")
         with connect() as con:
@@ -1064,12 +1179,14 @@ class Handler(BaseHTTPRequestHandler):
                 "UPDATE users SET status = ?, seller_status = ? WHERE id = ?",
                 (data.get("status", "active"), data.get("seller_status", "pending"), int(data["user_id"])),
             )
+        self.audit("user_status_update", "user", data["user_id"], f"{data.get('status')} / {data.get('seller_status')}")
         send_json(self, 200, {"ok": True})
 
     def admin_update_product_status(self, data):
         self.require_user("admin")
         with connect() as con:
             con.execute("UPDATE products SET moderation_status = ? WHERE id = ?", (data.get("moderation_status", "approved"), int(data["product_id"])))
+        self.audit("product_moderation_update", "product", data["product_id"], data.get("moderation_status", "approved"))
         send_json(self, 200, {"ok": True})
 
     def admin_update_return_status(self, data):
@@ -1079,6 +1196,20 @@ class Handler(BaseHTTPRequestHandler):
                 "UPDATE returns SET status = ?, dispute_status = ?, seller_response = ? WHERE id = ?",
                 (data.get("status", "requested"), data.get("dispute_status", "open"), data.get("seller_response", ""), int(data["return_id"])),
             )
+        self.audit("return_dispute_update", "return", data["return_id"], f"{data.get('status')} / {data.get('dispute_status')}")
+        send_json(self, 200, {"ok": True})
+
+    def admin_update_settings(self, data):
+        self.require_user("admin")
+        updates = data.get("settings", {})
+        with connect() as con:
+            for key, value in updates.items():
+                row = con.execute("SELECT key FROM admin_settings WHERE key = ?", (key,)).fetchone()
+                if row:
+                    con.execute("UPDATE admin_settings SET value = ?, updated_at = ? WHERE key = ?", (str(value), now(), key))
+                else:
+                    con.execute("INSERT INTO admin_settings (key, value, updated_at) VALUES (?, ?, ?)", (key, str(value), now()))
+        self.audit("settings_update", "settings", 0, ", ".join(sorted(updates.keys())))
         send_json(self, 200, {"ok": True})
 
 
