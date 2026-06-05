@@ -6,16 +6,86 @@ import sqlite3
 import time
 
 DB_PATH = os.environ.get("PASARMALAM_DB", "pasarmalam.sqlite3")
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+USE_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
 PORT = int(os.environ.get("PORT", "8080"))
 
 
+if USE_POSTGRES:
+    import psycopg
+    from psycopg.rows import dict_row
+
+
+class CursorProxy:
+    def __init__(self, cursor, lastrowid=None):
+        self.cursor = cursor
+        self.lastrowid = lastrowid
+
+    def fetchone(self):
+        return self.cursor.fetchone()
+
+    def fetchall(self):
+        return self.cursor.fetchall()
+
+    def __iter__(self):
+        return iter(self.cursor)
+
+
+class DbConnection:
+    def __init__(self, con):
+        self.con = con
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc_type:
+            self.con.rollback()
+        else:
+            self.con.commit()
+        self.con.close()
+
+    def execute(self, sql, params=None):
+        params = params or []
+        if USE_POSTGRES:
+            sql = sql.replace("?", "%s")
+            should_return_id = sql.lstrip().upper().startswith("INSERT ") and " RETURNING " not in sql.upper()
+            if should_return_id:
+                sql = sql.rstrip().rstrip(";") + " RETURNING id"
+            cur = self.con.execute(sql, params)
+            lastrowid = None
+            if should_return_id:
+                row = cur.fetchone()
+                lastrowid = row["id"] if isinstance(row, dict) else row[0]
+            return CursorProxy(cur, lastrowid)
+        return self.con.execute(sql, params)
+
+    def executemany(self, sql, rows):
+        if USE_POSTGRES:
+            sql = sql.replace("?", "%s")
+            with self.con.cursor() as cur:
+                return cur.executemany(sql, rows)
+        return self.con.executemany(sql, rows)
+
+    def executescript(self, script):
+        if USE_POSTGRES:
+            for statement in postgres_schema_statements():
+                self.execute(statement)
+            return None
+        return self.con.executescript(script)
+
+
 def connect():
+    if USE_POSTGRES:
+        return DbConnection(psycopg.connect(DATABASE_URL, row_factory=dict_row))
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
-    return con
+    return DbConnection(con)
 
 
 def row_to_dict(row):
+    if isinstance(row, dict):
+        return dict(row)
     return {key: row[key] for key in row.keys()}
 
 
@@ -157,8 +227,160 @@ def init_db():
         seed(con)
 
 
+def postgres_schema_statements():
+    return [
+        """
+        CREATE TABLE IF NOT EXISTS users (
+          id SERIAL PRIMARY KEY,
+          role TEXT NOT NULL CHECK(role IN ('buyer','seller','admin')),
+          name TEXT NOT NULL,
+          phone TEXT DEFAULT '',
+          email TEXT UNIQUE NOT NULL,
+          password TEXT NOT NULL,
+          address TEXT DEFAULT '',
+          shop_name TEXT DEFAULT '',
+          created_at INTEGER NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS products (
+          id SERIAL PRIMARY KEY,
+          seller_id INTEGER DEFAULT 1,
+          name TEXT NOT NULL,
+          shop TEXT NOT NULL,
+          category TEXT NOT NULL,
+          price DOUBLE PRECISION NOT NULL,
+          stock INTEGER NOT NULL DEFAULT 0,
+          condition TEXT NOT NULL CHECK(condition IN ('New','Used')),
+          price_mode TEXT NOT NULL CHECK(price_mode IN ('Fixed','Negotiable')),
+          description TEXT DEFAULT '',
+          warranty TEXT DEFAULT '',
+          variants TEXT DEFAULT '[]',
+          images TEXT DEFAULT '[]',
+          image_url TEXT DEFAULT '',
+          rating DOUBLE PRECISION DEFAULT 4.8,
+          sold INTEGER DEFAULT 0,
+          shipping_type TEXT DEFAULT 'Standard Rider',
+          weight_kg DOUBLE PRECISION DEFAULT 0.5,
+          created_at INTEGER NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS cart_items (
+          id SERIAL PRIMARY KEY,
+          buyer_id INTEGER NOT NULL DEFAULT 1,
+          product_id INTEGER NOT NULL,
+          quantity INTEGER NOT NULL DEFAULT 1,
+          variant TEXT DEFAULT '',
+          created_at INTEGER NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS wishlist (
+          id SERIAL PRIMARY KEY,
+          buyer_id INTEGER NOT NULL DEFAULT 1,
+          product_id INTEGER NOT NULL,
+          created_at INTEGER NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS messages (
+          id SERIAL PRIMARY KEY,
+          product_id INTEGER,
+          buyer_name TEXT NOT NULL,
+          seller_name TEXT NOT NULL,
+          sender_role TEXT NOT NULL CHECK(sender_role IN ('buyer','seller')),
+          body TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS reviews (
+          id SERIAL PRIMARY KEY,
+          product_id INTEGER,
+          seller_id INTEGER DEFAULT 1,
+          buyer_name TEXT NOT NULL,
+          rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
+          title TEXT NOT NULL,
+          body TEXT NOT NULL,
+          seller_reply TEXT DEFAULT '',
+          created_at INTEGER NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS orders (
+          id SERIAL PRIMARY KEY,
+          buyer_id INTEGER DEFAULT 1,
+          buyer_name TEXT NOT NULL,
+          product_id INTEGER NOT NULL,
+          quantity INTEGER NOT NULL DEFAULT 1,
+          variant TEXT DEFAULT '',
+          address TEXT DEFAULT '',
+          total DOUBLE PRECISION NOT NULL,
+          logistics_method TEXT NOT NULL,
+          logistics_fee DOUBLE PRECISION NOT NULL,
+          payment_method TEXT DEFAULT 'E-Wallet',
+          payment_status TEXT NOT NULL DEFAULT 'unpaid',
+          order_status TEXT NOT NULL DEFAULT 'placed',
+          escrow_status TEXT NOT NULL DEFAULT 'holding',
+          tracking_no TEXT DEFAULT '',
+          awb_label TEXT DEFAULT '',
+          created_at INTEGER NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS returns (
+          id SERIAL PRIMARY KEY,
+          order_id INTEGER NOT NULL,
+          buyer_name TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          request_type TEXT NOT NULL DEFAULT 'Return/Refund',
+          status TEXT NOT NULL DEFAULT 'requested',
+          evidence_url TEXT DEFAULT '',
+          seller_response TEXT DEFAULT '',
+          created_at INTEGER NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS campaigns (
+          id SERIAL PRIMARY KEY,
+          seller_id INTEGER DEFAULT 1,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL,
+          value TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'active',
+          created_at INTEGER NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS wallet (
+          id SERIAL PRIMARY KEY,
+          seller_id INTEGER DEFAULT 1,
+          type TEXT NOT NULL,
+          amount DOUBLE PRECISION NOT NULL,
+          note TEXT DEFAULT '',
+          created_at INTEGER NOT NULL
+        )
+        """,
+    ]
+
+
+def table_columns(con, table):
+    if USE_POSTGRES:
+        rows = con.execute(
+            """
+            SELECT column_name AS name
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = ?
+            """,
+            (table,),
+        )
+        return {row["name"] for row in rows}
+    return {row["name"] for row in con.execute(f"PRAGMA table_info({table})")}
+
+
 def migrate_products(con):
-    columns = {row["name"] for row in con.execute("PRAGMA table_info(products)")}
+    columns = table_columns(con, "products")
     additions = {
         "seller_id": "INTEGER DEFAULT 1",
         "warranty": "TEXT DEFAULT ''",
@@ -176,7 +398,7 @@ def migrate_products(con):
 
 
 def migrate_orders(con):
-    columns = {row["name"] for row in con.execute("PRAGMA table_info(orders)")}
+    columns = table_columns(con, "orders")
     additions = {
         "buyer_id": "INTEGER DEFAULT 1",
         "variant": "TEXT DEFAULT ''",
@@ -192,7 +414,7 @@ def migrate_orders(con):
 
 
 def migrate_reviews(con):
-    columns = {row["name"] for row in con.execute("PRAGMA table_info(reviews)")}
+    columns = table_columns(con, "reviews")
     if "seller_id" not in columns:
         con.execute("ALTER TABLE reviews ADD COLUMN seller_id INTEGER DEFAULT 1")
 
@@ -484,7 +706,10 @@ class Handler(BaseHTTPRequestHandler):
                 """,
                 (int(data.get("buyer_id", 1)), data.get("buyer_name", "Buyer"), product["id"], qty, data.get("variant", ""), data.get("address", ""), total, data.get("logistics_method", product["shipping_type"]), fee, data.get("payment_method", "E-Wallet"), tracking, awb, now()),
             )
-            con.execute("UPDATE products SET stock = MAX(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, product["id"]))
+            if USE_POSTGRES:
+                con.execute("UPDATE products SET stock = GREATEST(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, product["id"]))
+            else:
+                con.execute("UPDATE products SET stock = MAX(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, product["id"]))
         send_json(self, 201, {"id": cur.lastrowid, "total": total, "tracking_no": tracking, "escrow_status": "holding"})
 
     def update_order_status(self, data):
