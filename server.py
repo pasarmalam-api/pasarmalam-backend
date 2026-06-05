@@ -1,7 +1,11 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
+import base64
+import hashlib
+import hmac
 import json
 import os
+import secrets
 import sqlite3
 import time
 from decimal import Decimal
@@ -10,6 +14,7 @@ DB_PATH = os.environ.get("PASARMALAM_DB", "pasarmalam.sqlite3")
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 USE_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
 PORT = int(os.environ.get("PORT", "8080"))
+AUTH_SECRET = os.environ.get("AUTH_SECRET", "pasarmalam-dev-secret-change-me")
 
 
 if USE_POSTGRES:
@@ -98,6 +103,42 @@ def as_float(value):
     if isinstance(value, Decimal):
         return float(value)
     return float(value or 0)
+
+
+def hash_password(password, salt=None):
+    salt = salt or secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 120_000)
+    return f"pbkdf2_sha256${salt}${base64.urlsafe_b64encode(digest).decode('ascii')}"
+
+
+def verify_password(password, stored):
+    if not stored:
+        return False
+    if not stored.startswith("pbkdf2_sha256$"):
+        return hmac.compare_digest(password, stored)
+    _, salt, digest = stored.split("$", 2)
+    expected = hash_password(password, salt)
+    return hmac.compare_digest(expected, stored)
+
+
+def make_token(user):
+    payload = {"id": user["id"], "role": user["role"], "name": user["name"], "shop_name": user.get("shop_name", ""), "exp": now() + 60 * 60 * 24 * 30}
+    body = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode("utf-8")).decode("ascii")
+    sig = hmac.new(AUTH_SECRET.encode("utf-8"), body.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{body}.{sig}"
+
+
+def parse_token(token):
+    if not token or "." not in token:
+        return None
+    body, sig = token.rsplit(".", 1)
+    expected = hmac.new(AUTH_SECRET.encode("utf-8"), body.encode("utf-8"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, sig):
+        return None
+    payload = json.loads(base64.urlsafe_b64decode(body.encode("ascii")).decode("utf-8"))
+    if payload.get("exp", 0) < now():
+        return None
+    return payload
 
 
 def init_db():
@@ -198,6 +239,7 @@ def init_db():
 
             CREATE TABLE IF NOT EXISTS returns (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
+              buyer_id INTEGER DEFAULT 1,
               order_id INTEGER NOT NULL,
               buyer_name TEXT NOT NULL,
               reason TEXT NOT NULL,
@@ -231,6 +273,8 @@ def init_db():
         migrate_products(con)
         migrate_orders(con)
         migrate_reviews(con)
+        migrate_returns(con)
+        migrate_passwords(con)
         seed(con)
 
 
@@ -338,6 +382,7 @@ def postgres_schema_statements():
         """
         CREATE TABLE IF NOT EXISTS returns (
           id SERIAL PRIMARY KEY,
+          buyer_id INTEGER DEFAULT 1,
           order_id INTEGER NOT NULL,
           buyer_name TEXT NOT NULL,
           reason TEXT NOT NULL,
@@ -426,6 +471,20 @@ def migrate_reviews(con):
         con.execute("ALTER TABLE reviews ADD COLUMN seller_id INTEGER DEFAULT 1")
 
 
+def migrate_returns(con):
+    columns = table_columns(con, "returns")
+    if "buyer_id" not in columns:
+        con.execute("ALTER TABLE returns ADD COLUMN buyer_id INTEGER DEFAULT 1")
+
+
+def migrate_passwords(con):
+    rows = con.execute("SELECT id, password FROM users")
+    for row in rows:
+        password = row["password"]
+        if password and not password.startswith("pbkdf2_sha256$"):
+            con.execute("UPDATE users SET password = ? WHERE id = ?", (hash_password(password), row["id"]))
+
+
 def seed(con):
     if con.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"] == 0:
         con.executemany(
@@ -434,8 +493,8 @@ def seed(con):
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
-                ("buyer", "Aina Buyer", "0123456789", "buyer@pasarmalam.my", "demo123", "Kuala Lumpur", "", now()),
-                ("seller", "PM Seller", "01122223333", "seller@pasarmalam.my", "demo123", "Petaling Jaya", "PasarMalam Seller", now()),
+                ("buyer", "Aina Buyer", "0123456789", "buyer@pasarmalam.my", hash_password("demo123"), "Kuala Lumpur", "", now()),
+                ("seller", "PM Seller", "01122223333", "seller@pasarmalam.my", hash_password("demo123"), "Petaling Jaya", "PasarMalam Seller", now()),
             ],
         )
     if con.execute("SELECT COUNT(*) AS c FROM products").fetchone()["c"] == 0:
@@ -489,7 +548,7 @@ def send_json(handler, status, payload):
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Access-Control-Allow-Origin", "*")
     handler.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-    handler.send_header("Access-Control-Allow-Headers", "Content-Type")
+    handler.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-PM-Token")
     handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
     if status != 204:
@@ -497,6 +556,21 @@ def send_json(handler, status, payload):
 
 
 class Handler(BaseHTTPRequestHandler):
+    def current_user(self):
+        auth = self.headers.get("Authorization", "")
+        token = self.headers.get("X-PM-Token", "")
+        if auth.lower().startswith("bearer "):
+            token = auth.split(" ", 1)[1].strip()
+        return parse_token(token)
+
+    def require_user(self, role=None):
+        user = self.current_user()
+        if not user:
+            raise PermissionError("Login required")
+        if role and user["role"] != role:
+            raise PermissionError(f"{role} access required")
+        return user
+
     def do_HEAD(self):
         self.send_response(200)
         self.end_headers()
@@ -513,10 +587,10 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/products": lambda: self.get_products(query),
                 "/api/messages": lambda: self.list_table("messages", "messages"),
                 "/api/reviews": lambda: self.list_table("reviews", "reviews"),
-                "/api/orders": lambda: self.list_table("orders", "orders"),
+                "/api/orders": self.get_orders,
                 "/api/cart": lambda: self.get_cart(query),
-                "/api/wishlist": lambda: self.list_table("wishlist", "wishlist"),
-                "/api/returns": lambda: self.list_table("returns", "returns"),
+                "/api/wishlist": self.get_wishlist,
+                "/api/returns": self.get_returns,
                 "/api/campaigns": lambda: self.list_table("campaigns", "campaigns"),
                 "/api/wallet": lambda: self.list_table("wallet", "wallet"),
                 "/api/metrics": self.get_metrics,
@@ -527,6 +601,8 @@ class Handler(BaseHTTPRequestHandler):
                 route()
             else:
                 send_json(self, 404, {"error": "Not found"})
+        except PermissionError as exc:
+            send_json(self, 401, {"error": str(exc)})
         except Exception as exc:
             send_json(self, 500, {"error": str(exc)})
 
@@ -554,9 +630,11 @@ class Handler(BaseHTTPRequestHandler):
             elif parsed.path.startswith("/api/products/"):
                 self.product_by_id(method, parsed.path, data)
             elif parsed.path == "/api/cart":
-                self.create_simple("cart_items", data, {"buyer_id": 1, "quantity": 1, "variant": ""})
+                user = self.current_user()
+                self.create_simple("cart_items", data, {"buyer_id": user["id"] if user and user["role"] == "buyer" else 1, "quantity": 1, "variant": ""})
             elif parsed.path == "/api/wishlist":
-                self.create_simple("wishlist", data, {"buyer_id": 1})
+                user = self.current_user()
+                self.create_simple("wishlist", data, {"buyer_id": user["id"] if user and user["role"] == "buyer" else 1})
             elif parsed.path == "/api/messages":
                 self.create_simple("messages", data, {"product_id": None, "buyer_name": "Buyer", "seller_name": "PasarMalam Seller"})
             elif parsed.path == "/api/reviews":
@@ -566,13 +644,16 @@ class Handler(BaseHTTPRequestHandler):
             elif parsed.path == "/api/orders/status":
                 self.update_order_status(data)
             elif parsed.path == "/api/returns":
-                self.create_simple("returns", data, {"request_type": "Return/Refund", "status": "requested", "evidence_url": "", "seller_response": ""})
+                user = self.current_user()
+                self.create_simple("returns", data, {"buyer_id": user["id"] if user and user["role"] == "buyer" else 1, "buyer_name": user["name"] if user else "Buyer", "request_type": "Return/Refund", "status": "requested", "evidence_url": "", "seller_response": ""})
             elif parsed.path == "/api/campaigns":
                 self.create_simple("campaigns", data, {"seller_id": 1, "status": "active"})
             elif parsed.path == "/api/logistics/awb":
                 self.awb(data)
             else:
                 send_json(self, 404, {"error": "Not found"})
+        except PermissionError as exc:
+            send_json(self, 401, {"error": str(exc)})
         except Exception as exc:
             send_json(self, 400, {"error": str(exc)})
 
@@ -597,12 +678,15 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 200, {"products": rows})
 
     def create_product(self, data):
+        user = self.current_user()
         required = ["name", "shop", "category", "price", "stock", "condition", "price_mode"]
         for key in required:
             if key not in data:
                 raise ValueError(f"Missing {key}")
         images = data.get("images") or ([data.get("image_url")] if data.get("image_url") else [])
         variants = data.get("variants") or []
+        seller_id = user["id"] if user and user["role"] == "seller" else int(data.get("seller_id", 1))
+        shop = user.get("shop_name") or user.get("name") if user and user["role"] == "seller" else data["shop"]
         with connect() as con:
             cur = con.execute(
                 """
@@ -611,9 +695,9 @@ class Handler(BaseHTTPRequestHandler):
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    int(data.get("seller_id", 1)),
+                    seller_id,
                     data["name"],
-                    data["shop"],
+                    shop,
                     data["category"],
                     float(data["price"]),
                     int(data["stock"]),
@@ -633,7 +717,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def product_by_id(self, method, path, data):
         product_id = int(path.rsplit("/", 1)[-1])
+        user = self.current_user()
         with connect() as con:
+            product = con.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
+            if not product:
+                raise ValueError("Product not found")
+            if user and user["role"] == "seller" and int(product["seller_id"]) != int(user["id"]):
+                raise PermissionError("Seller cannot manage another seller product")
             if method == "DELETE":
                 con.execute("DELETE FROM products WHERE id = ?", (product_id,))
                 send_json(self, 200, {"ok": True})
@@ -653,6 +743,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def create_simple(self, table, data, defaults):
         payload = {**defaults, **data, "created_at": now()}
+        for protected_key in ("buyer_id", "seller_id"):
+            if protected_key in defaults:
+                payload[protected_key] = defaults[protected_key]
         keys = list(payload.keys())
         placeholders = ", ".join(["?"] * len(keys))
         with connect() as con:
@@ -667,21 +760,30 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as con:
             cur = con.execute(
                 "INSERT INTO users (role, name, phone, email, password, address, shop_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (data["role"], data["name"], data.get("phone", ""), data["email"], data["password"], data.get("address", ""), data.get("shop_name", ""), now()),
+                (data["role"], data["name"], data.get("phone", ""), data["email"], hash_password(data["password"]), data.get("address", ""), data.get("shop_name", ""), now()),
             )
-        send_json(self, 201, {"user": {"id": cur.lastrowid, "role": data["role"], "name": data["name"], "email": data["email"], "shop_name": data.get("shop_name", "")}})
+        user = {"id": cur.lastrowid, "role": data["role"], "name": data["name"], "email": data["email"], "shop_name": data.get("shop_name", "")}
+        send_json(self, 201, {"token": make_token(user), "user": user})
 
     def login(self, data):
         with connect() as con:
-            row = con.execute("SELECT * FROM users WHERE email = ? AND password = ?", (data.get("email"), data.get("password"))).fetchone()
+            row = con.execute("SELECT * FROM users WHERE email = ?", (data.get("email"),)).fetchone()
         if not row:
             send_json(self, 401, {"error": "Invalid login"})
             return
         user = row_to_dict(row)
+        if not verify_password(data.get("password", ""), user["password"]):
+            send_json(self, 401, {"error": "Invalid login"})
+            return
+        if not user["password"].startswith("pbkdf2_sha256$"):
+            with connect() as con:
+                con.execute("UPDATE users SET password = ? WHERE id = ?", (hash_password(data.get("password", "")), user["id"]))
         user.pop("password", None)
-        send_json(self, 200, {"token": f"demo-token-{user['id']}", "user": user})
+        send_json(self, 200, {"token": make_token(user), "user": user})
 
     def get_cart(self, query):
+        user = self.current_user()
+        buyer_id = user["id"] if user and user["role"] == "buyer" else 1
         with connect() as con:
             rows = [
                 row_to_dict(row)
@@ -689,13 +791,71 @@ class Handler(BaseHTTPRequestHandler):
                     """
                     SELECT cart_items.*, products.name, products.price, products.shop, products.image_url
                     FROM cart_items JOIN products ON products.id = cart_items.product_id
+                    WHERE cart_items.buyer_id = ?
                     ORDER BY cart_items.created_at DESC
-                    """
+                    """,
+                    (buyer_id,),
                 )
             ]
         send_json(self, 200, {"cart": rows})
 
+    def get_wishlist(self):
+        user = self.current_user()
+        buyer_id = user["id"] if user and user["role"] == "buyer" else 1
+        with connect() as con:
+            rows = [row_to_dict(row) for row in con.execute("SELECT * FROM wishlist WHERE buyer_id = ? ORDER BY created_at DESC, id DESC", (buyer_id,))]
+        send_json(self, 200, {"wishlist": rows})
+
+    def get_orders(self):
+        user = self.current_user()
+        with connect() as con:
+            if user and user["role"] == "buyer":
+                rows = [row_to_dict(row) for row in con.execute("SELECT * FROM orders WHERE buyer_id = ? ORDER BY created_at DESC, id DESC", (user["id"],))]
+            elif user and user["role"] == "seller":
+                rows = [
+                    row_to_dict(row)
+                    for row in con.execute(
+                        """
+                        SELECT orders.*
+                        FROM orders JOIN products ON products.id = orders.product_id
+                        WHERE products.seller_id = ?
+                        ORDER BY orders.created_at DESC, orders.id DESC
+                        """,
+                        (user["id"],),
+                    )
+                ]
+            else:
+                rows = [row_to_dict(row) for row in con.execute("SELECT * FROM orders ORDER BY created_at DESC, id DESC")]
+        send_json(self, 200, {"orders": rows})
+
+    def get_returns(self):
+        user = self.current_user()
+        with connect() as con:
+            if user and user["role"] == "buyer":
+                rows = [row_to_dict(row) for row in con.execute("SELECT * FROM returns WHERE buyer_id = ? ORDER BY created_at DESC, id DESC", (user["id"],))]
+            elif user and user["role"] == "seller":
+                rows = [
+                    row_to_dict(row)
+                    for row in con.execute(
+                        """
+                        SELECT returns.*
+                        FROM returns
+                        JOIN orders ON orders.id = returns.order_id
+                        JOIN products ON products.id = orders.product_id
+                        WHERE products.seller_id = ?
+                        ORDER BY returns.created_at DESC, returns.id DESC
+                        """,
+                        (user["id"],),
+                    )
+                ]
+            else:
+                rows = [row_to_dict(row) for row in con.execute("SELECT * FROM returns ORDER BY created_at DESC, id DESC")]
+        send_json(self, 200, {"returns": rows})
+
     def checkout(self, data):
+        user = self.current_user()
+        buyer_id = user["id"] if user and user["role"] == "buyer" else int(data.get("buyer_id", 1))
+        buyer_name = user["name"] if user and user["role"] == "buyer" else data.get("buyer_name", "Buyer")
         with connect() as con:
             product = con.execute("SELECT * FROM products WHERE id = ?", (int(data["product_id"]),)).fetchone()
             if not product:
@@ -711,7 +871,7 @@ class Handler(BaseHTTPRequestHandler):
                 (buyer_id, buyer_name, product_id, quantity, variant, address, total, logistics_method, logistics_fee, payment_method, payment_status, order_status, escrow_status, tracking_no, awb_label, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'placed', 'holding', ?, ?, ?)
                 """,
-                (int(data.get("buyer_id", 1)), data.get("buyer_name", "Buyer"), product["id"], qty, data.get("variant", ""), data.get("address", ""), total, data.get("logistics_method", product["shipping_type"]), fee, data.get("payment_method", "E-Wallet"), tracking, awb, now()),
+                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), data.get("address", ""), total, data.get("logistics_method", product["shipping_type"]), fee, data.get("payment_method", "E-Wallet"), tracking, awb, now()),
             )
             if USE_POSTGRES:
                 con.execute("UPDATE products SET stock = GREATEST(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, product["id"]))
@@ -722,7 +882,19 @@ class Handler(BaseHTTPRequestHandler):
     def update_order_status(self, data):
         status = data["order_status"]
         escrow = "released" if status == "completed" else data.get("escrow_status", "holding")
+        user = self.current_user()
         with connect() as con:
+            if user and user["role"] == "seller":
+                row = con.execute(
+                    """
+                    SELECT orders.id
+                    FROM orders JOIN products ON products.id = orders.product_id
+                    WHERE orders.id = ? AND products.seller_id = ?
+                    """,
+                    (int(data["order_id"]), user["id"]),
+                ).fetchone()
+                if not row:
+                    raise PermissionError("Seller cannot update another seller order")
             con.execute("UPDATE orders SET order_status = ?, escrow_status = ? WHERE id = ?", (status, escrow, int(data["order_id"])))
         send_json(self, 200, {"ok": True, "escrow_status": escrow})
 
