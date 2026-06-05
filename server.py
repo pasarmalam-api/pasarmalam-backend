@@ -55,7 +55,8 @@ class DbConnection:
         params = params or []
         if USE_POSTGRES:
             sql = sql.replace("?", "%s")
-            should_return_id = sql.lstrip().upper().startswith("INSERT ") and " RETURNING " not in sql.upper()
+            upper_sql = sql.lstrip().upper()
+            should_return_id = upper_sql.startswith("INSERT ") and " RETURNING " not in upper_sql and "INTO ADMIN_SETTINGS" not in upper_sql
             if should_return_id:
                 sql = sql.rstrip().rstrip(";") + " RETURNING id"
             cur = self.con.execute(sql, params)
