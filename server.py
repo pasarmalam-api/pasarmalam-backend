@@ -281,6 +281,7 @@ def init_db():
         migrate_users(con)
         migrate_passwords(con)
         seed(con)
+        ensure_admin(con)
 
 
 def postgres_schema_statements():
@@ -555,6 +556,17 @@ def seed(con):
             "INSERT INTO reviews (product_id, seller_id, buyer_name, rating, title, body, seller_reply, created_at) VALUES (?, 1, ?, ?, ?, ?, ?, ?)",
             [(1, "Aina", 5, "Fast reply", "Item condition matched the listing.", "Thank you.", now()), (2, "Jason", 4, "Good charger", "Works well and fair price.", "", now())],
         )
+
+
+def ensure_admin(con):
+    row = con.execute("SELECT id FROM users WHERE email = ?", ("admin@pasarmalam.my",)).fetchone()
+    if row:
+        con.execute("UPDATE users SET role = 'admin', status = 'active', seller_status = 'not_applicable' WHERE email = ?", ("admin@pasarmalam.my",))
+        return
+    con.execute(
+        "INSERT INTO users (role, name, phone, email, password, address, shop_name, status, seller_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        ("admin", "PM Admin", "0100000000", "admin@pasarmalam.my", hash_password("admin123"), "HQ", "", "active", "not_applicable", now()),
+    )
 
 
 def read_json(handler):
