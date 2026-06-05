@@ -4,6 +4,7 @@ import json
 import os
 import sqlite3
 import time
+from decimal import Decimal
 
 DB_PATH = os.environ.get("PASARMALAM_DB", "pasarmalam.sqlite3")
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
@@ -91,6 +92,12 @@ def row_to_dict(row):
 
 def now():
     return int(time.time())
+
+
+def as_float(value):
+    if isinstance(value, Decimal):
+        return float(value)
+    return float(value or 0)
 
 
 def init_db():
@@ -744,11 +751,11 @@ class Handler(BaseHTTPRequestHandler):
             {
                 "live_products": products["c"],
                 "orders": orders["c"],
-                "sales": round(orders["total"], 2),
+                "sales": round(as_float(orders["total"]), 2),
                 "response_rate": 98,
                 "late_shipment_rate": 1.2,
                 "cancellation_rate": 0.8,
-                "rating": round(reviews["rating"], 1),
+                "rating": round(as_float(reviews["rating"]), 1),
             },
         )
 
