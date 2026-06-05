@@ -154,6 +154,8 @@ def init_db():
               password TEXT NOT NULL,
               address TEXT DEFAULT '',
               shop_name TEXT DEFAULT '',
+              status TEXT DEFAULT 'active',
+              seller_status TEXT DEFAULT 'pending',
               created_at INTEGER NOT NULL
             );
 
@@ -172,6 +174,7 @@ def init_db():
               variants TEXT DEFAULT '[]',
               images TEXT DEFAULT '[]',
               image_url TEXT DEFAULT '',
+              moderation_status TEXT DEFAULT 'approved',
               rating REAL DEFAULT 4.8,
               sold INTEGER DEFAULT 0,
               shipping_type TEXT DEFAULT 'Standard Rider',
@@ -247,6 +250,7 @@ def init_db():
               status TEXT NOT NULL DEFAULT 'requested',
               evidence_url TEXT DEFAULT '',
               seller_response TEXT DEFAULT '',
+              dispute_status TEXT DEFAULT 'open',
               created_at INTEGER NOT NULL
             );
 
@@ -274,6 +278,7 @@ def init_db():
         migrate_orders(con)
         migrate_reviews(con)
         migrate_returns(con)
+        migrate_users(con)
         migrate_passwords(con)
         seed(con)
 
@@ -290,6 +295,8 @@ def postgres_schema_statements():
           password TEXT NOT NULL,
           address TEXT DEFAULT '',
           shop_name TEXT DEFAULT '',
+          status TEXT DEFAULT 'active',
+          seller_status TEXT DEFAULT 'pending',
           created_at INTEGER NOT NULL
         )
         """,
@@ -309,6 +316,7 @@ def postgres_schema_statements():
           variants TEXT DEFAULT '[]',
           images TEXT DEFAULT '[]',
           image_url TEXT DEFAULT '',
+          moderation_status TEXT DEFAULT 'approved',
           rating DOUBLE PRECISION DEFAULT 4.8,
           sold INTEGER DEFAULT 0,
           shipping_type TEXT DEFAULT 'Standard Rider',
@@ -390,6 +398,7 @@ def postgres_schema_statements():
           status TEXT NOT NULL DEFAULT 'requested',
           evidence_url TEXT DEFAULT '',
           seller_response TEXT DEFAULT '',
+          dispute_status TEXT DEFAULT 'open',
           created_at INTEGER NOT NULL
         )
         """,
@@ -439,6 +448,7 @@ def migrate_products(con):
         "variants": "TEXT DEFAULT '[]'",
         "images": "TEXT DEFAULT '[]'",
         "image_url": "TEXT DEFAULT ''",
+        "moderation_status": "TEXT DEFAULT 'approved'",
         "rating": "REAL DEFAULT 4.8",
         "sold": "INTEGER DEFAULT 0",
         "shipping_type": "TEXT DEFAULT 'Standard Rider'",
@@ -475,6 +485,19 @@ def migrate_returns(con):
     columns = table_columns(con, "returns")
     if "buyer_id" not in columns:
         con.execute("ALTER TABLE returns ADD COLUMN buyer_id INTEGER DEFAULT 1")
+    if "dispute_status" not in columns:
+        con.execute("ALTER TABLE returns ADD COLUMN dispute_status TEXT DEFAULT 'open'")
+
+
+def migrate_users(con):
+    columns = table_columns(con, "users")
+    additions = {
+        "status": "TEXT DEFAULT 'active'",
+        "seller_status": "TEXT DEFAULT 'pending'",
+    }
+    for name, sql in additions.items():
+        if name not in columns:
+            con.execute(f"ALTER TABLE users ADD COLUMN {name} {sql}")
 
 
 def migrate_passwords(con):
@@ -489,12 +512,13 @@ def seed(con):
     if con.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"] == 0:
         con.executemany(
             """
-            INSERT INTO users (role, name, phone, email, password, address, shop_name, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO users (role, name, phone, email, password, address, shop_name, status, seller_status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             [
-                ("buyer", "Aina Buyer", "0123456789", "buyer@pasarmalam.my", hash_password("demo123"), "Kuala Lumpur", "", now()),
-                ("seller", "PM Seller", "01122223333", "seller@pasarmalam.my", hash_password("demo123"), "Petaling Jaya", "PasarMalam Seller", now()),
+                ("buyer", "Aina Buyer", "0123456789", "buyer@pasarmalam.my", hash_password("demo123"), "Kuala Lumpur", "", "active", "not_applicable", now()),
+                ("seller", "PM Seller", "01122223333", "seller@pasarmalam.my", hash_password("demo123"), "Petaling Jaya", "PasarMalam Seller", "active", "approved", now()),
+                ("admin", "PM Admin", "0100000000", "admin@pasarmalam.my", hash_password("admin123"), "HQ", "", "active", "not_applicable", now()),
             ],
         )
     if con.execute("SELECT COUNT(*) AS c FROM products").fetchone()["c"] == 0:
@@ -595,6 +619,12 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/wallet": lambda: self.list_table("wallet", "wallet"),
                 "/api/metrics": self.get_metrics,
                 "/api/logistics/rates": self.get_logistics_rates,
+                "/api/admin/users": self.admin_users,
+                "/api/admin/sellers": self.admin_sellers,
+                "/api/admin/products": self.admin_products,
+                "/api/admin/orders": self.admin_orders,
+                "/api/admin/returns": self.admin_returns,
+                "/api/admin/metrics": self.admin_metrics,
             }
             route = routes.get(parsed.path)
             if route:
@@ -650,6 +680,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.create_simple("campaigns", data, {"seller_id": 1, "status": "active"})
             elif parsed.path == "/api/logistics/awb":
                 self.awb(data)
+            elif parsed.path == "/api/admin/user-status":
+                self.admin_update_user_status(data)
+            elif parsed.path == "/api/admin/product-status":
+                self.admin_update_product_status(data)
+            elif parsed.path == "/api/admin/return-status":
+                self.admin_update_return_status(data)
             else:
                 send_json(self, 404, {"error": "Not found"})
         except PermissionError as exc:
@@ -930,6 +966,108 @@ class Handler(BaseHTTPRequestHandler):
                 "rating": round(as_float(reviews["rating"]), 1),
             },
         )
+
+    def admin_users(self):
+        self.require_user("admin")
+        with connect() as con:
+            rows = [row_to_dict(row) for row in con.execute("SELECT id, role, name, phone, email, address, shop_name, status, seller_status, created_at FROM users ORDER BY created_at DESC, id DESC")]
+        send_json(self, 200, {"users": rows})
+
+    def admin_sellers(self):
+        self.require_user("admin")
+        with connect() as con:
+            rows = [row_to_dict(row) for row in con.execute("SELECT id, role, name, phone, email, address, shop_name, status, seller_status, created_at FROM users WHERE role = 'seller' ORDER BY created_at DESC, id DESC")]
+        send_json(self, 200, {"sellers": rows})
+
+    def admin_products(self):
+        self.require_user("admin")
+        with connect() as con:
+            rows = [row_to_dict(row) for row in con.execute("SELECT * FROM products ORDER BY created_at DESC, id DESC")]
+        for row in rows:
+            row["images"] = json.loads(row.get("images") or "[]")
+            row["variants"] = json.loads(row.get("variants") or "[]")
+        send_json(self, 200, {"products": rows})
+
+    def admin_orders(self):
+        self.require_user("admin")
+        with connect() as con:
+            rows = [
+                row_to_dict(row)
+                for row in con.execute(
+                    """
+                    SELECT orders.*, products.name AS product_name, products.shop AS seller_shop, products.seller_id
+                    FROM orders JOIN products ON products.id = orders.product_id
+                    ORDER BY orders.created_at DESC, orders.id DESC
+                    """
+                )
+            ]
+        send_json(self, 200, {"orders": rows})
+
+    def admin_returns(self):
+        self.require_user("admin")
+        with connect() as con:
+            rows = [
+                row_to_dict(row)
+                for row in con.execute(
+                    """
+                    SELECT returns.*, orders.product_id, products.name AS product_name, products.shop AS seller_shop
+                    FROM returns
+                    LEFT JOIN orders ON orders.id = returns.order_id
+                    LEFT JOIN products ON products.id = orders.product_id
+                    ORDER BY returns.created_at DESC, returns.id DESC
+                    """
+                )
+            ]
+        send_json(self, 200, {"returns": rows})
+
+    def admin_metrics(self):
+        self.require_user("admin")
+        with connect() as con:
+            users = con.execute("SELECT COUNT(*) AS c FROM users").fetchone()
+            sellers = con.execute("SELECT COUNT(*) AS c FROM users WHERE role = 'seller'").fetchone()
+            buyers = con.execute("SELECT COUNT(*) AS c FROM users WHERE role = 'buyer'").fetchone()
+            products = con.execute("SELECT COUNT(*) AS c FROM products").fetchone()
+            orders = con.execute("SELECT COUNT(*) AS c, COALESCE(SUM(total),0) AS total FROM orders").fetchone()
+            returns = con.execute("SELECT COUNT(*) AS c FROM returns").fetchone()
+            campaigns = con.execute("SELECT COUNT(*) AS c FROM campaigns").fetchone()
+        send_json(
+            self,
+            200,
+            {
+                "users": users["c"],
+                "buyers": buyers["c"],
+                "sellers": sellers["c"],
+                "products": products["c"],
+                "orders": orders["c"],
+                "sales": round(as_float(orders["total"]), 2),
+                "returns": returns["c"],
+                "campaigns": campaigns["c"],
+            },
+        )
+
+    def admin_update_user_status(self, data):
+        self.require_user("admin")
+        with connect() as con:
+            con.execute(
+                "UPDATE users SET status = ?, seller_status = ? WHERE id = ?",
+                (data.get("status", "active"), data.get("seller_status", "pending"), int(data["user_id"])),
+            )
+        send_json(self, 200, {"ok": True})
+
+    def admin_update_product_status(self, data):
+        self.require_user("admin")
+        with connect() as con:
+            con.execute("UPDATE products SET moderation_status = ? WHERE id = ?", (data.get("moderation_status", "approved"), int(data["product_id"])))
+        send_json(self, 200, {"ok": True})
+
+    def admin_update_return_status(self, data):
+        self.require_user("admin")
+        with connect() as con:
+            con.execute(
+                "UPDATE returns SET status = ?, dispute_status = ?, seller_response = ? WHERE id = ?",
+                (data.get("status", "requested"), data.get("dispute_status", "open"), data.get("seller_response", ""), int(data["return_id"])),
+            )
+        send_json(self, 200, {"ok": True})
 
 
 def shipping_fee(method, weight):
