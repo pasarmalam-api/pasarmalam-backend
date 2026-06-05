@@ -668,7 +668,7 @@ class Handler(BaseHTTPRequestHandler):
         query = parse_qs(parsed.query)
         try:
             routes = {
-                "/api/health": lambda: send_json(self, 200, {"ok": True, "service": "PasarMalam API", "features": "marketplace"}),
+                "/api/health": lambda: send_json(self, 200, {"ok": True, "service": "PasarMalam API", "features": "marketplace", "version": "admin-ops-2026-06-05"}),
                 "/api/products": lambda: self.get_products(query),
                 "/api/messages": lambda: self.list_table("messages", "messages"),
                 "/api/reviews": lambda: self.list_table("reviews", "reviews"),
