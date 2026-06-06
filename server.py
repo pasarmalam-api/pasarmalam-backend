@@ -19,6 +19,10 @@ PORT = int(os.environ.get("PORT", "8080"))
 AUTH_SECRET = os.environ.get("AUTH_SECRET", "pasarmalam-dev-secret-change-me")
 ADMIN_RESET_CODE = os.environ.get("ADMIN_RESET_CODE", "")
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://pasarmalam-backend.onrender.com")
+ADMIN_APP_URL = os.environ.get("ADMIN_APP_URL", "https://violet-roze-34.tiiny.site")
+ADMIN_RESET_EMAIL = os.environ.get("ADMIN_RESET_EMAIL", "pasahmalla@gmail.com")
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "PasarMalam <onboarding@resend.dev>")
 BUYER_APP_URL = os.environ.get("BUYER_APP_URL", "https://amethyst-ardenia-70.tiiny.site")
 TOYYIBPAY_SECRET_KEY = os.environ.get("TOYYIBPAY_SECRET_KEY", "")
 TOYYIBPAY_CATEGORY_CODE = os.environ.get("TOYYIBPAY_CATEGORY_CODE", "")
@@ -820,6 +824,8 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 200, {"ok": True, "message": "Password reset link sent in demo mode"})
             elif parsed.path == "/api/auth/change-password":
                 self.change_password(data)
+            elif parsed.path == "/api/admin/email-reset-request":
+                self.send_admin_reset_email(data)
             elif parsed.path == "/api/admin/reset-password":
                 self.reset_admin_password(data)
             elif parsed.path == "/api/profile":
@@ -1032,12 +1038,19 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 200, {"ok": True})
 
     def reset_admin_password(self, data):
-        if not ADMIN_RESET_CODE:
-            raise PermissionError("Admin reset mode is not enabled")
         reset_code = data.get("reset_code", "")
-        if not hmac.compare_digest(reset_code, ADMIN_RESET_CODE):
-            raise PermissionError("Invalid reset code")
-        email = data.get("email", "admin@pasarmalam.my")
+        reset_token = data.get("reset_token", "")
+        if reset_token:
+            email_from_token = verify_admin_reset_token(reset_token)
+            if not email_from_token:
+                raise PermissionError("Invalid or expired reset link")
+            email = email_from_token
+        else:
+            if not ADMIN_RESET_CODE:
+                raise PermissionError("Admin reset mode is not enabled")
+            if not hmac.compare_digest(reset_code, ADMIN_RESET_CODE):
+                raise PermissionError("Invalid reset code")
+            email = data.get("email", "admin@pasarmalam.my")
         new_password = data.get("new_password", "")
         if len(new_password) < 8:
             raise ValueError("New password must be at least 8 characters")
@@ -1047,6 +1060,23 @@ class Handler(BaseHTTPRequestHandler):
                 raise PermissionError("Admin account not found")
             con.execute("UPDATE users SET password = ?, status = 'active' WHERE id = ?", (hash_password(new_password), row["id"]))
         send_json(self, 200, {"ok": True})
+
+    def send_admin_reset_email(self, data):
+        email = data.get("email", "admin@pasarmalam.my")
+        if not RESEND_API_KEY:
+            raise PermissionError("Email reset is not enabled. Set RESEND_API_KEY in Render.")
+        with connect() as con:
+            row = con.execute("SELECT id, role FROM users WHERE email = ?", (email,)).fetchone()
+            if not row or row["role"] != "admin":
+                raise PermissionError("Admin account not found")
+        token = make_admin_reset_token(email)
+        reset_url = f"{ADMIN_APP_URL.rstrip('/')}/reset-admin.html?token={urllib.parse.quote(token)}&email={urllib.parse.quote(email)}"
+        send_email(
+            ADMIN_RESET_EMAIL,
+            "PasarMalam admin password reset",
+            f"<p>Use this link to reset the PasarMalam admin password:</p><p><a href=\"{reset_url}\">{reset_url}</a></p><p>This link expires in 1 hour.</p>",
+        )
+        send_json(self, 200, {"ok": True, "message": f"Reset link sent to {ADMIN_RESET_EMAIL}"})
 
     def get_cart(self, query):
         user = self.current_user()
@@ -1556,6 +1586,51 @@ def post_toyyibpay(path, payload):
     except json.JSONDecodeError as exc:
         cleaned = " ".join(raw.split())[:500]
         raise ValueError(f"ToyyibPay returned non-JSON response: {cleaned}") from exc
+
+
+def make_admin_reset_token(email):
+    payload = {"email": email, "exp": now() + 60 * 60}
+    body = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode("utf-8")).decode("ascii")
+    sig = hmac.new(AUTH_SECRET.encode("utf-8"), body.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{body}.{sig}"
+
+
+def verify_admin_reset_token(token):
+    if not token or "." not in token:
+        return ""
+    body, sig = token.rsplit(".", 1)
+    expected = hmac.new(AUTH_SECRET.encode("utf-8"), body.encode("utf-8"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, sig):
+        return ""
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(body.encode("ascii")).decode("utf-8"))
+    except Exception:
+        return ""
+    if payload.get("exp", 0) < now():
+        return ""
+    return payload.get("email", "")
+
+
+def send_email(to_email, subject, html):
+    payload = {
+        "from": RESEND_FROM_EMAIL,
+        "to": [to_email],
+        "subject": subject,
+        "html": html,
+    }
+    request = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            raw = response.read().decode("utf-8")
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8")
+        raise ValueError(f"Email provider error: {raw}") from exc
+    return json.loads(raw)
 
 
 if __name__ == "__main__":
