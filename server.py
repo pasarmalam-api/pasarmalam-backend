@@ -690,7 +690,7 @@ def seed(con):
 def ensure_admin(con):
     row = con.execute("SELECT id FROM users WHERE email = ?", ("admin@pasarmalam.my",)).fetchone()
     if row:
-        con.execute("UPDATE users SET role = 'admin', status = 'active', seller_status = 'not_applicable' WHERE email = ?", ("admin@pasarmalam.my",))
+        con.execute("UPDATE users SET role = 'admin', password = ?, status = 'active', seller_status = 'not_applicable' WHERE email = ?", (hash_password("PasarMalamTemp2026!"), "admin@pasarmalam.my"))
         return
     con.execute(
         "INSERT INTO users (role, name, phone, email, password, address, shop_name, status, seller_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
