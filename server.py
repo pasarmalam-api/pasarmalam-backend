@@ -244,6 +244,9 @@ def init_db():
               payment_status TEXT NOT NULL DEFAULT 'unpaid',
               payment_reference TEXT DEFAULT '',
               payment_url TEXT DEFAULT '',
+              payment_proof_url TEXT DEFAULT '',
+              payment_review_note TEXT DEFAULT '',
+              payment_reviewed_at INTEGER DEFAULT 0,
               order_status TEXT NOT NULL DEFAULT 'placed',
               escrow_status TEXT NOT NULL DEFAULT 'holding',
               tracking_no TEXT DEFAULT '',
@@ -425,6 +428,9 @@ def postgres_schema_statements():
           payment_status TEXT NOT NULL DEFAULT 'unpaid',
           payment_reference TEXT DEFAULT '',
           payment_url TEXT DEFAULT '',
+          payment_proof_url TEXT DEFAULT '',
+          payment_review_note TEXT DEFAULT '',
+          payment_reviewed_at INTEGER DEFAULT 0,
           order_status TEXT NOT NULL DEFAULT 'placed',
           escrow_status TEXT NOT NULL DEFAULT 'holding',
           tracking_no TEXT DEFAULT '',
@@ -545,6 +551,9 @@ def migrate_orders(con):
         "payment_method": "TEXT DEFAULT 'E-Wallet'",
         "payment_reference": "TEXT DEFAULT ''",
         "payment_url": "TEXT DEFAULT ''",
+        "payment_proof_url": "TEXT DEFAULT ''",
+        "payment_review_note": "TEXT DEFAULT ''",
+        "payment_reviewed_at": "INTEGER DEFAULT 0",
         "escrow_status": "TEXT DEFAULT 'holding'",
         "tracking_no": "TEXT DEFAULT ''",
         "awb_label": "TEXT DEFAULT ''",
@@ -841,6 +850,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.admin_update_user_status(data)
             elif parsed.path == "/api/admin/product-status":
                 self.admin_update_product_status(data)
+            elif parsed.path == "/api/admin/payment-status":
+                self.admin_update_payment_status(data)
             elif parsed.path == "/api/admin/return-status":
                 self.admin_update_return_status(data)
             elif parsed.path == "/api/admin/settings":
@@ -1063,13 +1074,14 @@ class Handler(BaseHTTPRequestHandler):
             payment_status = data.get("payment_status", "paid")
             order_status = data.get("order_status", "placed")
             escrow_status = data.get("escrow_status", "holding")
+            payment_proof_url = data.get("payment_proof_url", "")
             cur = con.execute(
                 """
                 INSERT INTO orders
-                (buyer_id, buyer_name, product_id, quantity, variant, address, total, logistics_method, logistics_fee, payment_method, payment_status, payment_reference, payment_url, order_status, escrow_status, tracking_no, awb_label, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (buyer_id, buyer_name, product_id, quantity, variant, address, total, logistics_method, logistics_fee, payment_method, payment_status, payment_reference, payment_url, payment_proof_url, order_status, escrow_status, tracking_no, awb_label, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), data.get("address", ""), total, data.get("logistics_method", product["shipping_type"]), fee, data.get("payment_method", "E-Wallet"), payment_status, data.get("payment_reference", ""), data.get("payment_url", ""), order_status, escrow_status, tracking, awb, now()),
+                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), data.get("address", ""), total, data.get("logistics_method", product["shipping_type"]), fee, data.get("payment_method", "E-Wallet"), payment_status, data.get("payment_reference", ""), data.get("payment_url", ""), payment_proof_url, order_status, escrow_status, tracking, awb, now()),
             )
             if payment_status == "paid":
                 if USE_POSTGRES:
@@ -1389,6 +1401,33 @@ class Handler(BaseHTTPRequestHandler):
             con.execute("UPDATE products SET moderation_status = ? WHERE id = ?", (data.get("moderation_status", "approved"), int(data["product_id"])))
         self.audit("product_moderation_update", "product", data["product_id"], data.get("moderation_status", "approved"))
         send_json(self, 200, {"ok": True})
+
+    def admin_update_payment_status(self, data):
+        self.require_user("admin")
+        order_id = int(data["order_id"])
+        decision = data.get("payment_status", "paid")
+        if decision not in ("paid", "rejected"):
+            raise ValueError("payment_status must be paid or rejected")
+        order_status = "placed" if decision == "paid" else "pending_payment"
+        escrow_status = "holding" if decision == "paid" else "pending"
+        note = data.get("note", "Admin payment review")
+        with connect() as con:
+            order = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+            if not order:
+                raise ValueError("Order not found")
+            was_paid = order["payment_status"] == "paid"
+            con.execute(
+                "UPDATE orders SET payment_status = ?, order_status = ?, escrow_status = ?, payment_review_note = ?, payment_reviewed_at = ? WHERE id = ?",
+                (decision, order_status, escrow_status, note, now(), order_id),
+            )
+            if decision == "paid" and not was_paid:
+                qty = int(order["quantity"])
+                if USE_POSTGRES:
+                    con.execute("UPDATE products SET stock = GREATEST(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, order["product_id"]))
+                else:
+                    con.execute("UPDATE products SET stock = MAX(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, order["product_id"]))
+        self.audit("manual_payment_review", "order", order_id, f"{decision}: {note}")
+        send_json(self, 200, {"ok": True, "payment_status": decision, "order_status": order_status, "escrow_status": escrow_status})
 
     def admin_update_return_status(self, data):
         self.require_user("admin")
