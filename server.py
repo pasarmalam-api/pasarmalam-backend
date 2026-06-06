@@ -1451,7 +1451,11 @@ def post_toyyibpay(path, payload):
     )
     with urllib.request.urlopen(request, timeout=20) as response:
         raw = response.read().decode("utf-8")
-    return json.loads(raw)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        cleaned = " ".join(raw.split())[:500]
+        raise ValueError(f"ToyyibPay returned non-JSON response: {cleaned}") from exc
 
 
 if __name__ == "__main__":
