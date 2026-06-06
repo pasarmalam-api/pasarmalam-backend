@@ -8,6 +8,8 @@ import os
 import secrets
 import sqlite3
 import time
+import urllib.parse
+import urllib.request
 from decimal import Decimal
 
 DB_PATH = os.environ.get("PASARMALAM_DB", "pasarmalam.sqlite3")
@@ -15,6 +17,12 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 USE_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
 PORT = int(os.environ.get("PORT", "8080"))
 AUTH_SECRET = os.environ.get("AUTH_SECRET", "pasarmalam-dev-secret-change-me")
+PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://pasarmalam-backend.onrender.com")
+BUYER_APP_URL = os.environ.get("BUYER_APP_URL", "https://amethyst-ardenia-70.tiiny.site")
+TOYYIBPAY_SECRET_KEY = os.environ.get("TOYYIBPAY_SECRET_KEY", "")
+TOYYIBPAY_CATEGORY_CODE = os.environ.get("TOYYIBPAY_CATEGORY_CODE", "")
+TOYYIBPAY_MODE = os.environ.get("TOYYIBPAY_MODE", "sandbox").lower()
+TOYYIBPAY_BASE_URL = "https://dev.toyyibpay.com" if TOYYIBPAY_MODE != "live" else "https://toyyibpay.com"
 
 
 if USE_POSTGRES:
@@ -234,6 +242,8 @@ def init_db():
               logistics_fee REAL NOT NULL,
               payment_method TEXT DEFAULT 'E-Wallet',
               payment_status TEXT NOT NULL DEFAULT 'unpaid',
+              payment_reference TEXT DEFAULT '',
+              payment_url TEXT DEFAULT '',
               order_status TEXT NOT NULL DEFAULT 'placed',
               escrow_status TEXT NOT NULL DEFAULT 'holding',
               tracking_no TEXT DEFAULT '',
@@ -253,6 +263,19 @@ def init_db():
               seller_response TEXT DEFAULT '',
               dispute_status TEXT DEFAULT 'open',
               created_at INTEGER NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS payments (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              order_id INTEGER NOT NULL,
+              provider TEXT NOT NULL,
+              bill_code TEXT DEFAULT '',
+              amount REAL NOT NULL,
+              status TEXT NOT NULL DEFAULT 'pending',
+              checkout_url TEXT DEFAULT '',
+              raw_response TEXT DEFAULT '',
+              created_at INTEGER NOT NULL,
+              updated_at INTEGER NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS campaigns (
@@ -293,6 +316,7 @@ def init_db():
         )
         migrate_products(con)
         migrate_orders(con)
+        migrate_payments(con)
         migrate_reviews(con)
         migrate_returns(con)
         migrate_users(con)
@@ -399,11 +423,27 @@ def postgres_schema_statements():
           logistics_fee DOUBLE PRECISION NOT NULL,
           payment_method TEXT DEFAULT 'E-Wallet',
           payment_status TEXT NOT NULL DEFAULT 'unpaid',
+          payment_reference TEXT DEFAULT '',
+          payment_url TEXT DEFAULT '',
           order_status TEXT NOT NULL DEFAULT 'placed',
           escrow_status TEXT NOT NULL DEFAULT 'holding',
           tracking_no TEXT DEFAULT '',
           awb_label TEXT DEFAULT '',
           created_at INTEGER NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS payments (
+          id SERIAL PRIMARY KEY,
+          order_id INTEGER NOT NULL,
+          provider TEXT NOT NULL,
+          bill_code TEXT DEFAULT '',
+          amount DOUBLE PRECISION NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          checkout_url TEXT DEFAULT '',
+          raw_response TEXT DEFAULT '',
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
         )
         """,
         """
@@ -503,6 +543,8 @@ def migrate_orders(con):
         "variant": "TEXT DEFAULT ''",
         "address": "TEXT DEFAULT ''",
         "payment_method": "TEXT DEFAULT 'E-Wallet'",
+        "payment_reference": "TEXT DEFAULT ''",
+        "payment_url": "TEXT DEFAULT ''",
         "escrow_status": "TEXT DEFAULT 'holding'",
         "tracking_no": "TEXT DEFAULT ''",
         "awb_label": "TEXT DEFAULT ''",
@@ -510,6 +552,43 @@ def migrate_orders(con):
     for name, sql in additions.items():
         if name not in columns:
             con.execute(f"ALTER TABLE orders ADD COLUMN {name} {sql}")
+
+
+def migrate_payments(con):
+    if USE_POSTGRES:
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS payments (
+              id SERIAL PRIMARY KEY,
+              order_id INTEGER NOT NULL,
+              provider TEXT NOT NULL,
+              bill_code TEXT DEFAULT '',
+              amount DOUBLE PRECISION NOT NULL,
+              status TEXT NOT NULL DEFAULT 'pending',
+              checkout_url TEXT DEFAULT '',
+              raw_response TEXT DEFAULT '',
+              created_at INTEGER NOT NULL,
+              updated_at INTEGER NOT NULL
+            )
+            """
+        )
+    else:
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS payments (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              order_id INTEGER NOT NULL,
+              provider TEXT NOT NULL,
+              bill_code TEXT DEFAULT '',
+              amount REAL NOT NULL,
+              status TEXT NOT NULL DEFAULT 'pending',
+              checkout_url TEXT DEFAULT '',
+              raw_response TEXT DEFAULT '',
+              created_at INTEGER NOT NULL,
+              updated_at INTEGER NOT NULL
+            )
+            """
+        )
 
 
 def migrate_reviews(con):
@@ -625,7 +704,13 @@ def read_json(handler):
         raise ValueError("Request body too large")
     if length == 0:
         return {}
-    return json.loads(handler.rfile.read(length).decode("utf-8"))
+    raw = handler.rfile.read(length).decode("utf-8")
+    content_type = handler.headers.get("Content-Type", "")
+    if "application/x-www-form-urlencoded" in content_type:
+        return {key: values[0] if values else "" for key, values in urllib.parse.parse_qs(raw).items()}
+    if not raw.strip():
+        return {}
+    return json.loads(raw)
 
 
 def send_json(handler, status, payload):
@@ -681,6 +766,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/wallet": lambda: self.list_table("wallet", "wallet"),
                 "/api/metrics": self.get_metrics,
                 "/api/logistics/rates": self.get_logistics_rates,
+                "/api/payments/toyyibpay/return": lambda: self.toyyibpay_return(query),
                 "/api/admin/users": self.admin_users,
                 "/api/admin/sellers": self.admin_sellers,
                 "/api/admin/products": self.admin_products,
@@ -738,6 +824,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.create_simple("reviews", data, {"product_id": None, "seller_id": 1, "buyer_name": "Buyer", "seller_reply": ""})
             elif parsed.path == "/api/checkout":
                 self.checkout(data)
+            elif parsed.path == "/api/payments/toyyibpay/create":
+                self.create_toyyibpay_payment(data)
+            elif parsed.path == "/api/payments/toyyibpay/callback":
+                self.toyyibpay_callback(data)
             elif parsed.path == "/api/orders/status":
                 self.update_order_status(data)
             elif parsed.path == "/api/returns":
@@ -970,19 +1060,129 @@ class Handler(BaseHTTPRequestHandler):
             total = float(product["price"]) * qty + fee
             tracking = f"PM{now()}{product['id']}"
             awb = f"AWB-{tracking}-{data.get('logistics_method', product['shipping_type']).replace(' ', '-')}"
+            payment_status = data.get("payment_status", "paid")
+            order_status = data.get("order_status", "placed")
+            escrow_status = data.get("escrow_status", "holding")
             cur = con.execute(
                 """
                 INSERT INTO orders
-                (buyer_id, buyer_name, product_id, quantity, variant, address, total, logistics_method, logistics_fee, payment_method, payment_status, order_status, escrow_status, tracking_no, awb_label, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'placed', 'holding', ?, ?, ?)
+                (buyer_id, buyer_name, product_id, quantity, variant, address, total, logistics_method, logistics_fee, payment_method, payment_status, payment_reference, payment_url, order_status, escrow_status, tracking_no, awb_label, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), data.get("address", ""), total, data.get("logistics_method", product["shipping_type"]), fee, data.get("payment_method", "E-Wallet"), tracking, awb, now()),
+                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), data.get("address", ""), total, data.get("logistics_method", product["shipping_type"]), fee, data.get("payment_method", "E-Wallet"), payment_status, data.get("payment_reference", ""), data.get("payment_url", ""), order_status, escrow_status, tracking, awb, now()),
             )
-            if USE_POSTGRES:
-                con.execute("UPDATE products SET stock = GREATEST(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, product["id"]))
-            else:
-                con.execute("UPDATE products SET stock = MAX(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, product["id"]))
-        send_json(self, 201, {"id": cur.lastrowid, "total": total, "tracking_no": tracking, "escrow_status": "holding"})
+            if payment_status == "paid":
+                if USE_POSTGRES:
+                    con.execute("UPDATE products SET stock = GREATEST(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, product["id"]))
+                else:
+                    con.execute("UPDATE products SET stock = MAX(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, product["id"]))
+        send_json(self, 201, {"id": cur.lastrowid, "total": total, "tracking_no": tracking, "escrow_status": escrow_status, "payment_status": payment_status})
+
+    def create_toyyibpay_payment(self, data):
+        user = self.current_user()
+        buyer_id = user["id"] if user and user["role"] == "buyer" else int(data.get("buyer_id", 1))
+        buyer_name = user["name"] if user and user["role"] == "buyer" else data.get("buyer_name", "Buyer")
+        buyer_email = data.get("buyer_email", "buyer@pasarmalam.my")
+        buyer_phone = data.get("buyer_phone", "0123456789")
+        with connect() as con:
+            product = con.execute("SELECT * FROM products WHERE id = ?", (int(data["product_id"]),)).fetchone()
+            if not product:
+                raise ValueError("Product not found")
+            qty = int(data.get("quantity", 1))
+            fee = float(data.get("logistics_fee", shipping_fee(data.get("logistics_method", product["shipping_type"]), product["weight_kg"])))
+            total = float(product["price"]) * qty + fee
+            tracking = f"PM{now()}{product['id']}"
+            awb = f"AWB-{tracking}-{data.get('logistics_method', product['shipping_type']).replace(' ', '-')}"
+            cur = con.execute(
+                """
+                INSERT INTO orders
+                (buyer_id, buyer_name, product_id, quantity, variant, address, total, logistics_method, logistics_fee, payment_method, payment_status, payment_reference, payment_url, order_status, escrow_status, tracking_no, awb_label, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ToyyibPay', 'unpaid', '', '', 'pending_payment', 'pending', ?, ?, ?)
+                """,
+                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), data.get("address", ""), total, data.get("logistics_method", product["shipping_type"]), fee, tracking, awb, now()),
+            )
+            order_id = cur.lastrowid
+
+        if not TOYYIBPAY_SECRET_KEY or not TOYYIBPAY_CATEGORY_CODE:
+            with connect() as con:
+                con.execute(
+                    "INSERT INTO payments (order_id, provider, bill_code, amount, status, checkout_url, raw_response, created_at, updated_at) VALUES (?, 'ToyyibPay', '', ?, 'setup_required', '', 'Missing ToyyibPay environment variables', ?, ?)",
+                    (order_id, total, now(), now()),
+                )
+            send_json(self, 200, {"ok": False, "setup_required": True, "order_id": order_id, "message": "Set TOYYIBPAY_SECRET_KEY and TOYYIBPAY_CATEGORY_CODE in Render."})
+            return
+
+        bill_name = clean_toyyib_text(f"PasarMalam Order {order_id}", 30)
+        bill_description = clean_toyyib_text(f"Payment for order {order_id}", 100)
+        payload = {
+            "userSecretKey": TOYYIBPAY_SECRET_KEY,
+            "categoryCode": TOYYIBPAY_CATEGORY_CODE,
+            "billName": bill_name,
+            "billDescription": bill_description,
+            "billPriceSetting": "1",
+            "billPayorInfo": "1",
+            "billAmount": str(int(round(total * 100))),
+            "billReturnUrl": f"{BUYER_APP_URL}/payment.html",
+            "billCallbackUrl": f"{PUBLIC_BASE_URL}/api/payments/toyyibpay/callback",
+            "billExternalReferenceNo": str(order_id),
+            "billTo": clean_toyyib_text(buyer_name, 30),
+            "billEmail": buyer_email,
+            "billPhone": buyer_phone,
+            "billPaymentChannel": "2",
+            "billContentEmail": "Thank you for buying with PasarMalam",
+            "billChargeToCustomer": "1",
+            "billExpiryDays": "3",
+        }
+        response = post_toyyibpay("/index.php/api/createBill", payload)
+        bill_code = response[0].get("BillCode") if isinstance(response, list) and response else ""
+        if not bill_code:
+            raise ValueError(f"ToyyibPay did not return BillCode: {response}")
+        checkout_url = f"{TOYYIBPAY_BASE_URL}/{bill_code}"
+        with connect() as con:
+            con.execute("UPDATE orders SET payment_reference = ?, payment_url = ? WHERE id = ?", (bill_code, checkout_url, order_id))
+            con.execute(
+                "INSERT INTO payments (order_id, provider, bill_code, amount, status, checkout_url, raw_response, created_at, updated_at) VALUES (?, 'ToyyibPay', ?, ?, 'pending', ?, ?, ?, ?)",
+                (order_id, bill_code, total, checkout_url, json.dumps(response), now(), now()),
+            )
+        send_json(self, 201, {"ok": True, "order_id": order_id, "bill_code": bill_code, "checkout_url": checkout_url, "total": total})
+
+    def toyyibpay_callback(self, data):
+        order_id = int(data.get("order_id", "0") or "0")
+        status = str(data.get("status", data.get("status_id", "")))
+        refno = str(data.get("refno", data.get("transaction_id", "")))
+        received_hash = str(data.get("hash", ""))
+        if TOYYIBPAY_SECRET_KEY:
+            expected = hashlib.md5(f"{TOYYIBPAY_SECRET_KEY}{status}{order_id}{refno}ok".encode("utf-8")).hexdigest()
+            if received_hash and received_hash != expected:
+                raise PermissionError("Invalid ToyyibPay callback hash")
+        self.apply_payment_status(order_id, status, str(data.get("billcode", "")), refno, data)
+        send_json(self, 200, {"ok": True})
+
+    def toyyibpay_return(self, query):
+        order_id = int((query.get("order_id") or ["0"])[0] or "0")
+        status = (query.get("status_id") or ["2"])[0]
+        bill_code = (query.get("billcode") or [""])[0]
+        if order_id:
+            self.apply_payment_status(order_id, status, bill_code, "", {"source": "return_url"})
+        send_json(self, 200, {"ok": True, "order_id": order_id, "status": payment_status_label(status)})
+
+    def apply_payment_status(self, order_id, status, bill_code, refno, raw):
+        label = payment_status_label(status)
+        order_status = "placed" if label == "paid" else "pending_payment"
+        escrow_status = "holding" if label == "paid" else "pending"
+        with connect() as con:
+            order = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+            if not order:
+                raise ValueError("Order not found")
+            was_paid = order["payment_status"] == "paid"
+            con.execute("UPDATE orders SET payment_status = ?, order_status = ?, escrow_status = ?, payment_reference = ? WHERE id = ?", (label, order_status, escrow_status, bill_code or order["payment_reference"], order_id))
+            con.execute("UPDATE payments SET status = ?, bill_code = ?, raw_response = ?, updated_at = ? WHERE order_id = ?", (label, bill_code, json.dumps(raw), now(), order_id))
+            if label == "paid" and not was_paid:
+                qty = int(order["quantity"])
+                if USE_POSTGRES:
+                    con.execute("UPDATE products SET stock = GREATEST(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, order["product_id"]))
+                else:
+                    con.execute("UPDATE products SET stock = MAX(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, order["product_id"]))
 
     def update_order_status(self, data):
         status = data["order_status"]
@@ -1217,6 +1417,37 @@ class Handler(BaseHTTPRequestHandler):
 def shipping_fee(method, weight):
     fees = {"In-Store Pickup": 0, "Standard Rider": 4.9, "Express Rider": 8.9, "Bulky Item": 12.9, "Seller Own Fleet": 6.9}
     return fees.get(method, 4.9) + max(float(weight) - 1, 0) * 1.5
+
+
+def clean_toyyib_text(value, limit):
+    allowed = []
+    for char in str(value or ""):
+        if char.isalnum() or char in (" ", "_"):
+            allowed.append(char)
+    text = "".join(allowed).strip() or "PasarMalam"
+    return text[:limit]
+
+
+def payment_status_label(status):
+    status = str(status)
+    if status == "1":
+        return "paid"
+    if status == "3":
+        return "failed"
+    return "pending"
+
+
+def post_toyyibpay(path, payload):
+    body = urllib.parse.urlencode(payload).encode("utf-8")
+    request = urllib.request.Request(
+        TOYYIBPAY_BASE_URL + path,
+        data=body,
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        raw = response.read().decode("utf-8")
+    return json.loads(raw)
 
 
 if __name__ == "__main__":
