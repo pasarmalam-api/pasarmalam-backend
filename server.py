@@ -1442,7 +1442,11 @@ def post_toyyibpay(path, payload):
     request = urllib.request.Request(
         TOYYIBPAY_BASE_URL + path,
         data=body,
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json,text/plain,*/*",
+            "User-Agent": "PasarMalam/1.0 (+https://pasarmalam-backend.onrender.com)",
+        },
         method="POST",
     )
     with urllib.request.urlopen(request, timeout=20) as response:
