@@ -817,6 +817,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.login(data)
             elif parsed.path == "/api/auth/password-reset":
                 send_json(self, 200, {"ok": True, "message": "Password reset link sent in demo mode"})
+            elif parsed.path == "/api/auth/change-password":
+                self.change_password(data)
+            elif parsed.path == "/api/profile":
+                self.update_profile(data)
             elif parsed.path == "/api/products" and method == "POST":
                 self.create_product(data)
             elif parsed.path.startswith("/api/products/"):
@@ -963,12 +967,16 @@ class Handler(BaseHTTPRequestHandler):
         for key in required:
             if key not in data:
                 raise ValueError(f"Missing {key}")
+        role = data["role"]
+        if role not in ("buyer", "seller"):
+            raise ValueError("Signup role must be buyer or seller")
+        seller_status = "pending" if role == "seller" else "not_applicable"
         with connect() as con:
             cur = con.execute(
-                "INSERT INTO users (role, name, phone, email, password, address, shop_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (data["role"], data["name"], data.get("phone", ""), data["email"], hash_password(data["password"]), data.get("address", ""), data.get("shop_name", ""), now()),
+                "INSERT INTO users (role, name, phone, email, password, address, shop_name, status, seller_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)",
+                (role, data["name"], data.get("phone", ""), data["email"], hash_password(data["password"]), data.get("address", ""), data.get("shop_name", ""), seller_status, now()),
             )
-        user = {"id": cur.lastrowid, "role": data["role"], "name": data["name"], "email": data["email"], "shop_name": data.get("shop_name", "")}
+        user = {"id": cur.lastrowid, "role": role, "name": data["name"], "phone": data.get("phone", ""), "email": data["email"], "address": data.get("address", ""), "shop_name": data.get("shop_name", ""), "status": "active", "seller_status": seller_status}
         send_json(self, 201, {"token": make_token(user), "user": user})
 
     def login(self, data):
@@ -981,11 +989,44 @@ class Handler(BaseHTTPRequestHandler):
         if not verify_password(data.get("password", ""), user["password"]):
             send_json(self, 401, {"error": "Invalid login"})
             return
+        if user.get("status") != "active":
+            send_json(self, 403, {"error": "Account is suspended"})
+            return
+        if user.get("role") == "seller" and user.get("seller_status") != "approved":
+            send_json(self, 403, {"error": "Seller account is waiting for admin approval"})
+            return
         if not user["password"].startswith("pbkdf2_sha256$"):
             with connect() as con:
                 con.execute("UPDATE users SET password = ? WHERE id = ?", (hash_password(data.get("password", "")), user["id"]))
         user.pop("password", None)
         send_json(self, 200, {"token": make_token(user), "user": user})
+
+    def update_profile(self, data):
+        user = self.require_user()
+        allowed = {"name", "phone", "address", "shop_name"}
+        updates = {key: str(data[key]) for key in allowed if key in data}
+        if user["role"] != "seller":
+            updates.pop("shop_name", None)
+        if not updates:
+            raise ValueError("No profile fields to update")
+        sql = ", ".join([f"{key} = ?" for key in updates])
+        with connect() as con:
+            con.execute(f"UPDATE users SET {sql} WHERE id = ?", [*updates.values(), user["id"]])
+            row = row_to_dict(con.execute("SELECT id, role, name, phone, email, address, shop_name, status, seller_status FROM users WHERE id = ?", (user["id"],)).fetchone())
+        send_json(self, 200, {"ok": True, "user": row, "token": make_token(row)})
+
+    def change_password(self, data):
+        user = self.require_user()
+        current = data.get("current_password", "")
+        new_password = data.get("new_password", "")
+        if len(new_password) < 8:
+            raise ValueError("New password must be at least 8 characters")
+        with connect() as con:
+            row = con.execute("SELECT password FROM users WHERE id = ?", (user["id"],)).fetchone()
+            if not row or not verify_password(current, row["password"]):
+                raise PermissionError("Current password is incorrect")
+            con.execute("UPDATE users SET password = ? WHERE id = ?", (hash_password(new_password), user["id"]))
+        send_json(self, 200, {"ok": True})
 
     def get_cart(self, query):
         user = self.current_user()
@@ -1024,7 +1065,7 @@ class Handler(BaseHTTPRequestHandler):
                         """
                         SELECT orders.*
                         FROM orders JOIN products ON products.id = orders.product_id
-                        WHERE products.seller_id = ?
+                        WHERE products.seller_id = ? AND orders.payment_status = 'paid'
                         ORDER BY orders.created_at DESC, orders.id DESC
                         """,
                         (user["id"],),
