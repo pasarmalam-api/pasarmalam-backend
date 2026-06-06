@@ -17,6 +17,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "")
 USE_POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
 PORT = int(os.environ.get("PORT", "8080"))
 AUTH_SECRET = os.environ.get("AUTH_SECRET", "pasarmalam-dev-secret-change-me")
+ADMIN_RESET_CODE = os.environ.get("ADMIN_RESET_CODE", "")
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://pasarmalam-backend.onrender.com")
 BUYER_APP_URL = os.environ.get("BUYER_APP_URL", "https://amethyst-ardenia-70.tiiny.site")
 TOYYIBPAY_SECRET_KEY = os.environ.get("TOYYIBPAY_SECRET_KEY", "")
@@ -819,6 +820,8 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 200, {"ok": True, "message": "Password reset link sent in demo mode"})
             elif parsed.path == "/api/auth/change-password":
                 self.change_password(data)
+            elif parsed.path == "/api/admin/reset-password":
+                self.reset_admin_password(data)
             elif parsed.path == "/api/profile":
                 self.update_profile(data)
             elif parsed.path == "/api/products" and method == "POST":
@@ -1026,6 +1029,23 @@ class Handler(BaseHTTPRequestHandler):
             if not row or not verify_password(current, row["password"]):
                 raise PermissionError("Current password is incorrect")
             con.execute("UPDATE users SET password = ? WHERE id = ?", (hash_password(new_password), user["id"]))
+        send_json(self, 200, {"ok": True})
+
+    def reset_admin_password(self, data):
+        if not ADMIN_RESET_CODE:
+            raise PermissionError("Admin reset mode is not enabled")
+        reset_code = data.get("reset_code", "")
+        if not hmac.compare_digest(reset_code, ADMIN_RESET_CODE):
+            raise PermissionError("Invalid reset code")
+        email = data.get("email", "admin@pasarmalam.my")
+        new_password = data.get("new_password", "")
+        if len(new_password) < 8:
+            raise ValueError("New password must be at least 8 characters")
+        with connect() as con:
+            row = con.execute("SELECT id, role FROM users WHERE email = ?", (email,)).fetchone()
+            if not row or row["role"] != "admin":
+                raise PermissionError("Admin account not found")
+            con.execute("UPDATE users SET password = ?, status = 'active' WHERE id = ?", (hash_password(new_password), row["id"]))
         send_json(self, 200, {"ok": True})
 
     def get_cart(self, query):
