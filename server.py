@@ -705,6 +705,12 @@ def ensure_admin_settings(con):
         "return_window_days": "7",
         "free_shipping_budget": "500",
         "late_shipment_threshold_days": "2",
+        "payment_bank_name": "Affin Bank",
+        "payment_account_name": "TANITOOLUWA Ventures",
+        "payment_account_number": "101-770000-653",
+        "payment_support_phone": "+60 11-6418 9641",
+        "payment_duitnow_note": "DuitNow QR will be added when ready.",
+        "payment_tng_note": "TNG / eWallet details will be added when ready.",
     }
     for key, value in defaults.items():
         row = con.execute("SELECT key FROM admin_settings WHERE key = ?", (key,)).fetchone()
@@ -780,6 +786,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/wallet": lambda: self.list_table("wallet", "wallet"),
                 "/api/metrics": self.get_metrics,
                 "/api/logistics/rates": self.get_logistics_rates,
+                "/api/public/settings": self.public_settings,
                 "/api/payments/toyyibpay/return": lambda: self.toyyibpay_return(query),
                 "/api/admin/users": self.admin_users,
                 "/api/admin/sellers": self.admin_sellers,
@@ -1319,6 +1326,12 @@ class Handler(BaseHTTPRequestHandler):
             {"method": "Seller Own Fleet", "fee": 6.9, "eta": "Seller arranged", "tracking": False},
         ]
         send_json(self, 200, {"rates": rows})
+
+    def public_settings(self):
+        allowed = ("payment_bank_name", "payment_account_name", "payment_account_number", "payment_support_phone", "payment_duitnow_note", "payment_tng_note")
+        with connect() as con:
+            rows = [row_to_dict(row) for row in con.execute("SELECT key, value FROM admin_settings WHERE key IN (?, ?, ?, ?, ?, ?)", allowed)]
+        send_json(self, 200, {"settings": {row["key"]: row["value"] for row in rows}})
 
     def get_metrics(self):
         with connect() as con:
