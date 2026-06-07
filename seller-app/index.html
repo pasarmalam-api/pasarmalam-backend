@@ -2,54 +2,162 @@
 <html lang="ms">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PasarMalam Seller App</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PasarMalam Seller Centre</title>
+  <link rel="stylesheet" href="seller.css">
   <style>
-    :root{--brand:#0f9f8f;--purple:#6d5dfc;--pink:#e43f8f;--side:#182236;--line:#e5e7eb;--muted:#6b7280;--bg:#f4f6f8;--gold:#f6c85f}
-    *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:#1f2937}button,input,select,textarea{font:inherit}button{cursor:pointer}.app{min-height:100vh;display:grid;grid-template-columns:250px 1fr}
-    aside{background:linear-gradient(180deg,var(--side),#22315a);color:#dbe3ef;padding:16px 12px;position:sticky;top:0;height:100vh}.brand{display:flex;gap:10px;align-items:center;padding-bottom:16px;border-bottom:1px solid #ffffff22}.logo{width:52px;height:52px;border-radius:13px;background:conic-gradient(from 160deg,var(--brand),var(--purple),var(--pink),var(--brand));display:grid;place-items:center;color:#fff;font-weight:900;font-size:22px;box-shadow:inset 0 0 0 3px #ffffffcc}h1,h2,h3{margin:0}h1{color:#fff;font-size:24px}.label,.version{font-size:12px;font-weight:900}.version{display:inline-block;margin-top:5px;border:1px solid #fff6;border-radius:999px;padding:3px 8px;color:#fff}nav{display:grid;gap:6px;margin-top:14px}nav button{border:0;border-radius:6px;min-height:42px;text-align:left;padding:0 12px;background:transparent;color:#dbe3ef;font-weight:900}nav button.active,nav button:hover{background:linear-gradient(90deg,#0f9f8f66,#6d5dfc55);color:#fff}
-    header{background:#fff;border-bottom:1px solid var(--line);padding:14px 18px;position:sticky;top:0;z-index:4}.top{display:flex;gap:12px;align-items:center;justify-content:space-between}.search,input,select,textarea{border:1px solid var(--line);border-radius:6px;padding:10px}.search{flex:1;max-width:520px}.primary{border:0;border-radius:6px;min-height:38px;padding:0 14px;color:#fff;background:linear-gradient(90deg,var(--brand),var(--purple));font-weight:900}.soft,.lang{border:1px solid var(--line);border-radius:6px;background:#fff;font-weight:900;min-height:36px;padding:0 12px}.lang{color:var(--brand)}
-    main{padding:18px}.banner{min-height:210px;border-radius:8px;padding:22px;color:#fff;display:flex;align-items:end;background:linear-gradient(90deg,#101828dd,#10182870,#10182811),url("pasar-malam-real.jpg") center/cover}.banner h2{font-size:34px;max-width:800px}.stats,.tools,.work,.two,.three,.rates{display:grid;gap:12px;margin:14px 0}.stats{grid-template-columns:repeat(4,1fr)}.work{grid-template-columns:390px 1fr}.two{grid-template-columns:1fr 1fr}.three{grid-template-columns:repeat(3,1fr)}.stat,.panel,.tool{background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 18px #00000008}.stat,.tool,.panel-body{padding:14px}.panel-head{display:flex;justify-content:space-between;align-items:center;padding:14px;border-bottom:1px solid var(--line)}.stat span,.item span,.msg span,.muted{color:var(--muted);font-size:13px}.stat b{display:block;font-size:25px;margin-top:5px}form{display:grid;gap:10px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}input,select,textarea{width:100%}textarea{min-height:78px}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left}th{color:var(--muted);font-size:13px;background:#fafafa}.tag{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:900;background:#eafaf2;color:#067647}.used,.low{background:#fff8db;color:#976400}.nego{background:#eef2ff;color:#2563eb}.danger{color:#b42318;border-color:#fecdca}.thumb{width:52px;height:52px;border-radius:6px;object-fit:cover;background:#f3f4f6;border:1px solid var(--line);vertical-align:middle;margin-right:10px}.msg,.order,.rate{border:1px solid var(--line);border-radius:6px;background:#fafafa;padding:10px;margin-top:8px}.msg.seller{background:#f0fffc;margin-left:18px}.reply{display:grid;grid-template-columns:1fr auto;gap:8px;margin-top:10px}.rate{display:grid;grid-template-columns:1fr auto;gap:10px}.rate strong{color:var(--brand)}.stars{color:var(--gold);font-weight:900}.preview-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.preview{aspect-ratio:1/1;border:1px solid var(--line);border-radius:6px;background:#fafafa center/cover no-repeat}.wallet-line{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:8px 0}.modal{position:fixed;inset:0;background:#0007;display:none;align-items:center;justify-content:center;z-index:20;padding:20px}.modal.open{display:flex}.sheet{background:#fff;border-radius:8px;max-width:560px;width:100%;padding:16px}
-    @media(max-width:980px){.app{grid-template-columns:1fr}aside{position:static;height:auto}.stats,.tools,.work,.two,.three{grid-template-columns:1fr}.top{flex-wrap:wrap}.search{max-width:none;flex-basis:100%}nav{grid-template-columns:repeat(2,1fr)}}@media(max-width:560px){nav,.row{grid-template-columns:1fr}.banner h2{font-size:27px}}
+    .hero{min-height:214px;border-radius:8px;padding:22px;color:#fff;display:flex;align-items:flex-end;background:linear-gradient(90deg,#101828e6,#10182891,#10182822),url("pasar-malam-real.jpg") center/cover;margin-bottom:14px}
+    .hero h2{font-size:34px;max-width:760px;margin-bottom:6px}
+    .hero p{max-width:760px;margin:0;color:#edf4ff}
+    .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .search{max-width:420px}
+    .section{margin-top:14px}
+    .mini-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:14px}
+    .quick{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .quick a{border:1px solid var(--line);border-radius:8px;background:#fff;padding:13px;font-weight:900;color:var(--brand)}
+    .product-title{display:flex;align-items:center;gap:10px}
+    @media(max-width:980px){.mini-grid,.quick{grid-template-columns:1fr}.hero h2{font-size:27px}.search{max-width:none}}
   </style>
 </head>
 <body>
-  <div class="app">
-    <aside><div class="brand"><div class="logo">PM</div><div><h1>PasarMalam</h1><div class="label">Aplikasi Penjual</div><div class="version">FULL SELLER CENTRE DEMO</div></div></div><nav><button class="active" onclick="location.href='index.html'">Dashboard</button><button onclick="location.href='login.html'">Login</button><button onclick="location.href='store-profile.html'">Store Profile</button><button onclick="location.href='orders.html'">Orders</button><button onclick="location.href='products.html'">Products</button><button onclick="location.href='campaigns.html'">Marketing</button><button onclick="location.href='wallet.html'">Finance</button><button onclick="location.href='logistics.html'">Logistics</button><button onclick="location.href='messages.html'">Messages</button><button onclick="location.href='reviews.html'">Reviews</button><button onclick="location.href='performance.html'">Performance</button><button onclick="location.href='settings.html'">Settings</button></nav></aside>
-    <div><header><div class="top"><div><h2>Merchant Dashboard</h2><span>Products, orders, returns, AWB, campaigns, wallet and metrics.</span></div><input class="search" id="search" placeholder="Search products"><button class="lang" id="langToggle">English</button><button class="primary" onclick="nameInput.focus()">Add Product</button></div></header>
+<div class="app">
+  <aside>
+    <a class="brand" href="index.html">
+      <div class="logo">PM</div>
+      <div><h1>PasarMalam</h1><div class="label">Seller Centre</div></div>
+    </a>
+    <nav>
+      <a class="active" href="index.html">Dashboard</a>
+      <a href="login.html">Sign In</a>
+      <a href="register.html">Register Seller</a>
+      <a href="products.html">Products</a>
+      <a href="add-product.html">Add Product</a>
+      <a href="orders.html">Orders</a>
+      <a href="returns.html">Returns</a>
+      <a href="messages.html">Messages</a>
+      <a href="logistics.html">Logistics</a>
+      <a href="wallet.html">Wallet</a>
+      <a href="campaigns.html">Campaigns</a>
+      <a href="reviews.html">Reviews</a>
+      <a href="performance.html">Performance</a>
+      <a href="settings.html">Settings</a>
+    </nav>
+  </aside>
+  <div>
+    <header>
+      <div class="top">
+        <div>
+          <h2>Merchant Dashboard</h2>
+          <span>Manage listings, orders, returns, chat, logistics and payouts.</span>
+        </div>
+        <div class="toolbar">
+          <input class="search" id="search" placeholder="Search product, category or shop">
+          <button class="soft" onclick="location.href='login.html'">Sign In</button>
+          <button class="soft" onclick="location.href='register.html'">Register</button>
+          <button class="primary" onclick="location.href='add-product.html'">Add Product</button>
+        </div>
+      </div>
+    </header>
     <main>
-      <section class="banner"><div><h2>PasarMalam Seller Centre</h2><p>Manage listings, stock, variants, logistics, buyer messages, ratings, refunds, change goods and payouts.</p></div></section>
-      <section class="stats"><div class="stat"><span>Live Products</span><b id="liveCount">0</b></div><div class="stat"><span>Orders</span><b id="orderCount">0</b></div><div class="stat"><span>Sales</span><b id="salesCount">RM0</b></div><div class="stat"><span>Reply Score</span><b id="replyScore">98%</b></div></section>
-      <section class="three"><div class="stat"><span>Late Shipment</span><b id="lateRate">0%</b></div><div class="stat"><span>Cancellation</span><b id="cancelRate">0%</b></div><div class="stat"><span>Rating</span><b id="ratingScore">0</b></div></section>
-      <section class="two"><div class="panel"><div class="panel-head"><h3>Seller Account</h3><span class="tag">Split pages</span></div><div class="panel-body"><div class="item">Login, store profile and performance now have their own pages.</div><button class="primary" onclick="location.href='login.html'">Seller Login</button> <button class="soft" onclick="location.href='store-profile.html'">Store Profile</button> <button class="soft" onclick="location.href='performance.html'">Performance</button><p class="muted" id="sellerProfile">Use the separate pages for account management.</p></div></div><div class="panel"><div class="panel-head"><h3>Wallet & Settlement</h3><button class="soft" id="loadWallet">Refresh</button></div><div class="panel-body" id="walletBox"></div></div></section>
-      <section class="work"><div class="panel"><div class="panel-head"><h3 id="formTitle">Add Product</h3><span class="tag">Multiple images + variants</span></div><div class="panel-body"><form id="form"><input id="nameInput" placeholder="Product name" required><div class="row"><input id="price" placeholder="Price RM" required><input id="stock" placeholder="Stock" required></div><select id="category"><option>Phones</option><option>Chargers</option><option>Electronics</option><option>Car Parts</option><option>Shoes</option><option>Clothes</option><option>Food</option><option>Drinks</option></select><div class="row"><select id="condition"><option>New</option><option>Used</option></select><select id="priceMode"><option>Fixed</option><option>Negotiable</option></select></div><div class="row"><input id="variantInput" placeholder="Variants: size, color, model"><input id="weightInput" placeholder="Weight KG" value="0.5"></div><div class="row"><select id="shippingType"><option>In-Store Pickup</option><option selected>Standard Rider</option><option>Express Rider</option><option>Bulky Item</option><option>Seller Own Fleet</option></select><input id="warrantyInput" placeholder="Warranty / return rule"></div><div class="row"><button type="button" class="soft" id="choosePhoto">Choose from device</button><button type="button" class="soft" id="takePhoto">Take a photo</button></div><input id="productImage" type="file" accept="image/*" multiple style="display:none"><input id="cameraImage" type="file" accept="image/*" capture="environment" style="display:none"><p id="uploadStatus" class="muted"></p><div class="preview-grid" id="previewGrid"></div><textarea id="descriptionInput" placeholder="Description for buyers"></textarea><button class="primary">Publish Product</button><button type="button" class="soft" id="clearEdit">Clear Edit</button></form></div></div><div class="panel"><div class="panel-head"><h3>Product Listings</h3><button class="soft">Bulk Edit</button></div><div class="panel-body" style="overflow:auto"><table><thead><tr><th>Product</th><th>Price</th><th>Stock</th><th>Condition</th><th>Shipping</th><th>Action</th></tr></thead><tbody id="rows"></tbody></table></div></div></section>
-      <section class="two"><div class="panel"><div class="panel-head"><h3>Real Order Management</h3><button class="soft" id="refreshOrders">Refresh</button></div><div class="panel-body"><div id="ordersBox"></div></div></div><div class="panel"><div class="panel-head"><h3>Return / Refund / Change Goods</h3><button class="soft" id="refreshReturns">Refresh</button></div><div class="panel-body" id="returnsBox"></div></div></section>
-      <section class="tools"><div class="tool"><b>Logistics Rate + AWB</b><div id="ratesBox"></div><input id="awbOrderId" placeholder="Order ID for AWB"><button class="soft" id="awbBtn">Generate AWB</button><p class="muted" id="awbText"></p></div><div class="tool"><b>Buyer-Seller Messages</b><div id="sellerChatList"></div><div class="reply"><input id="sellerReply" placeholder="Reply to buyer..."><button class="soft" id="sendSellerReply">Send</button></div></div><div class="tool"><b>Customer Reviews</b><div id="reviewsBox"></div></div><div class="tool"><b>Campaign Tools</b><input id="campaignName" placeholder="Campaign name"><div class="row"><select id="campaignType"><option>voucher</option><option>bundle_deal</option><option>flash_sale</option><option>free_shipping</option></select><input id="campaignValue" placeholder="Value"></div><button class="soft" id="campaignBtn">Create Campaign</button><div id="campaignBox"></div></div></section>
-    </main></div>
+      <section class="hero">
+        <div>
+          <h2>Professional seller workspace for PasarMalam merchants</h2>
+          <p>Track sales, publish products with photos, manage shipping, reply to buyers and handle refunds from one dashboard.</p>
+        </div>
+      </section>
+
+      <section class="grid">
+        <div class="stat"><span>Live Products</span><b id="productCount">0</b></div>
+        <div class="stat"><span>Orders</span><b id="orderCount">0</b></div>
+        <div class="stat"><span>Gross Sales</span><b id="salesCount">RM0</b></div>
+        <div class="stat"><span>Store Rating</span><b id="ratingScore">0</b></div>
+      </section>
+
+      <section class="three section">
+        <div class="stat"><span>Response Rate</span><b id="responseRate">0%</b></div>
+        <div class="stat"><span>Late Shipment</span><b id="lateShipment">0%</b></div>
+        <div class="stat"><span>Cancellation</span><b id="cancelRate">0%</b></div>
+      </section>
+
+      <section class="quick section">
+        <a href="products.html">Product Management</a>
+        <a href="orders.html">Order Processing</a>
+        <a href="logistics.html">Logistics / AWB</a>
+        <a href="campaigns.html">Campaign Tools</a>
+      </section>
+
+      <section class="mini-grid">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Product Listings</h3>
+            <button class="soft" onclick="location.href='products.html'">Open Products</button>
+          </div>
+          <div style="overflow:auto">
+            <table>
+              <thead><tr><th>Product</th><th>Price</th><th>Stock</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody id="productRows"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Wallet / Settlement</h3>
+            <button class="soft" onclick="loadWallet()">Refresh</button>
+          </div>
+          <div id="walletBox"></div>
+        </div>
+      </section>
+
+      <section class="two section">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Orders To Handle</h3>
+            <button class="soft" onclick="location.href='orders.html'">Open Orders</button>
+          </div>
+          <div id="ordersBox"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Returns / Disputes</h3>
+            <button class="soft" onclick="location.href='returns.html'">Open Returns</button>
+          </div>
+          <div id="returnsBox"></div>
+        </div>
+      </section>
+
+      <section class="three section">
+        <div class="panel">
+          <div class="panel-head"><h3>Buyer Messages</h3><a class="soft" href="messages.html">Reply</a></div>
+          <div id="messagesBox"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Logistics Rate</h3><a class="soft" href="logistics.html">AWB</a></div>
+          <div id="ratesBox"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Reviews</h3><a class="soft" href="reviews.html">View</a></div>
+          <div id="reviewsBox"></div>
+        </div>
+      </section>
+    </main>
   </div>
-  <script>
-    const API_BASE="https://pasarmalam-backend.onrender.com",CLOUD_NAME="dn68sok6b",UPLOAD_PRESET="pasarmalam_products";let apiProducts=[],selectedImages=[],editId=null,currentLang=localStorage.getItem("pasarmalam-lang")||"ms";const money=v=>`RM${Number(v).toFixed(2)}`;langToggle.onclick=()=>{currentLang=currentLang==="ms"?"en":"ms";localStorage.setItem("pasarmalam-lang",currentLang);langToggle.textContent=currentLang==="ms"?"English":"Malay"};
-    async function api(path,options={}){const token=localStorage.getItem("pm_token")||"";const headers={"Content-Type":"application/json",...(options.headers||{})};if(token)headers.Authorization=`Bearer ${token}`;const res=await fetch(API_BASE+path,{...options,headers});if(!res.ok)throw new Error(await res.text());return res.json()}
-    choosePhoto.onclick=()=>productImage.click();takePhoto.onclick=()=>cameraImage.click();productImage.onchange=()=>handleFiles([...productImage.files]);cameraImage.onchange=()=>handleFiles([...cameraImage.files]);
-    function resizeMarketplaceImage(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onerror=reject;reader.onload=()=>{const img=new Image();img.onerror=reject;img.onload=()=>{const size=1200,canvas=document.createElement("canvas"),ctx=canvas.getContext("2d"),sourceSize=Math.min(img.naturalWidth,img.naturalHeight),sx=(img.naturalWidth-sourceSize)/2,sy=(img.naturalHeight-sourceSize)/2;canvas.width=size;canvas.height=size;ctx.fillStyle="#fff";ctx.fillRect(0,0,size,size);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality="high";ctx.drawImage(img,sx,sy,sourceSize,sourceSize,0,0,size,size);resolve(canvas.toDataURL("image/jpeg",0.86))};img.src=reader.result};reader.readAsDataURL(file)})}
-    function dataUrlToBlob(dataUrl){const parts=dataUrl.split(","),mime=parts[0].match(/:(.*?);/)[1],bin=atob(parts[1]),arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:mime})}
-    async function uploadToCloudinary(dataUrl){const fd=new FormData();fd.append("file",dataUrlToBlob(dataUrl),"pasarmalam-product.jpg");fd.append("upload_preset",UPLOAD_PRESET);fd.append("folder","pasarmalam/products");const r=await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,{method:"POST",body:fd});const d=await r.json();if(!r.ok)throw new Error(d.error?.message||"Image upload failed");return d.secure_url}
-    async function handleFiles(files){for(const file of files.slice(0,6)){if(file.type.startsWith("image/")){outStatus("Uploading image...");const img=await resizeMarketplaceImage(file);const url=await uploadToCloudinary(img);selectedImages.push(url)}}drawPreview();outStatus("")}function outStatus(text){const el=document.getElementById("uploadStatus");if(el)el.textContent=text}function drawPreview(){previewGrid.innerHTML=selectedImages.map(img=>`<div class="preview" style="background-image:url('${img}')"></div>`).join("")}
-    function productRow(p){const thumb=(p.images&&p.images[0])||p.image_url;return `<tr><td class="item">${thumb?`<img class="thumb" src="${thumb}" alt="${p.name}">`:""}<b>${p.name}</b><span>${p.category} | ${(p.variants||[]).join(", ")}</span></td><td>${money(p.price)}</td><td><span class="tag ${p.stock<=6?"low":""}">${p.stock} left</span></td><td><span class="tag ${p.condition==="Used"?"used":""}">${p.condition}</span></td><td>${p.shipping_type}</td><td><button class="soft" onclick="editProduct(${p.id})">Edit</button> <button class="soft danger" onclick="deleteProduct(${p.id})">Delete</button></td></tr>`}
-    async function loadProducts(){apiProducts=(await api("/api/products")).products;renderProducts()}function renderProducts(){const q=search.value.toLowerCase();const list=apiProducts.filter(p=>`${p.name} ${p.shop} ${p.category}`.toLowerCase().includes(q));liveCount.textContent=apiProducts.length;rows.innerHTML=list.map(productRow).join("")}search.oninput=renderProducts;
-    function editProduct(id){const p=apiProducts.find(x=>x.id===id);editId=id;formTitle.textContent=`Edit Product #${id}`;nameInput.value=p.name;price.value=p.price;stock.value=p.stock;category.value=p.category;condition.value=p.condition;priceMode.value=p.price_mode;variantInput.value=(p.variants||[]).join(", ");weightInput.value=p.weight_kg||0.5;shippingType.value=p.shipping_type;warrantyInput.value=p.warranty||"";descriptionInput.value=p.description||"";selectedImages=p.images||[];drawPreview()}clearEdit.onclick=()=>{editId=null;formTitle.textContent="Add Product";form.reset();selectedImages=[];drawPreview()};
-    async function deleteProduct(id){if(!confirm("Delete product?"))return;await api(`/api/products/${id}`,{method:"DELETE"});await loadProducts()}
-    form.onsubmit=async e=>{e.preventDefault();const payload={name:nameInput.value,shop:"PasarMalam Seller",category:category.value,price:Number(price.value)||0,stock:Number(stock.value)||0,condition:condition.value,price_mode:priceMode.value,description:descriptionInput.value,warranty:warrantyInput.value,variants:variantInput.value.split(",").map(x=>x.trim()).filter(Boolean),images:selectedImages,shipping_type:shippingType.value,weight_kg:Number(weightInput.value)||0.5};if(editId)await api(`/api/products/${editId}`,{method:"PUT",body:JSON.stringify(payload)});else await api("/api/products",{method:"POST",body:JSON.stringify(payload)});clearEdit.click();await loadProducts()};
-    async function loadMetrics(){const m=await api("/api/metrics");orderCount.textContent=m.orders;salesCount.textContent=money(m.sales);replyScore.textContent=m.response_rate+"%";lateRate.textContent=m.late_shipment_rate+"%";cancelRate.textContent=m.cancellation_rate+"%";ratingScore.textContent=m.rating}
-    function orderHtml(o){return `<div class="order"><b>PM-${o.id}</b> ${o.order_status} | ${o.payment_status} | Escrow ${o.escrow_status}<br><span class="muted">${o.logistics_method} ${o.tracking_no}</span><div class="row"><select id="status${o.id}"><option>placed</option><option>paid</option><option>packed</option><option>shipped</option><option>delivered</option><option>completed</option><option>cancelled</option></select><button class="soft" onclick="updateOrder(${o.id})">Update</button></div></div>`}
-    async function loadOrders(){const rows=(await api("/api/orders")).orders;ordersBox.innerHTML=rows.map(orderHtml).join("")||"<p class='muted'>No orders yet</p>"}async function updateOrder(id){await api("/api/orders/status",{method:"POST",body:JSON.stringify({order_id:id,order_status:document.getElementById("status"+id).value})});await loadOrders();await loadMetrics()}refreshOrders.onclick=loadOrders;
-    async function loadReturns(){const rows=(await api("/api/returns")).returns;returnsBox.innerHTML=rows.map(r=>`<div class="order"><b>${r.request_type}</b> Order ${r.order_id}<br>${r.reason}<br><span class="tag">${r.status}</span><button class="soft" onclick="alert('Seller response recorded in next backend phase')">Respond</button></div>`).join("")||"<p class='muted'>No return request</p>"}refreshReturns.onclick=loadReturns;
-    async function loadRates(){const rows=(await api("/api/logistics/rates")).rates;ratesBox.innerHTML=rows.map(r=>`<div class="rate"><span>${r.method}<br><small>${r.eta} ${r.tracking?"Tracking":"Own arrangement"}</small></span><strong>${money(r.fee)}</strong></div>`).join("")}awbBtn.onclick=async()=>{const r=await api("/api/logistics/awb",{method:"POST",body:JSON.stringify({order_id:Number(awbOrderId.value)||1})});awbText.textContent=r.print_text};
-    async function loadWalletData(){const rows=(await api("/api/wallet")).wallet;walletBox.innerHTML=rows.map(w=>`<div class="wallet-line"><span>${w.type} - ${w.note}</span><b>${money(w.amount)}</b></div>`).join("")}loadWallet.onclick=loadWalletData;
-    async function loadCampaigns(){const rows=(await api("/api/campaigns")).campaigns;campaignBox.innerHTML=rows.map(c=>`<div class="order"><b>${c.name}</b><br>${c.type} | ${c.value} | ${c.status}</div>`).join("")}campaignBtn.onclick=async()=>{await api("/api/campaigns",{method:"POST",body:JSON.stringify({name:campaignName.value,type:campaignType.value,value:campaignValue.value})});await loadCampaigns()};
-    async function renderApiChat(){const rows=(await api("/api/messages")).messages;sellerChatList.innerHTML=rows.map(m=>`<div class="msg ${m.sender_role==="seller"?"seller":""}"><b>${m.sender_role==="buyer"?m.buyer_name:m.seller_name}</b><span>${m.body}</span></div>`).join("")||"<p class='muted'>No messages</p>"}sendSellerReply.onclick=async()=>{await api("/api/messages",{method:"POST",body:JSON.stringify({product_id:1,buyer_name:"Buyer",seller_name:"PasarMalam Seller",sender_role:"seller",body:sellerReply.value})});sellerReply.value="";await renderApiChat()};
-    async function loadReviews(){const rows=(await api("/api/reviews")).reviews;reviewsBox.innerHTML=rows.map(r=>`<div class="msg"><div class="stars">${"★".repeat(r.rating)}</div><b>${r.title}</b><span>${r.body}</span></div>`).join("")}
-    async function init(){await loadProducts();await loadMetrics();await loadOrders();await loadReturns();await loadRates();await loadWalletData();await loadCampaigns();await renderApiChat();await loadReviews()}init();
-  </script>
+</div>
+
+<script>
+const API="https://pasarmalam-backend.onrender.com";
+const money=v=>`RM${Number(v||0).toFixed(2)}`;
+async function api(path){const r=await fetch(API+path);return r.json()}
+function img(p){const src=(p.images&&p.images[0])||p.image_url;return src?`<img class="thumb" src="${src}" alt="">`:""}
+async function loadMetrics(){try{const m=await api("/api/metrics");orderCount.textContent=m.orders||0;salesCount.textContent=money(m.sales);ratingScore.textContent=m.rating||"4.8";responseRate.textContent=(m.response_rate||98)+"%";lateShipment.textContent=(m.late_shipment_rate||0)+"%";cancelRate.textContent=(m.cancellation_rate||0)+"%"}catch(e){}}
+async function loadProducts(){const d=await api("/api/products");const rows=d.products||[];productCount.textContent=rows.length;drawProducts(rows);search.oninput=()=>drawProducts(rows)}
+function drawProducts(rows){const q=(search.value||"").toLowerCase();productRows.innerHTML=rows.filter(p=>`${p.name} ${p.category} ${p.shop}`.toLowerCase().includes(q)).slice(0,8).map(p=>`<tr><td><div class="product-title">${img(p)}<div><b>${p.name}</b><div class="muted">${p.shop} | ${p.category}</div></div></div></td><td>${money(p.price)}</td><td><span class="tag ${p.stock<=5?"warn":""}">${p.stock}</span></td><td><span class="tag ${p.condition==="Used"?"warn":""}">${p.condition}</span></td><td><button class="soft" onclick="location.href='edit-product.html?id=${p.id}'">Edit</button></td></tr>`).join("")}
+async function loadOrders(){const d=await api("/api/orders");const rows=(d.orders||[]).slice(0,5);ordersBox.innerHTML=rows.map(o=>`<div class="order"><b>PM-${o.id}</b> <span class="tag">${o.order_status}</span><p class="muted">${o.logistics_method||"Shipping"} | ${money(o.total)}</p></div>`).join("")||"<p class='muted'>No orders yet.</p>"}
+async function loadReturns(){const d=await api("/api/returns");const rows=(d.returns||[]).slice(0,5);returnsBox.innerHTML=rows.map(r=>`<div class="order"><b>${r.request_type}</b><p>${r.reason}</p><span class="tag warn">${r.status}</span></div>`).join("")||"<p class='muted'>No return requests.</p>"}
+async function loadWallet(){const d=await api("/api/wallet");walletBox.innerHTML=(d.wallet||[]).slice(0,5).map(w=>`<div class="wallet-line"><span>${w.type}<br><small class="muted">${w.note}</small></span><b>${money(w.amount)}</b></div>`).join("")}
+async function loadMessages(){const d=await api("/api/messages");messagesBox.innerHTML=(d.messages||[]).slice(0,4).map(m=>`<div class="msg"><b>${m.sender_role}</b><div class="muted">${m.body}</div></div>`).join("")||"<p class='muted'>No messages.</p>"}
+async function loadRates(){const d=await api("/api/logistics/rates");ratesBox.innerHTML=(d.rates||[]).slice(0,4).map(r=>`<div class="rate"><span>${r.method}<br><small class="muted">${r.eta}</small></span><strong>${money(r.fee||r.rate)}</strong></div>`).join("")}
+async function loadReviews(){const d=await api("/api/reviews");reviewsBox.innerHTML=(d.reviews||[]).slice(0,3).map(r=>`<div class="msg"><div class="stars">${"*".repeat(Number(r.rating)||5)}</div><b>${r.title}</b><div class="muted">${r.body}</div></div>`).join("")}
+loadMetrics();loadProducts();loadOrders();loadReturns();loadWallet();loadMessages();loadRates();loadReviews();
+</script>
 </body>
 </html>

@@ -168,6 +168,13 @@ def init_db():
               password TEXT NOT NULL,
               address TEXT DEFAULT '',
               shop_name TEXT DEFAULT '',
+              identity_type TEXT DEFAULT '',
+              identity_number TEXT DEFAULT '',
+              business_type TEXT DEFAULT '',
+              ssm_number TEXT DEFAULT '',
+              bank_name TEXT DEFAULT '',
+              bank_account_name TEXT DEFAULT '',
+              bank_account_number TEXT DEFAULT '',
               status TEXT DEFAULT 'active',
               seller_status TEXT DEFAULT 'pending',
               created_at INTEGER NOT NULL
@@ -358,6 +365,13 @@ def postgres_schema_statements():
           password TEXT NOT NULL,
           address TEXT DEFAULT '',
           shop_name TEXT DEFAULT '',
+          identity_type TEXT DEFAULT '',
+          identity_number TEXT DEFAULT '',
+          business_type TEXT DEFAULT '',
+          ssm_number TEXT DEFAULT '',
+          bank_name TEXT DEFAULT '',
+          bank_account_name TEXT DEFAULT '',
+          bank_account_number TEXT DEFAULT '',
           status TEXT DEFAULT 'active',
           seller_status TEXT DEFAULT 'pending',
           created_at INTEGER NOT NULL
@@ -681,6 +695,13 @@ def migrate_users(con):
     additions = {
         "status": "TEXT DEFAULT 'active'",
         "seller_status": "TEXT DEFAULT 'pending'",
+        "identity_type": "TEXT DEFAULT ''",
+        "identity_number": "TEXT DEFAULT ''",
+        "business_type": "TEXT DEFAULT ''",
+        "ssm_number": "TEXT DEFAULT ''",
+        "bank_name": "TEXT DEFAULT ''",
+        "bank_account_name": "TEXT DEFAULT ''",
+        "bank_account_number": "TEXT DEFAULT ''",
     }
     for name, sql in additions.items():
         if name not in columns:
@@ -1049,15 +1070,53 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("Signup role must be buyer or seller")
         if not data.get("phone", "").strip():
             raise ValueError("Phone number is required")
-        if role == "buyer":
+        if role in ("buyer", "seller"):
             email_otp_token = data.get("email_otp_token", "")
-            if not verify_email_otp_token(data["email"], email_otp_token):
+            if not verify_email_otp_token(data["email"], email_otp_token, f"{role}_signup"):
                 raise PermissionError("Email OTP verification required")
+        if role == "seller":
+            seller_required = {
+                "shop_name": "Shop name is required",
+                "identity_type": "Identity type is required",
+                "identity_number": "Identity number is required",
+                "business_type": "Business type is required",
+                "ssm_number": "SSM number is required",
+                "bank_name": "Bank name is required",
+                "bank_account_name": "Bank account name is required",
+                "bank_account_number": "Bank account number is required",
+            }
+            for key, message in seller_required.items():
+                if not data.get(key, "").strip():
+                    raise ValueError(message)
         seller_status = "pending" if role == "seller" else "not_applicable"
         with connect() as con:
             cur = con.execute(
-                "INSERT INTO users (role, name, phone, email, password, address, shop_name, status, seller_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)",
-                (role, data["name"], data.get("phone", ""), data["email"], hash_password(data["password"]), data.get("address", ""), data.get("shop_name", ""), seller_status, now()),
+                """
+                INSERT INTO users (
+                    role, name, phone, email, password, address, shop_name,
+                    identity_type, identity_number, business_type, ssm_number,
+                    bank_name, bank_account_name, bank_account_number,
+                    status, seller_status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+                """,
+                (
+                    role,
+                    data["name"],
+                    data.get("phone", ""),
+                    data["email"],
+                    hash_password(data["password"]),
+                    data.get("address", ""),
+                    data.get("shop_name", ""),
+                    data.get("identity_type", ""),
+                    data.get("identity_number", ""),
+                    data.get("business_type", ""),
+                    data.get("ssm_number", ""),
+                    data.get("bank_name", ""),
+                    data.get("bank_account_name", ""),
+                    data.get("bank_account_number", ""),
+                    seller_status,
+                    now(),
+                ),
             )
         user = {"id": cur.lastrowid, "role": role, "name": data["name"], "phone": data.get("phone", ""), "email": data["email"], "address": data.get("address", ""), "shop_name": data.get("shop_name", ""), "status": "active", "seller_status": seller_status}
         send_json(self, 201, {"token": make_token(user), "user": user})
@@ -1468,13 +1527,13 @@ class Handler(BaseHTTPRequestHandler):
     def admin_users(self):
         self.require_user("admin")
         with connect() as con:
-            rows = [row_to_dict(row) for row in con.execute("SELECT id, role, name, phone, email, address, shop_name, status, seller_status, created_at FROM users ORDER BY created_at DESC, id DESC")]
+            rows = [row_to_dict(row) for row in con.execute("SELECT id, role, name, phone, email, address, shop_name, identity_type, identity_number, business_type, ssm_number, bank_name, bank_account_name, bank_account_number, status, seller_status, created_at FROM users ORDER BY created_at DESC, id DESC")]
         send_json(self, 200, {"users": rows})
 
     def admin_sellers(self):
         self.require_user("admin")
         with connect() as con:
-            rows = [row_to_dict(row) for row in con.execute("SELECT id, role, name, phone, email, address, shop_name, status, seller_status, created_at FROM users WHERE role = 'seller' ORDER BY created_at DESC, id DESC")]
+            rows = [row_to_dict(row) for row in con.execute("SELECT id, role, name, phone, email, address, shop_name, identity_type, identity_number, business_type, ssm_number, bank_name, bank_account_name, bank_account_number, status, seller_status, created_at FROM users WHERE role = 'seller' ORDER BY created_at DESC, id DESC")]
         send_json(self, 200, {"sellers": rows})
 
     def admin_products(self):
