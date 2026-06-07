@@ -1047,6 +1047,8 @@ class Handler(BaseHTTPRequestHandler):
         role = data["role"]
         if role not in ("buyer", "seller"):
             raise ValueError("Signup role must be buyer or seller")
+        if not data.get("phone", "").strip():
+            raise ValueError("Phone number is required")
         if role == "buyer" and RESEND_API_KEY:
             email_otp_token = data.get("email_otp_token", "")
             if not verify_email_otp_token(data["email"], email_otp_token):
