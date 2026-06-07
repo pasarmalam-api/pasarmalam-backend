@@ -757,6 +757,23 @@ def seed(con):
             """,
             [(*row, now()) for row in rows],
         )
+    extra_products = [
+        ("Cordless drill set", "Hardware Lane", "Hardware", 159, 8, "New", "Fixed", "Home repair drill kit with bits", "30-day shop warranty", '["12V","Tool kit"]', "Bulky Item", 2.2),
+        ("A4 notebook bundle", "Stationery Corner", "Stationery", 12.5, 40, "New", "Fixed", "Exercise books and pens bundle", "No warranty", '["5 books","Blue pen"]', "Standard Rider", 0.9),
+        ("Kids building blocks", "Toy Night", "Toys", 28, 15, "New", "Negotiable", "Creative toy set for kids", "7-day shop warranty", '["Small set","Large set"]', "Standard Rider", 0.8),
+        ("Nasi lemak ayam", "Malam Meals", "Meals", 9.9, 30, "New", "Fixed", "Fresh cooked meal for pickup", "Fresh item, no return", '["Normal","Extra sambal"]', "In-Store Pickup", 0.4),
+        ("Char kuey teow special", "Street Wok", "Street Food", 11.5, 25, "New", "Fixed", "Hot street food cooked fresh", "Fresh item, no return", '["Regular","Spicy"]', "In-Store Pickup", 0.5),
+    ]
+    for row in extra_products:
+        if con.execute("SELECT COUNT(*) AS c FROM products WHERE name = ?", (row[0],)).fetchone()["c"] == 0:
+            con.execute(
+                """
+                INSERT INTO products
+                (seller_id, name, shop, category, price, stock, condition, price_mode, description, warranty, variants, images, image_url, rating, sold, shipping_type, weight_kg, created_at)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', '', 4.8, 0, ?, ?, ?)
+                """,
+                (*row, now()),
+            )
     if con.execute("SELECT COUNT(*) AS c FROM campaigns").fetchone()["c"] == 0:
         con.executemany(
             "INSERT INTO campaigns (seller_id, name, type, value, status, created_at) VALUES (1, ?, ?, ?, 'active', ?)",
