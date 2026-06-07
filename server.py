@@ -320,6 +320,17 @@ def init_db():
               note TEXT DEFAULT '',
               created_at INTEGER NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS email_otps (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              email TEXT NOT NULL,
+              code_hash TEXT NOT NULL,
+              purpose TEXT NOT NULL DEFAULT 'buyer_signup',
+              verified INTEGER DEFAULT 0,
+              attempts INTEGER DEFAULT 0,
+              expires_at INTEGER NOT NULL,
+              created_at INTEGER NOT NULL
+            );
             """
         )
         migrate_products(con)
@@ -332,6 +343,7 @@ def init_db():
         seed(con)
         ensure_admin(con)
         ensure_admin_settings(con)
+        migrate_email_otps(con)
 
 
 def postgres_schema_statements():
@@ -511,6 +523,18 @@ def postgres_schema_statements():
           created_at INTEGER NOT NULL
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS email_otps (
+          id SERIAL PRIMARY KEY,
+          email TEXT NOT NULL,
+          code_hash TEXT NOT NULL,
+          purpose TEXT NOT NULL DEFAULT 'buyer_signup',
+          verified INTEGER DEFAULT 0,
+          attempts INTEGER DEFAULT 0,
+          expires_at INTEGER NOT NULL,
+          created_at INTEGER NOT NULL
+        )
+        """,
     ]
 
 
@@ -600,6 +624,39 @@ def migrate_payments(con):
               raw_response TEXT DEFAULT '',
               created_at INTEGER NOT NULL,
               updated_at INTEGER NOT NULL
+            )
+            """
+        )
+
+
+def migrate_email_otps(con):
+    if USE_POSTGRES:
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS email_otps (
+              id SERIAL PRIMARY KEY,
+              email TEXT NOT NULL,
+              code_hash TEXT NOT NULL,
+              purpose TEXT NOT NULL DEFAULT 'buyer_signup',
+              verified INTEGER DEFAULT 0,
+              attempts INTEGER DEFAULT 0,
+              expires_at INTEGER NOT NULL,
+              created_at INTEGER NOT NULL
+            )
+            """
+        )
+    else:
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS email_otps (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              email TEXT NOT NULL,
+              code_hash TEXT NOT NULL,
+              purpose TEXT NOT NULL DEFAULT 'buyer_signup',
+              verified INTEGER DEFAULT 0,
+              attempts INTEGER DEFAULT 0,
+              expires_at INTEGER NOT NULL,
+              created_at INTEGER NOT NULL
             )
             """
         )
@@ -827,6 +884,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.signup(data)
             elif parsed.path == "/api/auth/login":
                 self.login(data)
+            elif parsed.path == "/api/otp/email/send":
+                self.send_email_otp(data)
+            elif parsed.path == "/api/otp/email/verify":
+                self.verify_email_otp(data)
             elif parsed.path == "/api/auth/password-reset":
                 send_json(self, 200, {"ok": True, "message": "Password reset link sent in demo mode"})
             elif parsed.path == "/api/auth/change-password":
@@ -986,6 +1047,10 @@ class Handler(BaseHTTPRequestHandler):
         role = data["role"]
         if role not in ("buyer", "seller"):
             raise ValueError("Signup role must be buyer or seller")
+        if role == "buyer" and RESEND_API_KEY:
+            email_otp_token = data.get("email_otp_token", "")
+            if not verify_email_otp_token(data["email"], email_otp_token):
+                raise PermissionError("Email OTP verification required")
         seller_status = "pending" if role == "seller" else "not_applicable"
         with connect() as con:
             cur = con.execute(
@@ -994,6 +1059,52 @@ class Handler(BaseHTTPRequestHandler):
             )
         user = {"id": cur.lastrowid, "role": role, "name": data["name"], "phone": data.get("phone", ""), "email": data["email"], "address": data.get("address", ""), "shop_name": data.get("shop_name", ""), "status": "active", "seller_status": seller_status}
         send_json(self, 201, {"token": make_token(user), "user": user})
+
+    def send_email_otp(self, data):
+        email = data.get("email", "").strip().lower()
+        purpose = data.get("purpose", "buyer_signup")
+        if not email or "@" not in email:
+            raise ValueError("Valid email is required")
+        if not RESEND_API_KEY:
+            raise PermissionError("Email OTP is not enabled. Set RESEND_API_KEY in Render.")
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        with connect() as con:
+            con.execute(
+                "INSERT INTO email_otps (email, code_hash, purpose, verified, attempts, expires_at, created_at) VALUES (?, ?, ?, 0, 0, ?, ?)",
+                (email, hash_otp_code(email, code), purpose, now() + 10 * 60, now()),
+            )
+        send_email(
+            email,
+            "PasarMalam verification code",
+            f"<p>Your PasarMalam verification code is:</p><h2>{code}</h2><p>This code expires in 10 minutes.</p>",
+        )
+        send_json(self, 200, {"ok": True, "message": "OTP sent to email"})
+
+    def verify_email_otp(self, data):
+        email = data.get("email", "").strip().lower()
+        code = data.get("code", "").strip()
+        purpose = data.get("purpose", "buyer_signup")
+        if not email or not code:
+            raise ValueError("Email and OTP code are required")
+        expected_hash = hash_otp_code(email, code)
+        with connect() as con:
+            row = con.execute(
+                "SELECT * FROM email_otps WHERE email = ? AND purpose = ? ORDER BY created_at DESC, id DESC LIMIT 1",
+                (email, purpose),
+            ).fetchone()
+            if not row:
+                raise PermissionError("OTP not found")
+            otp = row_to_dict(row)
+            if otp["expires_at"] < now():
+                raise PermissionError("OTP expired")
+            if int(otp.get("attempts") or 0) >= 5:
+                raise PermissionError("Too many OTP attempts")
+            if not hmac.compare_digest(otp["code_hash"], expected_hash):
+                con.execute("UPDATE email_otps SET attempts = attempts + 1 WHERE id = ?", (otp["id"],))
+                raise PermissionError("Invalid OTP")
+            con.execute("UPDATE email_otps SET verified = 1 WHERE id = ?", (otp["id"],))
+        token = make_email_otp_token(email, purpose)
+        send_json(self, 200, {"ok": True, "email_otp_token": token})
 
     def login(self, data):
         with connect() as con:
@@ -1622,6 +1733,31 @@ def verify_admin_reset_token(token):
     if payload.get("exp", 0) < now():
         return ""
     return payload.get("email", "")
+
+
+def hash_otp_code(email, code):
+    return hmac.new(AUTH_SECRET.encode("utf-8"), f"{email}:{code}".encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def make_email_otp_token(email, purpose):
+    payload = {"email": email, "purpose": purpose, "exp": now() + 15 * 60}
+    body = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode("utf-8")).decode("ascii")
+    sig = hmac.new(AUTH_SECRET.encode("utf-8"), body.encode("utf-8"), hashlib.sha256).hexdigest()
+    return f"{body}.{sig}"
+
+
+def verify_email_otp_token(email, token, purpose="buyer_signup"):
+    if not token or "." not in token:
+        return False
+    body, sig = token.rsplit(".", 1)
+    expected = hmac.new(AUTH_SECRET.encode("utf-8"), body.encode("utf-8"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, sig):
+        return False
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(body.encode("ascii")).decode("utf-8"))
+    except Exception:
+        return False
+    return payload.get("email") == email and payload.get("purpose") == purpose and payload.get("exp", 0) >= now()
 
 
 def send_email(to_email, subject, html):
