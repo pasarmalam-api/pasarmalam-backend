@@ -1079,8 +1079,6 @@ class Handler(BaseHTTPRequestHandler):
                 "shop_name": "Shop name is required",
                 "identity_type": "Identity type is required",
                 "identity_number": "Identity number is required",
-                "business_type": "Business type is required",
-                "ssm_number": "SSM number is required",
                 "bank_name": "Bank name is required",
                 "bank_account_name": "Bank account name is required",
                 "bank_account_number": "Bank account number is required",
