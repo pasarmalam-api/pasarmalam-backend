@@ -30,16 +30,19 @@
 </main>
 <script>
 const API="https://pasarmalam-backend.onrender.com";
-function togglePassword(){password.type=password.type==="password"?"text":"password";viewBtn.textContent=password.type==="password"?"View":"Hide"}
+const $=id=>document.getElementById(id);
+function setStatus(text,type="muted"){const el=$("status");el.className="status "+type;el.textContent=text}
+function togglePassword(){const password=$("password"),viewBtn=$("viewBtn");password.type=password.type==="password"?"text":"password";viewBtn.textContent=password.type==="password"?"View":"Hide"}
 async function login(){
-  status.className="status muted";status.textContent="Signing in...";
-  if(!email.value.trim()||!password.value){status.className="status error";status.textContent="Email and password are required.";return}
+  const email=$("email"),password=$("password");
+  setStatus("Signing in...");
+  if(!email.value.trim()||!password.value){setStatus("Email and password are required.","error");return}
   const r=await fetch(API+"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value.trim(),password:password.value})});
   const d=await r.json().catch(()=>({}));
-  if(d.token){localStorage.setItem("pm_token",d.token);localStorage.setItem("pm_user",JSON.stringify(d.user));status.className="status success";status.textContent="Signed in. Redirecting...";setTimeout(()=>location.href="index.html",650)}
-  else{status.className="status error";status.textContent=d.error||"Sign in failed."}
+  if(d.token){localStorage.setItem("pm_token",d.token);localStorage.setItem("pm_user",JSON.stringify(d.user));setStatus("Signed in. Redirecting...","success");setTimeout(()=>location.href="index.html",650)}
+  else{setStatus(d.error||"Sign in failed.","error")}
 }
-password.addEventListener("keydown",e=>{if(e.key==="Enter")login()});
+document.addEventListener("DOMContentLoaded",()=>$("password").addEventListener("keydown",e=>{if(e.key==="Enter")login()}));
 </script>
 </body>
 </html>

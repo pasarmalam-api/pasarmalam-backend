@@ -36,18 +36,20 @@
 <script>
 const API="https://pasarmalam-backend.onrender.com";
 let emailOtpToken="";
-function setStatus(text,type="muted"){status.className="status "+type;status.textContent=text}
-function togglePassword(){password.type=password.type==="password"?"text":"password";viewBtn.textContent=password.type==="password"?"View":"Hide"}
+const $=id=>document.getElementById(id);
+function setStatus(text,type="muted"){const el=$("status");el.className="status "+type;el.textContent=text}
+function togglePassword(){const password=$("password"),viewBtn=$("viewBtn");password.type=password.type==="password"?"text":"password";viewBtn.textContent=password.type==="password"?"View":"Hide"}
 async function post(path,body){const r=await fetch(API+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Request failed");return d}
 async function sendEmailOtp(){
-  try{if(!email.value.trim()){setStatus("Email is required.","error");return}setStatus("Sending OTP...");const d=await post("/api/otp/email/send",{email:email.value.trim(),purpose:"buyer_signup"});setStatus(d.message||"OTP sent to email.","success")}
+  try{const email=$("email");if(!email.value.trim()){setStatus("Email is required.","error");return}setStatus("Sending OTP...");const d=await post("/api/otp/email/send",{email:email.value.trim(),purpose:"buyer_signup"});setStatus(d.message||"OTP sent to email.","success")}
   catch(e){setStatus(e.message,"error")}
 }
 async function verifyEmailOtp(){
-  try{if(!otp.value.trim()){setStatus("OTP code is required.","error");return}setStatus("Verifying OTP...");const d=await post("/api/otp/email/verify",{email:email.value.trim(),code:otp.value.trim(),purpose:"buyer_signup"});emailOtpToken=d.email_otp_token;setStatus("Email verified. You can create account now.","success")}
+  try{const email=$("email"),otp=$("otp");if(!otp.value.trim()){setStatus("OTP code is required.","error");return}setStatus("Verifying OTP...");const d=await post("/api/otp/email/verify",{email:email.value.trim(),code:otp.value.trim(),purpose:"buyer_signup"});emailOtpToken=d.email_otp_token;setStatus("Email verified. You can create account now.","success")}
   catch(e){setStatus(e.message,"error")}
 }
 async function signup(){
+  const name=$("name"),phone=$("phone"),email=$("email"),password=$("password"),address=$("address"),agree=$("agree");
   if(!name.value.trim()){setStatus("Full name is required.","error");return}
   if(!phone.value.trim()){setStatus("Phone number is required.","error");return}
   if(!email.value.trim()){setStatus("Email is required.","error");return}
