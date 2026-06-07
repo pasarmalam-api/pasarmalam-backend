@@ -172,6 +172,9 @@ def init_db():
               identity_number TEXT DEFAULT '',
               business_type TEXT DEFAULT '',
               ssm_number TEXT DEFAULT '',
+              ssm_document_url TEXT DEFAULT '',
+              business_verification_status TEXT DEFAULT 'not_submitted',
+              business_verification_submitted_at INTEGER DEFAULT 0,
               bank_name TEXT DEFAULT '',
               bank_account_name TEXT DEFAULT '',
               bank_account_number TEXT DEFAULT '',
@@ -369,6 +372,9 @@ def postgres_schema_statements():
           identity_number TEXT DEFAULT '',
           business_type TEXT DEFAULT '',
           ssm_number TEXT DEFAULT '',
+          ssm_document_url TEXT DEFAULT '',
+          business_verification_status TEXT DEFAULT 'not_submitted',
+          business_verification_submitted_at INTEGER DEFAULT 0,
           bank_name TEXT DEFAULT '',
           bank_account_name TEXT DEFAULT '',
           bank_account_number TEXT DEFAULT '',
@@ -699,6 +705,9 @@ def migrate_users(con):
         "identity_number": "TEXT DEFAULT ''",
         "business_type": "TEXT DEFAULT ''",
         "ssm_number": "TEXT DEFAULT ''",
+        "ssm_document_url": "TEXT DEFAULT ''",
+        "business_verification_status": "TEXT DEFAULT 'not_submitted'",
+        "business_verification_submitted_at": "INTEGER DEFAULT 0",
         "bank_name": "TEXT DEFAULT ''",
         "bank_account_name": "TEXT DEFAULT ''",
         "bank_account_number": "TEXT DEFAULT ''",
@@ -950,6 +959,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.awb(data)
             elif parsed.path == "/api/admin/user-status":
                 self.admin_update_user_status(data)
+            elif parsed.path == "/api/admin/business-verification":
+                self.admin_update_business_verification(data)
             elif parsed.path == "/api/admin/product-status":
                 self.admin_update_product_status(data)
             elif parsed.path == "/api/admin/payment-status":
@@ -1093,9 +1104,10 @@ class Handler(BaseHTTPRequestHandler):
                 INSERT INTO users (
                     role, name, phone, email, password, address, shop_name,
                     identity_type, identity_number, business_type, ssm_number,
+                    ssm_document_url, business_verification_status, business_verification_submitted_at,
                     bank_name, bank_account_name, bank_account_number,
                     status, seller_status, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?)
                 """,
                 (
                     role,
@@ -1109,6 +1121,9 @@ class Handler(BaseHTTPRequestHandler):
                     data.get("identity_number", ""),
                     data.get("business_type", ""),
                     data.get("ssm_number", ""),
+                    data.get("ssm_document_url", ""),
+                    "pending_review" if data.get("ssm_number", "").strip() or data.get("ssm_document_url", "").strip() else "not_submitted",
+                    now() if data.get("ssm_number", "").strip() or data.get("ssm_document_url", "").strip() else 0,
                     data.get("bank_name", ""),
                     data.get("bank_account_name", ""),
                     data.get("bank_account_number", ""),
@@ -1190,15 +1205,21 @@ class Handler(BaseHTTPRequestHandler):
     def update_profile(self, data):
         user = self.require_user()
         allowed = {"name", "phone", "address", "shop_name"}
+        seller_allowed = {"business_type", "ssm_number", "ssm_document_url", "bank_name", "bank_account_name", "bank_account_number"}
+        if user["role"] == "seller":
+            allowed |= seller_allowed
         updates = {key: str(data[key]) for key in allowed if key in data}
         if user["role"] != "seller":
             updates.pop("shop_name", None)
+        elif any(key in updates for key in ("business_type", "ssm_number", "ssm_document_url")):
+            updates["business_verification_status"] = "pending_review" if updates.get("ssm_number") or updates.get("ssm_document_url") else "not_submitted"
+            updates["business_verification_submitted_at"] = now() if updates["business_verification_status"] == "pending_review" else 0
         if not updates:
             raise ValueError("No profile fields to update")
         sql = ", ".join([f"{key} = ?" for key in updates])
         with connect() as con:
             con.execute(f"UPDATE users SET {sql} WHERE id = ?", [*updates.values(), user["id"]])
-            row = row_to_dict(con.execute("SELECT id, role, name, phone, email, address, shop_name, status, seller_status FROM users WHERE id = ?", (user["id"],)).fetchone())
+            row = row_to_dict(con.execute("SELECT id, role, name, phone, email, address, shop_name, identity_type, identity_number, business_type, ssm_number, ssm_document_url, business_verification_status, business_verification_submitted_at, bank_name, bank_account_name, bank_account_number, status, seller_status FROM users WHERE id = ?", (user["id"],)).fetchone())
         send_json(self, 200, {"ok": True, "user": row, "token": make_token(row)})
 
     def change_password(self, data):
@@ -1525,13 +1546,13 @@ class Handler(BaseHTTPRequestHandler):
     def admin_users(self):
         self.require_user("admin")
         with connect() as con:
-            rows = [row_to_dict(row) for row in con.execute("SELECT id, role, name, phone, email, address, shop_name, identity_type, identity_number, business_type, ssm_number, bank_name, bank_account_name, bank_account_number, status, seller_status, created_at FROM users ORDER BY created_at DESC, id DESC")]
+            rows = [row_to_dict(row) for row in con.execute("SELECT id, role, name, phone, email, address, shop_name, identity_type, identity_number, business_type, ssm_number, ssm_document_url, business_verification_status, business_verification_submitted_at, bank_name, bank_account_name, bank_account_number, status, seller_status, created_at FROM users ORDER BY created_at DESC, id DESC")]
         send_json(self, 200, {"users": rows})
 
     def admin_sellers(self):
         self.require_user("admin")
         with connect() as con:
-            rows = [row_to_dict(row) for row in con.execute("SELECT id, role, name, phone, email, address, shop_name, identity_type, identity_number, business_type, ssm_number, bank_name, bank_account_name, bank_account_number, status, seller_status, created_at FROM users WHERE role = 'seller' ORDER BY created_at DESC, id DESC")]
+            rows = [row_to_dict(row) for row in con.execute("SELECT id, role, name, phone, email, address, shop_name, identity_type, identity_number, business_type, ssm_number, ssm_document_url, business_verification_status, business_verification_submitted_at, bank_name, bank_account_name, bank_account_number, status, seller_status, created_at FROM users WHERE role = 'seller' ORDER BY created_at DESC, id DESC")]
         send_json(self, 200, {"sellers": rows})
 
     def admin_products(self):
@@ -1667,6 +1688,19 @@ class Handler(BaseHTTPRequestHandler):
                 (data.get("status", "active"), data.get("seller_status", "pending"), int(data["user_id"])),
             )
         self.audit("user_status_update", "user", data["user_id"], f"{data.get('status')} / {data.get('seller_status')}")
+        send_json(self, 200, {"ok": True})
+
+    def admin_update_business_verification(self, data):
+        self.require_user("admin")
+        status = data.get("business_verification_status", "pending_review")
+        if status not in ("not_submitted", "pending_review", "verified", "rejected"):
+            raise ValueError("Invalid business verification status")
+        with connect() as con:
+            con.execute(
+                "UPDATE users SET business_verification_status = ? WHERE id = ? AND role = 'seller'",
+                (status, int(data["user_id"])),
+            )
+        self.audit("business_verification_update", "user", data["user_id"], status)
         send_json(self, 200, {"ok": True})
 
     def admin_update_product_status(self, data):
