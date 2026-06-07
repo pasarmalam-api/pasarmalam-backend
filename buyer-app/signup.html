@@ -1,55 +1,64 @@
 <!doctype html>
 <html lang="ms">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>PasarMalam Signup</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PasarMalam Sign Up</title>
   <style>
-    :root{--brand:#0f9f8f;--purple:#6d5dfc;--pink:#e43f8f;--line:#e6e9ef;--bg:#f5f7fb;--muted:#687282;--ink:#1f2937}
-    *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--ink)}button,input,textarea{font:inherit}button{cursor:pointer}
-    header{background:linear-gradient(180deg,var(--brand),var(--purple));color:#fff}.bar,main{max-width:1020px;margin:auto}.bar{display:flex;justify-content:space-between;align-items:center;padding:14px 16px}.brand{display:flex;gap:10px;align-items:center;cursor:pointer}.logo{width:52px;height:52px;border-radius:13px;background:conic-gradient(from 160deg,var(--brand),var(--purple),var(--pink),var(--brand));display:grid;place-items:center;font-weight:900;font-size:22px;box-shadow:inset 0 0 0 3px #ffffffcc}h1,h2,h3{margin:0}.soft{background:#fff;color:var(--brand);border:1px solid #b8fff5;border-radius:6px;min-height:38px;padding:0 14px;font-weight:900}
-    main{display:grid;grid-template-columns:1fr 430px;gap:18px;padding:18px 16px}.hero{border-radius:8px;min-height:560px;background:linear-gradient(90deg,#101828dd,#10182866),url("pasar-malam-real.jpg") center/cover;color:#fff;padding:28px;display:flex;align-items:flex-end}.hero h2{font-size:38px;max-width:560px}.hero p{max-width:560px;line-height:1.5}.panel{background:#fff;border:1px solid var(--line);border-radius:8px;padding:18px;box-shadow:0 12px 26px #0000000a}.tabs{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:7px;overflow:hidden;margin:14px 0}.tabs button{border:0;background:#fff;min-height:42px;font-weight:900;color:var(--muted)}.tabs button.active{background:#f0fffc;color:var(--brand)}label{display:block;font-size:13px;font-weight:900;margin:10px 0 5px}input,textarea{width:100%;border:1px solid var(--line);border-radius:6px;padding:12px;background:#fff}.field{display:grid;grid-template-columns:1fr auto;gap:8px}.primary{border:0;border-radius:6px;min-height:42px;padding:0 14px;color:#fff;background:linear-gradient(90deg,var(--brand),var(--purple));font-weight:900;width:100%}.outline{border:1px solid var(--line);border-radius:6px;min-height:42px;padding:0 12px;background:#fff;color:var(--brand);font-weight:900}.muted{color:var(--muted);font-size:13px}.terms{display:flex;gap:8px;align-items:flex-start;margin:12px 0}.terms input{width:auto;margin-top:2px}.divider{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:13px;margin:14px 0}.divider:before,.divider:after{content:"";height:1px;background:var(--line);flex:1}.social{display:grid;grid-template-columns:1fr 1fr;gap:8px}.success{border:1px solid #b8fff5;background:#f0fffc;color:var(--brand);border-radius:6px;padding:10px;margin-top:10px}
-    @media(max-width:850px){main{grid-template-columns:1fr}.hero{min-height:260px}.hero h2{font-size:30px}}
+    :root{--brand:#0f9f8f;--purple:#5a54d6;--pink:#d93682;--ink:#182230;--muted:#667085;--line:#e4e7ec;--bg:#f6f8fb;--panel:#fff}
+    *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--ink)}button,input,textarea{font:inherit}button{cursor:pointer}a{color:var(--brand);font-weight:800;text-decoration:none}
+    header{background:#fff;border-bottom:1px solid var(--line)}.bar,.shell{max-width:1120px;margin:auto}.bar{display:flex;justify-content:space-between;align-items:center;padding:14px 18px}.brand{display:flex;align-items:center;gap:10px}.logo{width:48px;height:48px;border-radius:12px;background:conic-gradient(from 160deg,var(--brand),var(--purple),var(--pink),var(--brand));display:grid;place-items:center;color:#fff;font-weight:900;font-size:21px;box-shadow:inset 0 0 0 3px #ffffffcc}.brand h1{font-size:22px;margin:0}.brand span{display:block;color:var(--muted);font-size:12px;font-weight:800}
+    .shell{min-height:calc(100vh - 77px);display:grid;grid-template-columns:1.05fr 460px;gap:22px;align-items:center;padding:26px 18px}.visual{min-height:620px;border-radius:8px;background:linear-gradient(90deg,#101828e6,#10182888,#10182822),url("pasar-malam-real.jpg") center/cover;color:#fff;display:flex;align-items:flex-end;padding:32px}.visual h2{font-size:42px;line-height:1.05;margin:0 0 10px;max-width:660px}.visual p{margin:0;max-width:580px;line-height:1.55;color:#eef4ff}.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:24px;box-shadow:0 16px 40px #18223012}.card h2{margin:0 0 6px;font-size:28px}.muted{color:var(--muted);font-size:14px;line-height:1.45}.mode{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:7px;overflow:hidden;margin:18px 0}.mode a{min-height:42px;display:grid;place-items:center;color:var(--muted);background:#fff}.mode a.active{background:#effdfa;color:var(--brand)}
+    label{display:block;font-size:13px;font-weight:900;margin:12px 0 6px}input,textarea{width:100%;border:1px solid var(--line);border-radius:6px;padding:12px;background:#fff}textarea{min-height:74px;resize:vertical}.field{display:grid;grid-template-columns:1fr auto;gap:8px}.primary,.outline{border-radius:6px;min-height:44px;padding:0 14px;font-weight:900}.primary{width:100%;border:0;background:linear-gradient(90deg,var(--brand),var(--purple));color:#fff;margin-top:14px}.outline{border:1px solid var(--line);background:#fff;color:var(--brand)}.terms{display:flex;gap:8px;align-items:flex-start;margin:12px 0}.terms input{width:auto;margin-top:2px}.status{min-height:22px;margin-top:12px}.success{border:1px solid #b8fff5;background:#effdfa;color:#067a6f;border-radius:6px;padding:10px}.error{border:1px solid #fecaca;background:#fff1f2;color:#b42318;border-radius:6px;padding:10px}.note{background:#f9fafb;border:1px solid var(--line);border-radius:6px;padding:10px;margin-top:12px}
+    @media(max-width:900px){.shell{grid-template-columns:1fr}.visual{min-height:260px}.visual h2{font-size:31px}}@media(max-width:520px){.shell{padding:16px 12px}.card{padding:18px}.visual{padding:22px}.field{grid-template-columns:1fr}.bar{align-items:flex-start}}
   </style>
 </head>
 <body>
-<header><div class="bar"><div class="brand" onclick="location.href='index.html'"><div class="logo">PM</div><div><h1>PasarMalam</h1><div>Daftar Akaun Pembeli</div></div></div><button class="soft" onclick="location.href='login.html'">Login</button></div></header>
-<main>
-  <section class="hero"><div><h2>Create your PasarMalam buyer account</h2><p>Shop safely, save addresses, track orders, upload payment receipts, chat with sellers and request returns.</p></div></section>
-  <section class="panel">
-    <h2>Sign Up</h2>
-    <p class="muted">Malay first. English labels included for clarity.</p>
-    <div class="tabs"><button class="active" type="button">Phone / Email</button><button type="button" onclick="status.textContent='Social login will be connected later.'">Social</button></div>
-    <label>Nama penuh / Full name</label><input id="name" placeholder="Your name">
-    <label>Nombor telefon / Phone number</label><input id="phone" placeholder="+60">
-    <label>Email</label><div class="field"><input id="email" placeholder="Email"><button class="outline" onclick="sendEmailOtp()" type="button">Send OTP</button></div>
-    <label>Kod OTP Email / Email OTP code</label><div class="field"><input id="otp" placeholder="6-digit code"><button class="outline" onclick="verifyEmailOtp()" type="button">Verify</button></div>
-    <label>Password</label><div class="field"><input id="password" type="password" placeholder="Minimum 8 characters"><button class="outline" onclick="togglePassword()" type="button" id="viewBtn">View</button></div>
-    <label>Alamat penghantaran / Delivery address</label><textarea id="address" placeholder="House, street, city, postcode"></textarea>
-    <label class="terms"><input id="agree" type="checkbox"><span>I agree to PasarMalam buyer protection, privacy and marketplace terms.</span></label>
-    <p><button class="primary" onclick="signup()">Create Account</button></p>
-    <div class="divider">or</div>
-    <div class="social"><button class="outline" onclick="status.textContent='Google login will be connected later.'" type="button">Google</button><button class="outline" onclick="status.textContent='Facebook login will be connected later.'" type="button">Facebook</button></div>
-    <p class="muted">Already have account? <a href="login.html">Login</a></p>
-    <p id="status" class="muted"></p>
+<header><div class="bar"><div class="brand" onclick="location.href='index.html'"><div class="logo">PM</div><div><h1>PasarMalam</h1><span>Aplikasi Pembeli</span></div></div><button class="outline" onclick="location.href='login.html'">Sign In</button></div></header>
+<main class="shell">
+  <section class="visual"><div><h2>Create a verified buyer account</h2><p>Sign up with email OTP, compulsory phone number and delivery address so PasarMalam can keep proper customer data for orders and support.</p></div></section>
+  <section class="card">
+    <h2>Sign up with email</h2>
+    <p class="muted">Daftar akaun pembeli menggunakan email. OTP akan dihantar ke email untuk pengesahan.</p>
+    <div class="mode"><a href="login.html">Sign In</a><a class="active" href="signup.html">Sign Up</a></div>
+    <label>Nama penuh / Full name</label><input id="name" autocomplete="name" placeholder="Your full name">
+    <label>Nombor telefon / Phone number</label><input id="phone" autocomplete="tel" inputmode="tel" placeholder="+60">
+    <label>Email</label><div class="field"><input id="email" type="email" autocomplete="email" placeholder="you@example.com"><button class="outline" onclick="sendEmailOtp()" type="button">Send OTP</button></div>
+    <label>Kod OTP Email / Email OTP code</label><div class="field"><input id="otp" inputmode="numeric" maxlength="6" placeholder="6-digit code"><button class="outline" onclick="verifyEmailOtp()" type="button">Verify</button></div>
+    <label>Password</label><div class="field"><input id="password" type="password" autocomplete="new-password" placeholder="Minimum 8 characters"><button class="outline" onclick="togglePassword()" type="button" id="viewBtn">View</button></div>
+    <label>Alamat penghantaran / Delivery address</label><textarea id="address" autocomplete="street-address" placeholder="House, street, city, postcode"></textarea>
+    <label class="terms"><input id="agree" type="checkbox"><span>I agree to PasarMalam Terms & Conditions, Privacy Policy, Buyer Protection, and Marketplace Rules.</span></label>
+    <button class="primary" onclick="signup()">Create Account</button>
+    <div class="note muted">Already registered? <a href="login.html">Sign in with email</a></div>
+    <div id="status" class="status muted"></div>
   </section>
 </main>
 <script>
 const API="https://pasarmalam-backend.onrender.com";
 let emailOtpToken="";
+function setStatus(text,type="muted"){status.className="status "+type;status.textContent=text}
 function togglePassword(){password.type=password.type==="password"?"text":"password";viewBtn.textContent=password.type==="password"?"View":"Hide"}
 async function post(path,body){const r=await fetch(API+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Request failed");return d}
-async function sendEmailOtp(){try{status.textContent="Sending OTP...";const d=await post("/api/otp/email/send",{email:email.value,purpose:"buyer_signup"});status.textContent=d.message||"OTP sent."}catch(e){status.textContent=e.message}}
-async function verifyEmailOtp(){try{status.textContent="Verifying OTP...";const d=await post("/api/otp/email/verify",{email:email.value,code:otp.value,purpose:"buyer_signup"});emailOtpToken=d.email_otp_token;status.innerHTML='<div class="success">Email verified. You can create account now.</div>'}catch(e){status.textContent=e.message}}
+async function sendEmailOtp(){
+  try{if(!email.value.trim()){setStatus("Email is required.","error");return}setStatus("Sending OTP...");const d=await post("/api/otp/email/send",{email:email.value.trim(),purpose:"buyer_signup"});setStatus(d.message||"OTP sent to email.","success")}
+  catch(e){setStatus(e.message,"error")}
+}
+async function verifyEmailOtp(){
+  try{if(!otp.value.trim()){setStatus("OTP code is required.","error");return}setStatus("Verifying OTP...");const d=await post("/api/otp/email/verify",{email:email.value.trim(),code:otp.value.trim(),purpose:"buyer_signup"});emailOtpToken=d.email_otp_token;setStatus("Email verified. You can create account now.","success")}
+  catch(e){setStatus(e.message,"error")}
+}
 async function signup(){
-  if(!agree.checked){status.textContent="Please accept the terms first.";return}
-  if(!phone.value.trim()){status.textContent="Phone number is required.";return}
-  if(!emailOtpToken){status.textContent="Please verify your email OTP first.";return}
-  if(password.value.length<8){status.textContent="Password must be at least 8 characters.";return}
-  status.textContent="Creating account...";
-  const r=await fetch(API+"/api/auth/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name.value,email:email.value,password:password.value,phone:phone.value,address:address.value,role:"buyer",email_otp_token:emailOtpToken})});
-  const d=await r.json();
-  if(d.token){localStorage.setItem("pm_token",d.token);localStorage.setItem("pm_user",JSON.stringify(d.user));status.innerHTML='<div class="success">Account created. You are logged in.</div>'}
-  else status.textContent=d.error||"Signup failed";
+  if(!name.value.trim()){setStatus("Full name is required.","error");return}
+  if(!phone.value.trim()){setStatus("Phone number is required.","error");return}
+  if(!email.value.trim()){setStatus("Email is required.","error");return}
+  if(!emailOtpToken){setStatus("Please verify your email OTP first.","error");return}
+  if(password.value.length<8){setStatus("Password must be at least 8 characters.","error");return}
+  if(!agree.checked){setStatus("Please accept the terms first.","error");return}
+  setStatus("Creating account...");
+  const r=await fetch(API+"/api/auth/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name.value.trim(),email:email.value.trim(),password:password.value,phone:phone.value.trim(),address:address.value.trim(),role:"buyer",email_otp_token:emailOtpToken})});
+  const d=await r.json().catch(()=>({}));
+  if(d.token){localStorage.setItem("pm_token",d.token);localStorage.setItem("pm_user",JSON.stringify(d.user));setStatus("Account created. Redirecting...","success");setTimeout(()=>location.href="index.html",800)}
+  else setStatus(d.error||"Signup failed.","error");
 }
 </script>
 </body>
