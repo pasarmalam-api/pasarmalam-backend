@@ -1049,7 +1049,7 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("Signup role must be buyer or seller")
         if not data.get("phone", "").strip():
             raise ValueError("Phone number is required")
-        if role == "buyer" and RESEND_API_KEY:
+        if role == "buyer":
             email_otp_token = data.get("email_otp_token", "")
             if not verify_email_otp_token(data["email"], email_otp_token):
                 raise PermissionError("Email OTP verification required")
