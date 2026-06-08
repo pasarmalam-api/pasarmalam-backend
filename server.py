@@ -269,6 +269,11 @@ def init_db():
               payment_reviewed_at INTEGER DEFAULT 0,
               order_status TEXT NOT NULL DEFAULT 'placed',
               escrow_status TEXT NOT NULL DEFAULT 'holding',
+              status_updated_at INTEGER DEFAULT 0,
+              delivered_at INTEGER DEFAULT 0,
+              completed_at INTEGER DEFAULT 0,
+              return_deadline_at INTEGER DEFAULT 0,
+              escrow_release_at INTEGER DEFAULT 0,
               tracking_no TEXT DEFAULT '',
               awb_label TEXT DEFAULT '',
               created_at INTEGER NOT NULL
@@ -323,6 +328,7 @@ def init_db():
               seller_earning REAL DEFAULT 0,
               status TEXT DEFAULT 'pending',
               reviewed_at INTEGER DEFAULT 0,
+              payout_proof_url TEXT DEFAULT '',
               note TEXT DEFAULT '',
               created_at INTEGER NOT NULL
             );
@@ -483,6 +489,11 @@ def postgres_schema_statements():
           payment_reviewed_at INTEGER DEFAULT 0,
           order_status TEXT NOT NULL DEFAULT 'placed',
           escrow_status TEXT NOT NULL DEFAULT 'holding',
+          status_updated_at INTEGER DEFAULT 0,
+          delivered_at INTEGER DEFAULT 0,
+          completed_at INTEGER DEFAULT 0,
+          return_deadline_at INTEGER DEFAULT 0,
+          escrow_release_at INTEGER DEFAULT 0,
           tracking_no TEXT DEFAULT '',
           awb_label TEXT DEFAULT '',
           created_at INTEGER NOT NULL
@@ -541,6 +552,7 @@ def postgres_schema_statements():
           seller_earning DOUBLE PRECISION DEFAULT 0,
           status TEXT DEFAULT 'pending',
           reviewed_at INTEGER DEFAULT 0,
+          payout_proof_url TEXT DEFAULT '',
           note TEXT DEFAULT '',
           created_at INTEGER NOT NULL
         )
@@ -624,6 +636,11 @@ def migrate_orders(con):
         "payment_review_note": "TEXT DEFAULT ''",
         "payment_reviewed_at": "INTEGER DEFAULT 0",
         "escrow_status": "TEXT DEFAULT 'holding'",
+        "status_updated_at": "INTEGER DEFAULT 0",
+        "delivered_at": "INTEGER DEFAULT 0",
+        "completed_at": "INTEGER DEFAULT 0",
+        "return_deadline_at": "INTEGER DEFAULT 0",
+        "escrow_release_at": "INTEGER DEFAULT 0",
         "tracking_no": "TEXT DEFAULT ''",
         "awb_label": "TEXT DEFAULT ''",
     }
@@ -679,6 +696,7 @@ def migrate_wallet(con):
         "seller_earning": "REAL DEFAULT 0",
         "status": "TEXT DEFAULT 'pending'",
         "reviewed_at": "INTEGER DEFAULT 0",
+        "payout_proof_url": "TEXT DEFAULT ''",
     }
     for name, sql in additions.items():
         if name not in columns:
@@ -1012,7 +1030,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.update_order_status(data)
             elif parsed.path == "/api/returns":
                 user = self.current_user()
-                self.create_simple("returns", data, {"buyer_id": user["id"] if user and user["role"] == "buyer" else 1, "buyer_name": user["name"] if user else "Buyer", "request_type": "Return/Refund", "status": "requested", "evidence_url": "", "seller_response": ""})
+                self.create_return(data, user)
             elif parsed.path == "/api/campaigns":
                 self.create_simple("campaigns", data, {"seller_id": 1, "status": "active"})
             elif parsed.path == "/api/logistics/awb":
@@ -1436,6 +1454,34 @@ class Handler(BaseHTTPRequestHandler):
         summary = wallet_summary(rows)
         send_json(self, 200, {"wallet": rows, "summary": summary})
 
+    def create_return(self, data, user):
+        buyer_id = user["id"] if user and user["role"] == "buyer" else 1
+        buyer_name = user["name"] if user else "Buyer"
+        order_id = int(data["order_id"])
+        with connect() as con:
+            order = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+            if not order:
+                raise ValueError("Order not found")
+            if user and user["role"] == "buyer" and int(order["buyer_id"]) != int(user["id"]):
+                raise PermissionError("Buyer cannot return another buyer order")
+            if order["payment_status"] != "paid":
+                raise ValueError("Only paid orders can request return/refund")
+            if order["order_status"] not in ("delivered", "completed"):
+                raise ValueError("Return/refund opens after delivery")
+            deadline = int(order["return_deadline_at"] or 0)
+            if deadline and now() > deadline:
+                raise ValueError("Return/refund deadline has passed")
+            con.execute(
+                """
+                INSERT INTO returns
+                (buyer_id, order_id, buyer_name, reason, request_type, status, evidence_url, seller_response, dispute_status, created_at)
+                VALUES (?, ?, ?, ?, ?, 'requested', ?, '', 'open', ?)
+                """,
+                (buyer_id, order_id, buyer_name, data.get("reason", ""), data.get("request_type", "Return/Refund"), data.get("evidence_url", ""), now()),
+            )
+            con.execute("UPDATE orders SET escrow_status = 'dispute_hold' WHERE id = ?", (order_id,))
+        send_json(self, 201, {"ok": True})
+
     def checkout(self, data):
         user = self.current_user()
         buyer_id = user["id"] if user and user["role"] == "buyer" else int(data.get("buyer_id", 1))
@@ -1643,7 +1689,7 @@ class Handler(BaseHTTPRequestHandler):
             if not order:
                 raise ValueError("Order not found")
             was_paid = order["payment_status"] == "paid"
-            con.execute("UPDATE orders SET payment_status = ?, order_status = ?, escrow_status = ?, payment_reference = ? WHERE id = ?", (label, order_status, escrow_status, bill_code or order["payment_reference"], order_id))
+            con.execute("UPDATE orders SET payment_status = ?, order_status = ?, escrow_status = ?, payment_reference = ?, status_updated_at = ? WHERE id = ?", (label, order_status, escrow_status, bill_code or order["payment_reference"], now(), order_id))
             con.execute("UPDATE payments SET status = ?, bill_code = ?, raw_response = ?, updated_at = ? WHERE order_id = ?", (label, bill_code, json.dumps(raw), now(), order_id))
             if label == "paid" and not was_paid:
                 qty = int(order["quantity"])
@@ -1691,7 +1737,24 @@ class Handler(BaseHTTPRequestHandler):
 
     def update_order_status(self, data):
         status = data["order_status"]
-        escrow = "released" if status == "completed" else data.get("escrow_status", "holding")
+        status_now = now()
+        return_window_days = int(data.get("return_window_days", 15))
+        escrow_release_days = int(data.get("escrow_release_days", 15))
+        delivered_at = 0
+        completed_at = 0
+        return_deadline_at = 0
+        escrow_release_at = 0
+        escrow = data.get("escrow_status", "holding")
+        if status == "delivered":
+            delivered_at = status_now
+            return_deadline_at = status_now + return_window_days * 86400
+            escrow_release_at = status_now + escrow_release_days * 86400
+            escrow = "holding"
+        elif status == "completed":
+            completed_at = status_now
+            escrow = "released"
+        elif status == "cancelled":
+            escrow = "cancelled"
         user = self.current_user()
         with connect() as con:
             if user and user["role"] == "seller":
@@ -1705,7 +1768,16 @@ class Handler(BaseHTTPRequestHandler):
                 ).fetchone()
                 if not row:
                     raise PermissionError("Seller cannot update another seller order")
-            con.execute("UPDATE orders SET order_status = ?, escrow_status = ? WHERE id = ?", (status, escrow, int(data["order_id"])))
+            existing = con.execute("SELECT delivered_at, completed_at, return_deadline_at, escrow_release_at FROM orders WHERE id = ?", (int(data["order_id"]),)).fetchone()
+            delivered_at = delivered_at or int(existing["delivered_at"] or 0)
+            completed_at = completed_at or int(existing["completed_at"] or 0)
+            return_deadline_at = return_deadline_at or int(existing["return_deadline_at"] or 0)
+            escrow_release_at = escrow_release_at or int(existing["escrow_release_at"] or 0)
+            con.execute(
+                "UPDATE orders SET order_status = ?, escrow_status = ?, status_updated_at = ?, delivered_at = ?, completed_at = ?, return_deadline_at = ?, escrow_release_at = ? WHERE id = ?",
+                (status, escrow, status_now, delivered_at, completed_at, return_deadline_at, escrow_release_at, int(data["order_id"])),
+            )
+            sync_wallet_settlements(con)
         send_json(self, 200, {"ok": True, "escrow_status": escrow})
 
     def awb(self, data):
@@ -1929,8 +2001,8 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("Order not found")
             was_paid = order["payment_status"] == "paid"
             con.execute(
-                "UPDATE orders SET payment_status = ?, order_status = ?, escrow_status = ?, payment_review_note = ?, payment_reviewed_at = ? WHERE id = ?",
-                (decision, order_status, escrow_status, note, now(), order_id),
+                "UPDATE orders SET payment_status = ?, order_status = ?, escrow_status = ?, payment_review_note = ?, payment_reviewed_at = ?, status_updated_at = ? WHERE id = ?",
+                (decision, order_status, escrow_status, note, now(), now(), order_id),
             )
             if decision == "paid" and not was_paid:
                 qty = int(order["quantity"])
@@ -1955,7 +2027,7 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("Wallet record not found")
             reviewed_at = now() if status in ("approved", "paid_out", "held", "rejected") else 0
             final_note = note or row["note"] or f"Payout {status}"
-            con.execute("UPDATE wallet SET status = ?, reviewed_at = ?, note = ? WHERE id = ?", (status, reviewed_at, final_note, wallet_id))
+            con.execute("UPDATE wallet SET status = ?, reviewed_at = ?, payout_proof_url = ?, note = ? WHERE id = ?", (status, reviewed_at, data.get("payout_proof_url", row["payout_proof_url"] or ""), final_note, wallet_id))
         self.audit("payout_status_update", "wallet", wallet_id, status)
         send_json(self, 200, {"ok": True, "status": status})
 
