@@ -891,6 +891,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/metrics": self.get_metrics,
                 "/api/logistics/rates": self.get_logistics_rates,
                 "/api/public/settings": self.public_settings,
+                "/api/payments/toyyibpay/status": lambda: self.toyyibpay_status(query),
                 "/api/payments/toyyibpay/return": lambda: self.toyyibpay_return(query),
                 "/api/admin/users": self.admin_users,
                 "/api/admin/sellers": self.admin_sellers,
@@ -1400,8 +1401,8 @@ class Handler(BaseHTTPRequestHandler):
         user = self.current_user()
         buyer_id = user["id"] if user and user["role"] == "buyer" else int(data.get("buyer_id", 1))
         buyer_name = user["name"] if user and user["role"] == "buyer" else data.get("buyer_name", "Buyer")
-        buyer_email = data.get("buyer_email", "buyer@pasarmalam.my")
-        buyer_phone = data.get("buyer_phone", "0123456789")
+        buyer_email = data.get("buyer_email") or (user.get("email") if user else "") or "buyer@pasarmalam.my"
+        buyer_phone = data.get("buyer_phone") or (user.get("phone") if user else "") or "0123456789"
         with connect() as con:
             product = con.execute("SELECT * FROM products WHERE id = ?", (int(data["product_id"]),)).fetchone()
             if not product:
@@ -1446,7 +1447,7 @@ class Handler(BaseHTTPRequestHandler):
             "billTo": clean_toyyib_text(buyer_name, 30),
             "billEmail": buyer_email,
             "billPhone": buyer_phone,
-            "billPaymentChannel": "2",
+            "billPaymentChannel": "0",
             "billContentEmail": "Thank you for buying with PasarMalam",
             "billChargeToCustomer": "1",
             "billExpiryDays": "3",
@@ -1465,7 +1466,8 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 201, {"ok": True, "order_id": order_id, "bill_code": bill_code, "checkout_url": checkout_url, "total": total})
 
     def toyyibpay_callback(self, data):
-        order_id = int(data.get("order_id", "0") or "0")
+        bill_code = str(data.get("billcode", data.get("billCode", "")))
+        order_id = self.resolve_payment_order_id(data.get("order_id") or data.get("billExternalReferenceNo"), bill_code)
         status = str(data.get("status", data.get("status_id", "")))
         refno = str(data.get("refno", data.get("transaction_id", "")))
         received_hash = str(data.get("hash", ""))
@@ -1473,16 +1475,48 @@ class Handler(BaseHTTPRequestHandler):
             expected = hashlib.md5(f"{TOYYIBPAY_SECRET_KEY}{status}{order_id}{refno}ok".encode("utf-8")).hexdigest()
             if received_hash and received_hash != expected:
                 raise PermissionError("Invalid ToyyibPay callback hash")
-        self.apply_payment_status(order_id, status, str(data.get("billcode", "")), refno, data)
+        self.apply_payment_status(order_id, status, bill_code, refno, data)
         send_json(self, 200, {"ok": True})
 
     def toyyibpay_return(self, query):
-        order_id = int((query.get("order_id") or ["0"])[0] or "0")
-        status = (query.get("status_id") or ["2"])[0]
         bill_code = (query.get("billcode") or [""])[0]
+        order_id = self.resolve_payment_order_id((query.get("order_id") or [""])[0], bill_code)
+        status = (query.get("status_id") or ["2"])[0]
         if order_id:
             self.apply_payment_status(order_id, status, bill_code, "", {"source": "return_url"})
         send_json(self, 200, {"ok": True, "order_id": order_id, "status": payment_status_label(status)})
+
+    def toyyibpay_status(self, query):
+        bill_code = (query.get("billcode") or query.get("billCode") or [""])[0]
+        order_id = self.resolve_payment_order_id((query.get("order_id") or [""])[0], bill_code)
+        if not order_id:
+            raise ValueError("Payment/order not found")
+        status = ""
+        raw = {"source": "local"}
+        if bill_code and TOYYIBPAY_SECRET_KEY:
+            raw = post_toyyibpay("/index.php/api/getBillTransactions", {"billCode": bill_code})
+            if isinstance(raw, list) and raw:
+                status = str(raw[0].get("billpaymentStatus") or raw[0].get("billStatus") or "")
+        if status:
+            self.apply_payment_status(order_id, status, bill_code, "", raw)
+        with connect() as con:
+            order = con.execute("SELECT id, payment_status, order_status, escrow_status, payment_reference, payment_url FROM orders WHERE id = ?", (order_id,)).fetchone()
+        if not order:
+            raise ValueError("Order not found")
+        send_json(self, 200, {"ok": True, "order": row_to_dict(order), "gateway": raw})
+
+    def resolve_payment_order_id(self, external_order_id="", bill_code=""):
+        try:
+            order_id = int(str(external_order_id or "0") or "0")
+        except ValueError:
+            order_id = 0
+        if order_id:
+            return order_id
+        if not bill_code:
+            return 0
+        with connect() as con:
+            order = con.execute("SELECT order_id FROM payments WHERE bill_code = ? ORDER BY id DESC LIMIT 1", (bill_code,)).fetchone()
+        return int(order["order_id"]) if order else 0
 
     def apply_payment_status(self, order_id, status, bill_code, refno, raw):
         label = payment_status_label(status)
