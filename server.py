@@ -1398,6 +1398,8 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 201, {"id": cur.lastrowid, "total": total, "tracking_no": tracking, "escrow_status": escrow_status, "payment_status": payment_status})
 
     def create_toyyibpay_payment(self, data):
+        if not TOYYIBPAY_SECRET_KEY or not TOYYIBPAY_CATEGORY_CODE:
+            raise PermissionError("Set TOYYIBPAY_SECRET_KEY and TOYYIBPAY_CATEGORY_CODE in Render before accepting live payments.")
         user = self.current_user()
         buyer_id = user["id"] if user and user["role"] == "buyer" else int(data.get("buyer_id", 1))
         buyer_name = user["name"] if user and user["role"] == "buyer" else data.get("buyer_name", "Buyer")
@@ -1421,15 +1423,6 @@ class Handler(BaseHTTPRequestHandler):
                 (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), data.get("address", ""), total, data.get("logistics_method", product["shipping_type"]), fee, tracking, awb, now()),
             )
             order_id = cur.lastrowid
-
-        if not TOYYIBPAY_SECRET_KEY or not TOYYIBPAY_CATEGORY_CODE:
-            with connect() as con:
-                con.execute(
-                    "INSERT INTO payments (order_id, provider, bill_code, amount, status, checkout_url, raw_response, created_at, updated_at) VALUES (?, 'ToyyibPay', '', ?, 'setup_required', '', 'Missing ToyyibPay environment variables', ?, ?)",
-                    (order_id, total, now(), now()),
-                )
-            send_json(self, 200, {"ok": False, "setup_required": True, "order_id": order_id, "message": "Set TOYYIBPAY_SECRET_KEY and TOYYIBPAY_CATEGORY_CODE in Render."})
-            return
 
         bill_name = clean_toyyib_text(f"PasarMalam Order {order_id}", 30)
         bill_description = clean_toyyib_text(f"Payment for order {order_id}", 100)
