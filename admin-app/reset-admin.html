@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Reset Admin Password</title><link rel="stylesheet" href="admin.css">
+</head>
+<body>
+<main class="login">
+  <div class="panel">
+    <div class="logo">PM</div>
+    <h2>Reset Admin Password</h2>
+    <p class="muted">Enter a new admin password. The reset token is read from your email link.</p>
+    <input id="email" placeholder="Admin email" value="admin@pasarmalam.my">
+    <div class="row"><input id="newPassword" type="password" placeholder="New password, min 8 chars"><button class="soft" onclick="togglePassword()" type="button" id="viewBtn">View</button></div>
+    <p><button class="primary" onclick="resetPassword()">Save New Password</button></p>
+    <p id="status" class="muted"></p>
+    <p><button class="soft" onclick="location.href='login.html'">Back to Login</button></p>
+  </div>
+</main>
+<script>
+const API="https://pasarmalam-backend.onrender.com",q=new URLSearchParams(location.search),token=q.get("token")||"",emailParam=q.get("email")||"";
+if(emailParam)email.value=emailParam;
+function togglePassword(){newPassword.type=newPassword.type==="password"?"text":"password";viewBtn.textContent=newPassword.type==="password"?"View":"Hide"}
+async function resetPassword(){status.textContent="Saving password...";const r=await fetch(API+"/api/admin/reset-password",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value,reset_token:token,new_password:newPassword.value})});const d=await r.json().catch(()=>({}));if(r.ok){status.textContent="Password reset successful. Redirecting to login...";setTimeout(()=>location.href="login.html",1000)}else status.textContent=d.error||"Reset failed"}
+</script>
+</body>
+</html>
