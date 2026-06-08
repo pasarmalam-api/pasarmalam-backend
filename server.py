@@ -1423,7 +1423,7 @@ class Handler(BaseHTTPRequestHandler):
                         FROM wallet
                         LEFT JOIN users ON users.id = wallet.seller_id
                         LEFT JOIN orders ON orders.id = wallet.order_id
-                        WHERE wallet.seller_id = ?
+                        WHERE wallet.seller_id = ? AND wallet.order_id > 0
                         ORDER BY wallet.created_at DESC, wallet.id DESC
                         """,
                         (user["id"],),
@@ -1432,7 +1432,7 @@ class Handler(BaseHTTPRequestHandler):
             elif user and user["role"] == "admin":
                 rows = wallet_rows(con)
             else:
-                rows = [row_to_dict(row) for row in con.execute("SELECT * FROM wallet ORDER BY created_at DESC, id DESC")]
+                rows = [row_to_dict(row) for row in con.execute("SELECT * FROM wallet WHERE order_id > 0 ORDER BY created_at DESC, id DESC")]
         summary = wallet_summary(rows)
         send_json(self, 200, {"wallet": rows, "summary": summary})
 
@@ -2043,6 +2043,7 @@ def wallet_rows(con):
             FROM wallet
             LEFT JOIN users ON users.id = wallet.seller_id
             LEFT JOIN orders ON orders.id = wallet.order_id
+            WHERE wallet.order_id > 0
             ORDER BY wallet.created_at DESC, wallet.id DESC
             """
         )
