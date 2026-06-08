@@ -28,6 +28,11 @@ TOYYIBPAY_SECRET_KEY = os.environ.get("TOYYIBPAY_SECRET_KEY", "")
 TOYYIBPAY_CATEGORY_CODE = os.environ.get("TOYYIBPAY_CATEGORY_CODE", "")
 TOYYIBPAY_MODE = os.environ.get("TOYYIBPAY_MODE", "sandbox").lower()
 TOYYIBPAY_BASE_URL = "https://dev.toyyibpay.com" if TOYYIBPAY_MODE != "live" else "https://toyyibpay.com"
+BILLPLZ_API_KEY = os.environ.get("BILLPLZ_API_KEY", "")
+BILLPLZ_COLLECTION_ID = os.environ.get("BILLPLZ_COLLECTION_ID", "")
+BILLPLZ_X_SIGNATURE_KEY = os.environ.get("BILLPLZ_X_SIGNATURE_KEY", "")
+BILLPLZ_MODE = os.environ.get("BILLPLZ_MODE", "sandbox").lower()
+BILLPLZ_BASE_URL = "https://www.billplz-sandbox.com" if BILLPLZ_MODE != "live" else "https://www.billplz.com"
 
 
 if USE_POSTGRES:
@@ -893,6 +898,8 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/public/settings": self.public_settings,
                 "/api/payments/toyyibpay/status": lambda: self.toyyibpay_status(query),
                 "/api/payments/toyyibpay/return": lambda: self.toyyibpay_return(query),
+                "/api/payments/billplz/status": lambda: self.billplz_status(query),
+                "/api/payments/billplz/return": lambda: self.billplz_return(query),
                 "/api/admin/users": self.admin_users,
                 "/api/admin/sellers": self.admin_sellers,
                 "/api/admin/products": self.admin_products,
@@ -966,6 +973,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.create_toyyibpay_payment(data)
             elif parsed.path == "/api/payments/toyyibpay/callback":
                 self.toyyibpay_callback(data)
+            elif parsed.path == "/api/payments/billplz/create":
+                self.create_billplz_payment(data)
+            elif parsed.path == "/api/payments/billplz/callback":
+                self.billplz_callback(data)
             elif parsed.path == "/api/orders/status":
                 self.update_order_status(data)
             elif parsed.path == "/api/returns":
@@ -1458,6 +1469,58 @@ class Handler(BaseHTTPRequestHandler):
             )
         send_json(self, 201, {"ok": True, "order_id": order_id, "bill_code": bill_code, "checkout_url": checkout_url, "total": total})
 
+    def create_billplz_payment(self, data):
+        if not BILLPLZ_API_KEY or not BILLPLZ_COLLECTION_ID:
+            raise PermissionError("Set BILLPLZ_API_KEY and BILLPLZ_COLLECTION_ID in Render before accepting Billplz payments.")
+        user = self.current_user()
+        buyer_id = user["id"] if user and user["role"] == "buyer" else int(data.get("buyer_id", 1))
+        buyer_name = user["name"] if user and user["role"] == "buyer" else data.get("buyer_name", "Buyer")
+        buyer_email = data.get("buyer_email") or (user.get("email") if user else "") or "buyer@pasarmalam.my"
+        buyer_phone = data.get("buyer_phone") or (user.get("phone") if user else "") or "0123456789"
+        with connect() as con:
+            product = con.execute("SELECT * FROM products WHERE id = ?", (int(data["product_id"]),)).fetchone()
+            if not product:
+                raise ValueError("Product not found")
+            qty = int(data.get("quantity", 1))
+            fee = float(data.get("logistics_fee", shipping_fee(data.get("logistics_method", product["shipping_type"]), product["weight_kg"])))
+            total = float(product["price"]) * qty + fee
+            tracking = f"PM{now()}{product['id']}"
+            awb = f"AWB-{tracking}-{data.get('logistics_method', product['shipping_type']).replace(' ', '-')}"
+            cur = con.execute(
+                """
+                INSERT INTO orders
+                (buyer_id, buyer_name, product_id, quantity, variant, address, total, logistics_method, logistics_fee, payment_method, payment_status, payment_reference, payment_url, order_status, escrow_status, tracking_no, awb_label, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Billplz', 'unpaid', '', '', 'pending_payment', 'pending', ?, ?, ?)
+                """,
+                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), data.get("address", ""), total, data.get("logistics_method", product["shipping_type"]), fee, tracking, awb, now()),
+            )
+            order_id = cur.lastrowid
+
+        payload = {
+            "collection_id": BILLPLZ_COLLECTION_ID,
+            "email": buyer_email,
+            "mobile": buyer_phone,
+            "name": buyer_name,
+            "amount": str(int(round(total * 100))),
+            "description": clean_toyyib_text(f"PasarMalam Order {order_id}", 200),
+            "callback_url": f"{PUBLIC_BASE_URL}/api/payments/billplz/callback",
+            "redirect_url": f"{BUYER_APP_URL}/payment.html?provider=billplz",
+            "reference_1_label": "Order ID",
+            "reference_1": str(order_id),
+        }
+        response = post_billplz("/api/v3/bills", payload)
+        bill_id = response.get("id", "")
+        checkout_url = response.get("url", "")
+        if not bill_id or not checkout_url:
+            raise ValueError(f"Billplz did not return payment URL: {response}")
+        with connect() as con:
+            con.execute("UPDATE orders SET payment_reference = ?, payment_url = ? WHERE id = ?", (bill_id, checkout_url, order_id))
+            con.execute(
+                "INSERT INTO payments (order_id, provider, bill_code, amount, status, checkout_url, raw_response, created_at, updated_at) VALUES (?, 'Billplz', ?, ?, 'pending', ?, ?, ?, ?)",
+                (order_id, bill_id, total, checkout_url, json.dumps(response), now(), now()),
+            )
+        send_json(self, 201, {"ok": True, "order_id": order_id, "bill_code": bill_id, "checkout_url": checkout_url, "total": total})
+
     def toyyibpay_callback(self, data):
         bill_code = str(data.get("billcode", data.get("billCode", "")))
         order_id = self.resolve_payment_order_id(data.get("order_id") or data.get("billExternalReferenceNo"), bill_code)
@@ -1528,6 +1591,43 @@ class Handler(BaseHTTPRequestHandler):
                     con.execute("UPDATE products SET stock = GREATEST(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, order["product_id"]))
                 else:
                     con.execute("UPDATE products SET stock = MAX(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, order["product_id"]))
+
+    def billplz_callback(self, data):
+        bill_id = str(data.get("id", data.get("billplz[id]", "")))
+        order_id = self.resolve_payment_order_id("", bill_id)
+        if not order_id:
+            order_id = int(data.get("reference_1", "0") or "0")
+        if BILLPLZ_X_SIGNATURE_KEY and data.get("x_signature"):
+            if not verify_billplz_signature(data, BILLPLZ_X_SIGNATURE_KEY):
+                raise PermissionError("Invalid Billplz callback signature")
+        paid = str(data.get("paid", "")).lower() == "true" or data.get("state") == "paid"
+        status = "1" if paid else "3"
+        self.apply_payment_status(order_id, status, bill_id, str(data.get("transaction_id", "")), data)
+        send_json(self, 200, {"ok": True})
+
+    def billplz_return(self, query):
+        bill_id = (query.get("billplz[id]") or query.get("id") or [""])[0]
+        order_id = self.resolve_payment_order_id("", bill_id)
+        paid = (query.get("billplz[paid]") or query.get("paid") or ["false"])[0].lower() == "true"
+        if order_id:
+            self.apply_payment_status(order_id, "1" if paid else "3", bill_id, "", {"source": "billplz_return"})
+        send_json(self, 200, {"ok": True, "order_id": order_id, "status": "paid" if paid else "failed"})
+
+    def billplz_status(self, query):
+        bill_id = (query.get("billplz[id]") or query.get("id") or query.get("billcode") or [""])[0]
+        order_id = self.resolve_payment_order_id((query.get("order_id") or [""])[0], bill_id)
+        if not order_id:
+            raise ValueError("Payment/order not found")
+        raw = {"source": "local"}
+        if bill_id and BILLPLZ_API_KEY:
+            raw = get_billplz(f"/api/v3/bills/{urllib.parse.quote(bill_id)}")
+            paid = bool(raw.get("paid"))
+            self.apply_payment_status(order_id, "1" if paid else "2", bill_id, "", raw)
+        with connect() as con:
+            order = con.execute("SELECT id, payment_status, order_status, escrow_status, payment_reference, payment_url FROM orders WHERE id = ?", (order_id,)).fetchone()
+        if not order:
+            raise ValueError("Order not found")
+        send_json(self, 200, {"ok": True, "order": row_to_dict(order), "gateway": raw})
 
     def update_order_status(self, data):
         status = data["order_status"]
@@ -1847,6 +1947,67 @@ def post_toyyibpay(path, payload):
     except json.JSONDecodeError as exc:
         cleaned = " ".join(raw.split())[:500]
         raise ValueError(f"ToyyibPay returned non-JSON response: {cleaned}") from exc
+
+
+def billplz_auth_header():
+    token = base64.b64encode(f"{BILLPLZ_API_KEY}:".encode("utf-8")).decode("ascii")
+    return f"Basic {token}"
+
+
+def post_billplz(path, payload):
+    body = urllib.parse.urlencode(payload).encode("utf-8")
+    request = urllib.request.Request(
+        BILLPLZ_BASE_URL + path,
+        data=body,
+        headers={
+            "Authorization": billplz_auth_header(),
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+            "User-Agent": "PasarMalam/1.0 (+https://pasarmalam-backend.onrender.com)",
+        },
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        raw = response.read().decode("utf-8")
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        cleaned = " ".join(raw.split())[:500]
+        raise ValueError(f"Billplz returned non-JSON response: {cleaned}") from exc
+
+
+def get_billplz(path):
+    request = urllib.request.Request(
+        BILLPLZ_BASE_URL + path,
+        headers={
+            "Authorization": billplz_auth_header(),
+            "Accept": "application/json",
+            "User-Agent": "PasarMalam/1.0 (+https://pasarmalam-backend.onrender.com)",
+        },
+        method="GET",
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        raw = response.read().decode("utf-8")
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        cleaned = " ".join(raw.split())[:500]
+        raise ValueError(f"Billplz returned non-JSON response: {cleaned}") from exc
+
+
+def verify_billplz_signature(data, key):
+    source = []
+    for raw_key, value in data.items():
+        if raw_key == "x_signature":
+            continue
+        normalized = raw_key
+        if normalized.startswith("billplz[") and normalized.endswith("]"):
+            normalized = "billplz" + normalized[8:-1]
+        source.append((normalized.lower(), f"{normalized}{value}"))
+    source.sort(key=lambda item: item[0])
+    text = "|".join(item[1] for item in source)
+    expected = hmac.new(key.encode("utf-8"), text.encode("utf-8"), hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, str(data.get("x_signature", "")))
 
 
 def make_admin_reset_token(email):
