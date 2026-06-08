@@ -314,8 +314,15 @@ def init_db():
             CREATE TABLE IF NOT EXISTS wallet (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
               seller_id INTEGER DEFAULT 1,
+              order_id INTEGER DEFAULT 0,
               type TEXT NOT NULL,
               amount REAL NOT NULL,
+              gross_amount REAL DEFAULT 0,
+              commission_rate REAL DEFAULT 0,
+              commission_amount REAL DEFAULT 0,
+              seller_earning REAL DEFAULT 0,
+              status TEXT DEFAULT 'pending',
+              reviewed_at INTEGER DEFAULT 0,
               note TEXT DEFAULT '',
               created_at INTEGER NOT NULL
             );
@@ -351,6 +358,7 @@ def init_db():
         migrate_products(con)
         migrate_orders(con)
         migrate_payments(con)
+        migrate_wallet(con)
         migrate_reviews(con)
         migrate_returns(con)
         migrate_users(con)
@@ -524,8 +532,15 @@ def postgres_schema_statements():
         CREATE TABLE IF NOT EXISTS wallet (
           id SERIAL PRIMARY KEY,
           seller_id INTEGER DEFAULT 1,
+          order_id INTEGER DEFAULT 0,
           type TEXT NOT NULL,
           amount DOUBLE PRECISION NOT NULL,
+          gross_amount DOUBLE PRECISION DEFAULT 0,
+          commission_rate DOUBLE PRECISION DEFAULT 0,
+          commission_amount DOUBLE PRECISION DEFAULT 0,
+          seller_earning DOUBLE PRECISION DEFAULT 0,
+          status TEXT DEFAULT 'pending',
+          reviewed_at INTEGER DEFAULT 0,
           note TEXT DEFAULT '',
           created_at INTEGER NOT NULL
         )
@@ -652,6 +667,22 @@ def migrate_payments(con):
             )
             """
         )
+
+
+def migrate_wallet(con):
+    columns = table_columns(con, "wallet")
+    additions = {
+        "order_id": "INTEGER DEFAULT 0",
+        "gross_amount": "REAL DEFAULT 0",
+        "commission_rate": "REAL DEFAULT 0",
+        "commission_amount": "REAL DEFAULT 0",
+        "seller_earning": "REAL DEFAULT 0",
+        "status": "TEXT DEFAULT 'pending'",
+        "reviewed_at": "INTEGER DEFAULT 0",
+    }
+    for name, sql in additions.items():
+        if name not in columns:
+            con.execute(f"ALTER TABLE wallet ADD COLUMN {name} {sql}")
 
 
 def migrate_email_otps(con):
@@ -892,7 +923,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/wishlist": self.get_wishlist,
                 "/api/returns": self.get_returns,
                 "/api/campaigns": lambda: self.list_table("campaigns", "campaigns"),
-                "/api/wallet": lambda: self.list_table("wallet", "wallet"),
+                "/api/wallet": self.get_wallet,
                 "/api/metrics": self.get_metrics,
                 "/api/logistics/rates": self.get_logistics_rates,
                 "/api/public/settings": self.public_settings,
@@ -994,6 +1025,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.admin_update_product_status(data)
             elif parsed.path == "/api/admin/payment-status":
                 self.admin_update_payment_status(data)
+            elif parsed.path == "/api/admin/payout-status":
+                self.admin_update_payout_status(data)
             elif parsed.path == "/api/admin/return-status":
                 self.admin_update_return_status(data)
             elif parsed.path == "/api/admin/settings":
@@ -1375,6 +1408,33 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 rows = [row_to_dict(row) for row in con.execute("SELECT * FROM returns ORDER BY created_at DESC, id DESC")]
         send_json(self, 200, {"returns": rows})
+
+    def get_wallet(self):
+        user = self.current_user()
+        with connect() as con:
+            sync_wallet_settlements(con)
+            if user and user["role"] == "seller":
+                rows = [
+                    row_to_dict(row)
+                    for row in con.execute(
+                        """
+                        SELECT wallet.*, users.shop_name, users.name AS seller_name, users.bank_name, users.bank_account_name, users.bank_account_number,
+                               orders.order_status, orders.payment_status, orders.escrow_status
+                        FROM wallet
+                        LEFT JOIN users ON users.id = wallet.seller_id
+                        LEFT JOIN orders ON orders.id = wallet.order_id
+                        WHERE wallet.seller_id = ?
+                        ORDER BY wallet.created_at DESC, wallet.id DESC
+                        """,
+                        (user["id"],),
+                    )
+                ]
+            elif user and user["role"] == "admin":
+                rows = wallet_rows(con)
+            else:
+                rows = [row_to_dict(row) for row in con.execute("SELECT * FROM wallet ORDER BY created_at DESC, id DESC")]
+        summary = wallet_summary(rows)
+        send_json(self, 200, {"wallet": rows, "summary": summary})
 
     def checkout(self, data):
         user = self.current_user()
@@ -1881,6 +1941,24 @@ class Handler(BaseHTTPRequestHandler):
         self.audit("manual_payment_review", "order", order_id, f"{decision}: {note}")
         send_json(self, 200, {"ok": True, "payment_status": decision, "order_status": order_status, "escrow_status": escrow_status})
 
+    def admin_update_payout_status(self, data):
+        self.require_user("admin")
+        wallet_id = int(data["wallet_id"])
+        status = data.get("status", "approved")
+        if status not in ("pending", "approved", "paid_out", "held", "rejected"):
+            raise ValueError("Invalid payout status")
+        note = data.get("note", "")
+        with connect() as con:
+            sync_wallet_settlements(con)
+            row = con.execute("SELECT * FROM wallet WHERE id = ?", (wallet_id,)).fetchone()
+            if not row:
+                raise ValueError("Wallet record not found")
+            reviewed_at = now() if status in ("approved", "paid_out", "held", "rejected") else 0
+            final_note = note or row["note"] or f"Payout {status}"
+            con.execute("UPDATE wallet SET status = ?, reviewed_at = ?, note = ? WHERE id = ?", (status, reviewed_at, final_note, wallet_id))
+        self.audit("payout_status_update", "wallet", wallet_id, status)
+        send_json(self, 200, {"ok": True, "status": status})
+
     def admin_update_return_status(self, data):
         self.require_user("admin")
         with connect() as con:
@@ -1908,6 +1986,79 @@ class Handler(BaseHTTPRequestHandler):
 def shipping_fee(method, weight):
     fees = {"In-Store Pickup": 0, "Standard Rider": 4.9, "Express Rider": 8.9, "Bulky Item": 12.9, "Seller Own Fleet": 6.9}
     return fees.get(method, 4.9) + max(float(weight) - 1, 0) * 1.5
+
+
+def commission_rate_for_seller(seller):
+    seller = seller or {}
+    seller_age_days = max((now() - int(seller.get("created_at") or now())) / 86400, 0)
+    if seller_age_days <= 30:
+        return 3.0
+    if seller.get("business_verification_status") == "verified":
+        return 4.0
+    return 5.0
+
+
+def sync_wallet_settlements(con):
+    rows = [
+        row_to_dict(row)
+        for row in con.execute(
+            """
+            SELECT orders.*, products.seller_id
+            FROM orders JOIN products ON products.id = orders.product_id
+            WHERE orders.payment_status = 'paid'
+              AND orders.order_status IN ('delivered', 'completed')
+            ORDER BY orders.created_at DESC, orders.id DESC
+            """
+        )
+    ]
+    for order in rows:
+        existing = con.execute("SELECT id FROM wallet WHERE order_id = ? AND type = 'settlement'", (order["id"],)).fetchone()
+        if existing:
+            continue
+        seller = con.execute("SELECT * FROM users WHERE id = ?", (order["seller_id"],)).fetchone()
+        seller = row_to_dict(seller) if seller else {"created_at": now(), "business_verification_status": "not_submitted"}
+        rate = commission_rate_for_seller(seller)
+        gross = round(as_float(order["total"]), 2)
+        commission = round(gross * rate / 100, 2)
+        earning = round(gross - commission, 2)
+        con.execute(
+            """
+            INSERT INTO wallet
+            (seller_id, order_id, type, amount, gross_amount, commission_rate, commission_amount, seller_earning, status, note, created_at)
+            VALUES (?, ?, 'settlement', ?, ?, ?, ?, ?, 'pending', ?, ?)
+            """,
+            (order["seller_id"], order["id"], earning, gross, rate, commission, earning, f"Order PM-{order['id']} completed; payout pending admin approval", now()),
+        )
+
+
+def wallet_rows(con):
+    sync_wallet_settlements(con)
+    return [
+        row_to_dict(row)
+        for row in con.execute(
+            """
+            SELECT wallet.*, users.shop_name, users.name AS seller_name, users.email AS seller_email,
+                   users.bank_name, users.bank_account_name, users.bank_account_number,
+                   orders.order_status, orders.payment_status, orders.escrow_status
+            FROM wallet
+            LEFT JOIN users ON users.id = wallet.seller_id
+            LEFT JOIN orders ON orders.id = wallet.order_id
+            ORDER BY wallet.created_at DESC, wallet.id DESC
+            """
+        )
+    ]
+
+
+def wallet_summary(rows):
+    summary = {"gross": 0, "commission": 0, "seller_earning": 0, "pending": 0, "approved": 0, "paid_out": 0, "held": 0}
+    for row in rows:
+        summary["gross"] += as_float(row.get("gross_amount") or 0)
+        summary["commission"] += as_float(row.get("commission_amount") or 0)
+        summary["seller_earning"] += as_float(row.get("seller_earning") or row.get("amount") or 0)
+        status = row.get("status") or "pending"
+        if status in summary:
+            summary[status] += as_float(row.get("seller_earning") or row.get("amount") or 0)
+    return {key: round(value, 2) for key, value in summary.items()}
 
 
 def clean_toyyib_text(value, limit):
