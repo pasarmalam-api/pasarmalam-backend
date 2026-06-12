@@ -39,7 +39,7 @@
       else if(status==="2") title.innerHTML="<span class='pending'>Payment pending</span>";
       try{
         if(orderId||billcode){
-          const endpoint=provider==="billplz"?"/api/payments/billplz/status":"/api/payments/toyyibpay/status";
+          const endpoint="/api/payments/billplz/status";
           const r=await fetch(`${API_BASE}${endpoint}?order_id=${encodeURIComponent(orderId)}&billcode=${encodeURIComponent(billcode)}`);
           const data=await r.json();
           if(!r.ok) throw new Error(data.error||"Status check failed");
