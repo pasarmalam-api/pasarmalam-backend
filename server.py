@@ -370,6 +370,7 @@ def init_db():
         migrate_users(con)
         migrate_passwords(con)
         seed(con)
+        sync_demo_seller_ownership(con)
         ensure_admin(con)
         ensure_admin_settings(con)
         migrate_email_otps(con)
@@ -854,6 +855,19 @@ def ensure_admin(con):
         "INSERT INTO users (role, name, phone, email, password, address, shop_name, status, seller_status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         ("admin", "PM Admin", "0100000000", "admin@pasarmalam.my", hash_password("admin123"), "HQ", "", "active", "not_applicable", now()),
     )
+
+
+def sync_demo_seller_ownership(con):
+    seller = con.execute("SELECT id FROM users WHERE email = ? AND role = 'seller'", ("seller@pasarmalam.my",)).fetchone()
+    if not seller:
+        return
+    seller_id = int(seller["id"])
+    if seller_id == 1:
+        return
+    con.execute("UPDATE products SET seller_id = ? WHERE seller_id = 1", (seller_id,))
+    con.execute("UPDATE campaigns SET seller_id = ? WHERE seller_id = 1", (seller_id,))
+    con.execute("UPDATE wallet SET seller_id = ? WHERE seller_id = 1", (seller_id,))
+    con.execute("UPDATE reviews SET seller_id = ? WHERE seller_id = 1", (seller_id,))
 
 
 def ensure_admin_settings(con):
