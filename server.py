@@ -2354,9 +2354,10 @@ class Handler(BaseHTTPRequestHandler):
                 escrow = "refund_approved" if return_status == "approved" else ("refund_rejected" if return_status == "rejected" else ("refunded" if return_status == "refunded" else "dispute_hold"))
                 con.execute("UPDATE orders SET escrow_status = ?, status_updated_at = ? WHERE id = ?", (escrow, now(), order_id))
                 if return_status in ("approved", "refunded"):
+                    hold_note = "Seller payout held because order was refunded" if return_status == "refunded" else "Seller payout held because return is approved"
                     con.execute(
-                        "UPDATE wallet SET status = 'held', note = ?, reviewed_at = ? WHERE order_id = ? AND type = 'settlement' AND status IN ('pending', 'approved')",
-                        (f"Seller payout held because return is {return_status}", now(), order_id),
+                        "UPDATE wallet SET status = 'held', note = ?, reviewed_at = ? WHERE order_id = ? AND type = 'settlement' AND status IN ('pending', 'approved', 'held')",
+                        (hold_note, now(), order_id),
                     )
                 create_notification(con, "buyer", ctx["buyer_id"], f"Return PM-{order_id} {return_status}", f"Admin decision: {return_status}.", "return", "returns.html")
                 create_notification(con, "seller", ctx["seller_id"], f"Return PM-{order_id} {return_status}", f"Admin decision: {return_status}.", "return", "returns.html")
@@ -2399,11 +2400,21 @@ def sync_wallet_settlements(con):
         """
         UPDATE wallet
         SET status = 'held',
-            note = 'Payout held because order is in refund/dispute flow',
+            note = (
+                SELECT CASE orders.escrow_status
+                    WHEN 'refunded' THEN 'Seller payout held because order was refunded'
+                    WHEN 'refund_approved' THEN 'Seller payout held because return is approved'
+                    WHEN 'refund_rejected' THEN 'Seller payout held while refund rejection is reviewed'
+                    WHEN 'cancelled' THEN 'Seller payout held because order was cancelled'
+                    ELSE 'Payout held because order is in refund/dispute flow'
+                END
+                FROM orders
+                WHERE orders.id = wallet.order_id
+            ),
             reviewed_at = ?
         WHERE type = 'settlement'
           AND order_id IN (SELECT id FROM orders WHERE escrow_status IN (?, ?, ?, ?, ?))
-          AND status IN ('pending', 'approved')
+          AND status IN ('pending', 'approved', 'held')
         """,
         (now(), *blocked_escrows),
     )
