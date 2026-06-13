@@ -1736,7 +1736,19 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 200, {"ok": True, "order": row_to_dict(order), "gateway": raw})
 
     def update_order_status(self, data):
-        status = data["order_status"]
+        aliases = {
+            "placed": "to_pack",
+            "paid": "to_pack",
+            "packed": "to_pack",
+            "to_pack": "to_pack",
+            "shipped": "shipped",
+            "delivered": "delivered",
+            "completed": "completed",
+            "cancelled": "cancelled",
+        }
+        status = aliases.get(str(data["order_status"]).strip().lower())
+        if not status:
+            raise ValueError("Invalid order status")
         status_now = now()
         return_window_days = int(data.get("return_window_days", 15))
         escrow_release_days = int(data.get("escrow_release_days", 15))
@@ -1757,6 +1769,11 @@ class Handler(BaseHTTPRequestHandler):
             escrow = "cancelled"
         user = self.current_user()
         with connect() as con:
+            order = con.execute("SELECT * FROM orders WHERE id = ?", (int(data["order_id"]),)).fetchone()
+            if not order:
+                raise ValueError("Order not found")
+            if order["payment_status"] != "paid" and status not in ("cancelled",):
+                raise ValueError("Only paid orders can move to fulfillment")
             if user and user["role"] == "seller":
                 row = con.execute(
                     """
@@ -1768,17 +1785,19 @@ class Handler(BaseHTTPRequestHandler):
                 ).fetchone()
                 if not row:
                     raise PermissionError("Seller cannot update another seller order")
-            existing = con.execute("SELECT delivered_at, completed_at, return_deadline_at, escrow_release_at FROM orders WHERE id = ?", (int(data["order_id"]),)).fetchone()
-            delivered_at = delivered_at or int(existing["delivered_at"] or 0)
-            completed_at = completed_at or int(existing["completed_at"] or 0)
-            return_deadline_at = return_deadline_at or int(existing["return_deadline_at"] or 0)
-            escrow_release_at = escrow_release_at or int(existing["escrow_release_at"] or 0)
+            delivered_at = delivered_at or int(order["delivered_at"] or 0)
+            completed_at = completed_at or int(order["completed_at"] or 0)
+            return_deadline_at = return_deadline_at or int(order["return_deadline_at"] or 0)
+            escrow_release_at = escrow_release_at or int(order["escrow_release_at"] or 0)
+            tracking_no = data.get("tracking_no", order["tracking_no"] or "")
+            awb_label = data.get("awb_label", order["awb_label"] or "")
             con.execute(
-                "UPDATE orders SET order_status = ?, escrow_status = ?, status_updated_at = ?, delivered_at = ?, completed_at = ?, return_deadline_at = ?, escrow_release_at = ? WHERE id = ?",
-                (status, escrow, status_now, delivered_at, completed_at, return_deadline_at, escrow_release_at, int(data["order_id"])),
+                "UPDATE orders SET order_status = ?, escrow_status = ?, status_updated_at = ?, delivered_at = ?, completed_at = ?, return_deadline_at = ?, escrow_release_at = ?, tracking_no = ?, awb_label = ? WHERE id = ?",
+                (status, escrow, status_now, delivered_at, completed_at, return_deadline_at, escrow_release_at, tracking_no, awb_label, int(data["order_id"])),
             )
             sync_wallet_settlements(con)
-        send_json(self, 200, {"ok": True, "escrow_status": escrow})
+            updated = con.execute("SELECT id, order_status, escrow_status, tracking_no, awb_label, return_deadline_at, escrow_release_at FROM orders WHERE id = ?", (int(data["order_id"]),)).fetchone()
+        send_json(self, 200, {"ok": True, "order": row_to_dict(updated)})
 
     def awb(self, data):
         awb = f"PM-AWB-{int(data.get('order_id', 0)):06d}"
