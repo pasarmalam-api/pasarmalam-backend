@@ -1002,6 +1002,76 @@ def send_json(handler, status, payload):
         handler.wfile.write(body)
 
 
+def send_html(handler, status, html):
+    body = html.encode("utf-8")
+    handler.send_response(status)
+    handler.send_header("Content-Type", "text/html; charset=utf-8")
+    handler.send_header("Access-Control-Allow-Origin", "*")
+    handler.send_header("Content-Length", str(len(body)))
+    handler.end_headers()
+    handler.wfile.write(body)
+
+
+def backend_homepage():
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PasarMalam API</title>
+  <style>
+    :root{{--brand:#0f9f8f;--purple:#4f46e5;--pink:#e43f8f;--bg:#f5f7fb;--text:#18212f;--muted:#667085;--line:#e5e7eb}}
+    *{{box-sizing:border-box}}
+    body{{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--text)}}
+    header{{background:linear-gradient(135deg,var(--brand),var(--purple));color:#fff;padding:28px 18px}}
+    main,nav{{max-width:980px;margin:auto}}
+    .brand{{display:flex;gap:12px;align-items:center}}
+    .logo{{width:58px;height:58px;border-radius:14px;background:conic-gradient(from 160deg,var(--brand),var(--purple),var(--pink),var(--brand));display:grid;place-items:center;font-weight:900;box-shadow:inset 0 0 0 3px #ffffffcc}}
+    h1{{margin:0;font-size:32px}} p{{line-height:1.55}}
+    .status{{display:inline-flex;gap:8px;align-items:center;background:#ffffff20;border:1px solid #ffffff55;border-radius:999px;padding:8px 12px;margin-top:14px;font-weight:700}}
+    .dot{{width:10px;height:10px;border-radius:50%;background:#38d98a}}
+    section{{background:#fff;border:1px solid var(--line);border-radius:8px;padding:18px;margin:18px}}
+    .grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}}
+    a.card{{display:block;text-decoration:none;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:14px;background:#fff}}
+    a.card:hover{{border-color:var(--brand)}}
+    .muted{{color:var(--muted)}} code{{background:#eef2ff;padding:2px 6px;border-radius:6px}}
+    @media(max-width:760px){{.grid{{grid-template-columns:1fr}} h1{{font-size:26px}}}}
+  </style>
+</head>
+<body>
+  <header>
+    <nav>
+      <div class="brand"><div class="logo">PM</div><div><h1>PasarMalam API</h1><div>Backend service for buyer, seller and admin apps</div></div></div>
+      <div class="status"><span class="dot"></span> Online</div>
+    </nav>
+  </header>
+  <main>
+    <section>
+      <h2>Service Status</h2>
+      <p>This Render service powers PasarMalam products, users, orders, payments, returns, wallet settlement, notifications and admin operations.</p>
+      <p class="muted">Base URL: <code>{PUBLIC_BASE_URL}</code></p>
+    </section>
+    <section>
+      <h2>API Checks</h2>
+      <div class="grid">
+        <a class="card" href="/api/health"><b>Health</b><p class="muted">Backend service check</p></a>
+        <a class="card" href="/api/products"><b>Products</b><p class="muted">Live marketplace products</p></a>
+        <a class="card" href="/api/public/settings"><b>Public Settings</b><p class="muted">Payment/support settings</p></a>
+      </div>
+    </section>
+    <section>
+      <h2>Connected Apps</h2>
+      <div class="grid">
+        <a class="card" href="https://www.pasarmalamapp.com"><b>Landing</b><p class="muted">Main public website</p></a>
+        <a class="card" href="{BUYER_APP_URL}"><b>Buyer App</b><p class="muted">Shopping, checkout and returns</p></a>
+        <a class="card" href="{ADMIN_APP_URL}"><b>Admin App</b><p class="muted">Operations and settlement</p></a>
+      </div>
+    </section>
+  </main>
+</body>
+</html>"""
+
+
 class Handler(BaseHTTPRequestHandler):
     def current_user(self):
         auth = self.headers.get("Authorization", "")
@@ -1030,6 +1100,7 @@ class Handler(BaseHTTPRequestHandler):
         query = parse_qs(parsed.query)
         try:
             routes = {
+                "/": lambda: send_html(self, 200, backend_homepage()),
                 "/api/health": lambda: send_json(self, 200, {"ok": True, "service": "PasarMalam API", "features": "marketplace", "version": "admin-ops-2026-06-05"}),
                 "/api/products": lambda: self.get_products(query),
                 "/api/messages": lambda: self.list_table("messages", "messages"),
