@@ -124,6 +124,29 @@ def as_float(value):
     return float(value or 0)
 
 
+def create_notification(con, role, user_id, title, body, type_="info", target_url=""):
+    con.execute(
+        "INSERT INTO notifications (role, user_id, title, body, type, target_url, read_at, created_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?)",
+        (role, int(user_id or 0), title, body, type_, target_url, now()),
+    )
+
+
+def notify_admins(con, title, body, type_="admin", target_url=""):
+    create_notification(con, "admin", 0, title, body, type_, target_url)
+
+
+def order_context(con, order_id):
+    row = con.execute(
+        """
+        SELECT orders.*, products.seller_id, products.name AS product_name, products.shop AS seller_shop
+        FROM orders LEFT JOIN products ON products.id = orders.product_id
+        WHERE orders.id = ?
+        """,
+        (int(order_id),),
+    ).fetchone()
+    return row_to_dict(row) if row else None
+
+
 def hash_password(password, salt=None):
     salt = salt or secrets.token_hex(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 120_000)
@@ -359,6 +382,18 @@ def init_db():
               expires_at INTEGER NOT NULL,
               created_at INTEGER NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS notifications (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              role TEXT NOT NULL,
+              user_id INTEGER DEFAULT 0,
+              title TEXT NOT NULL,
+              body TEXT NOT NULL,
+              type TEXT DEFAULT 'info',
+              target_url TEXT DEFAULT '',
+              read_at INTEGER DEFAULT 0,
+              created_at INTEGER NOT NULL
+            );
             """
         )
         migrate_products(con)
@@ -374,6 +409,7 @@ def init_db():
         ensure_admin(con)
         ensure_admin_settings(con)
         migrate_email_otps(con)
+        migrate_notifications(con)
 
 
 def postgres_schema_statements():
@@ -588,6 +624,19 @@ def postgres_schema_statements():
           created_at INTEGER NOT NULL
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS notifications (
+          id SERIAL PRIMARY KEY,
+          role TEXT NOT NULL,
+          user_id INTEGER DEFAULT 0,
+          title TEXT NOT NULL,
+          body TEXT NOT NULL,
+          type TEXT DEFAULT 'info',
+          target_url TEXT DEFAULT '',
+          read_at INTEGER DEFAULT 0,
+          created_at INTEGER NOT NULL
+        )
+        """,
     ]
 
 
@@ -731,6 +780,41 @@ def migrate_email_otps(con):
               verified INTEGER DEFAULT 0,
               attempts INTEGER DEFAULT 0,
               expires_at INTEGER NOT NULL,
+              created_at INTEGER NOT NULL
+            )
+            """
+            )
+
+
+def migrate_notifications(con):
+    if USE_POSTGRES:
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS notifications (
+              id SERIAL PRIMARY KEY,
+              role TEXT NOT NULL,
+              user_id INTEGER DEFAULT 0,
+              title TEXT NOT NULL,
+              body TEXT NOT NULL,
+              type TEXT DEFAULT 'info',
+              target_url TEXT DEFAULT '',
+              read_at INTEGER DEFAULT 0,
+              created_at INTEGER NOT NULL
+            )
+            """
+        )
+    else:
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS notifications (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              role TEXT NOT NULL,
+              user_id INTEGER DEFAULT 0,
+              title TEXT NOT NULL,
+              body TEXT NOT NULL,
+              type TEXT DEFAULT 'info',
+              target_url TEXT DEFAULT '',
+              read_at INTEGER DEFAULT 0,
               created_at INTEGER NOT NULL
             )
             """
@@ -953,6 +1037,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/orders": self.get_orders,
                 "/api/cart": lambda: self.get_cart(query),
                 "/api/wishlist": self.get_wishlist,
+                "/api/notifications": self.get_notifications,
                 "/api/returns": self.get_returns,
                 "/api/campaigns": lambda: self.list_table("campaigns", "campaigns"),
                 "/api/wallet": self.get_wallet,
@@ -1047,6 +1132,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.create_return(data, user)
             elif parsed.path == "/api/returns/respond":
                 self.seller_respond_return(data)
+            elif parsed.path == "/api/notifications/read":
+                self.mark_notifications_read(data)
             elif parsed.path == "/api/campaigns":
                 self.create_campaign(data)
             elif parsed.path == "/api/logistics/awb":
@@ -1419,6 +1506,45 @@ class Handler(BaseHTTPRequestHandler):
             rows = [row_to_dict(row) for row in con.execute("SELECT * FROM wishlist WHERE buyer_id = ? ORDER BY created_at DESC, id DESC", (buyer_id,))]
         send_json(self, 200, {"wishlist": rows})
 
+    def get_notifications(self):
+        user = self.current_user()
+        role = user["role"] if user else (parse_qs(urlparse(self.path).query).get("role") or ["buyer"])[0]
+        user_id = int(user["id"]) if user else int((parse_qs(urlparse(self.path).query).get("user_id") or ["1"])[0] or 1)
+        if role not in ("buyer", "seller", "admin"):
+            role = "buyer"
+        with connect() as con:
+            if role == "admin":
+                rows = [
+                    row_to_dict(row)
+                    for row in con.execute(
+                        "SELECT * FROM notifications WHERE role = 'admin' OR user_id = ? ORDER BY created_at DESC, id DESC LIMIT 100",
+                        (user_id,),
+                    )
+                ]
+            else:
+                rows = [
+                    row_to_dict(row)
+                    for row in con.execute(
+                        "SELECT * FROM notifications WHERE role = ? AND (user_id = 0 OR user_id = ?) ORDER BY created_at DESC, id DESC LIMIT 100",
+                        (role, user_id),
+                    )
+                ]
+        unread = sum(1 for row in rows if not int(row.get("read_at") or 0))
+        send_json(self, 200, {"notifications": rows, "unread": unread})
+
+    def mark_notifications_read(self, data):
+        user = self.current_user()
+        role = user["role"] if user else data.get("role", "buyer")
+        user_id = int(user["id"]) if user else int(data.get("user_id", 1) or 1)
+        with connect() as con:
+            if data.get("notification_id"):
+                con.execute("UPDATE notifications SET read_at = ? WHERE id = ?", (now(), int(data["notification_id"])))
+            elif role == "admin":
+                con.execute("UPDATE notifications SET read_at = ? WHERE role = 'admin' OR user_id = ?", (now(), user_id))
+            else:
+                con.execute("UPDATE notifications SET read_at = ? WHERE role = ? AND (user_id = 0 OR user_id = ?)", (now(), role, user_id))
+        send_json(self, 200, {"ok": True})
+
     def get_orders(self):
         user = self.current_user()
         with connect() as con:
@@ -1518,6 +1644,11 @@ class Handler(BaseHTTPRequestHandler):
                 (buyer_id, order_id, buyer_name, data.get("reason", ""), data.get("request_type", "Return/Refund"), data.get("evidence_url", ""), now()),
             )
             con.execute("UPDATE orders SET escrow_status = 'dispute_hold' WHERE id = ?", (order_id,))
+            ctx = order_context(con, order_id)
+            if ctx:
+                create_notification(con, "buyer", buyer_id, f"Return request submitted for PM-{order_id}", "Your request is waiting for seller/admin review.", "return", "returns.html")
+                create_notification(con, "seller", ctx["seller_id"], f"Return request for PM-{order_id}", data.get("reason", "Buyer requested return/refund."), "return", "returns.html")
+                notify_admins(con, f"Return request PM-{order_id}", f"Buyer reason: {data.get('reason', '')}", "return", "returns.html")
         send_json(self, 201, {"ok": True})
 
     def seller_respond_return(self, data):
@@ -1543,6 +1674,10 @@ class Handler(BaseHTTPRequestHandler):
                 "UPDATE returns SET seller_response = ?, dispute_status = 'seller_responded' WHERE id = ?",
                 (response, return_id),
             )
+            row = con.execute("SELECT order_id, buyer_id FROM returns WHERE id = ?", (return_id,)).fetchone()
+            if row:
+                create_notification(con, "buyer", row["buyer_id"], f"Seller responded to return PM-{row['order_id']}", response, "return", "returns.html")
+                notify_admins(con, f"Seller responded to return #{return_id}", response, "return", "returns.html")
         send_json(self, 200, {"ok": True, "seller_response": response, "dispute_status": "seller_responded"})
 
     def checkout(self, data):
@@ -1760,6 +1895,11 @@ class Handler(BaseHTTPRequestHandler):
                     con.execute("UPDATE products SET stock = GREATEST(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, order["product_id"]))
                 else:
                     con.execute("UPDATE products SET stock = MAX(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, order["product_id"]))
+                ctx = order_context(con, order_id)
+                if ctx:
+                    create_notification(con, "buyer", ctx["buyer_id"], f"Payment received for PM-{order_id}", "Your payment is confirmed. The seller can now prepare your order.", "payment", f"orders.html")
+                    create_notification(con, "seller", ctx["seller_id"], f"New paid order PM-{order_id}", f"Prepare {ctx.get('product_name') or 'the item'} for the buyer.", "order", f"orders.html")
+                    notify_admins(con, f"Paid order PM-{order_id}", f"Bill payment confirmed for RM{as_float(ctx['total']):.2f}.", "payment", "orders.html")
 
     def billplz_callback(self, data):
         bill_id = str(data.get("id", data.get("billplz[id]", "")))
@@ -1860,6 +2000,13 @@ class Handler(BaseHTTPRequestHandler):
             )
             sync_wallet_settlements(con)
             updated = con.execute("SELECT id, order_status, escrow_status, tracking_no, awb_label, return_deadline_at, escrow_release_at FROM orders WHERE id = ?", (int(data["order_id"]),)).fetchone()
+            ctx = order_context(con, int(data["order_id"]))
+            if ctx:
+                create_notification(con, "buyer", ctx["buyer_id"], f"Order PM-{ctx['id']} {status}", f"Tracking: {tracking_no or 'not added yet'}.", "order", "orders.html")
+                if status == "delivered":
+                    notify_admins(con, f"Order PM-{ctx['id']} delivered", "Return/refund window and escrow countdown are now active.", "order", "orders.html")
+                elif status == "completed":
+                    notify_admins(con, f"Order PM-{ctx['id']} completed", "Seller settlement can be reviewed.", "wallet", "wallet.html")
         send_json(self, 200, {"ok": True, "order": row_to_dict(updated)})
 
     def awb(self, data):
@@ -2110,16 +2257,28 @@ class Handler(BaseHTTPRequestHandler):
             reviewed_at = now() if status in ("approved", "paid_out", "held", "rejected") else 0
             final_note = note or row["note"] or f"Payout {status}"
             con.execute("UPDATE wallet SET status = ?, reviewed_at = ?, payout_proof_url = ?, note = ? WHERE id = ?", (status, reviewed_at, data.get("payout_proof_url", row["payout_proof_url"] or ""), final_note, wallet_id))
+            create_notification(con, "seller", row["seller_id"], f"Payout {status}", final_note, "wallet", "wallet.html")
         self.audit("payout_status_update", "wallet", wallet_id, status)
         send_json(self, 200, {"ok": True, "status": status})
 
     def admin_update_return_status(self, data):
         self.require_user("admin")
         with connect() as con:
+            row = con.execute("SELECT * FROM returns WHERE id = ?", (int(data["return_id"]),)).fetchone()
+            order_id = int(row["order_id"]) if row else 0
+            ctx = order_context(con, order_id) if order_id else None
+            return_status = data.get("status", "requested")
+            dispute_status = data.get("dispute_status", "open")
             con.execute(
                 "UPDATE returns SET status = ?, dispute_status = ?, seller_response = ? WHERE id = ?",
-                (data.get("status", "requested"), data.get("dispute_status", "open"), data.get("seller_response", ""), int(data["return_id"])),
+                (return_status, dispute_status, data.get("seller_response", ""), int(data["return_id"])),
             )
+            if ctx:
+                escrow = "refund_approved" if return_status == "approved" else ("refund_rejected" if return_status == "rejected" else "dispute_hold")
+                con.execute("UPDATE orders SET escrow_status = ?, status_updated_at = ? WHERE id = ?", (escrow, now(), order_id))
+                create_notification(con, "buyer", ctx["buyer_id"], f"Return PM-{order_id} {return_status}", f"Admin decision: {return_status}.", "return", "returns.html")
+                create_notification(con, "seller", ctx["seller_id"], f"Return PM-{order_id} {return_status}", f"Admin decision: {return_status}.", "return", "returns.html")
+                notify_admins(con, f"Return #{data['return_id']} updated", f"Status: {return_status}, dispute: {dispute_status}.", "return", "returns.html")
         self.audit("return_dispute_update", "return", data["return_id"], f"{data.get('status')} / {data.get('dispute_status')}")
         send_json(self, 200, {"ok": True})
 
