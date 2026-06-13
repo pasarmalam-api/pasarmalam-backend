@@ -1045,6 +1045,8 @@ class Handler(BaseHTTPRequestHandler):
             elif parsed.path == "/api/returns":
                 user = self.current_user()
                 self.create_return(data, user)
+            elif parsed.path == "/api/returns/respond":
+                self.seller_respond_return(data)
             elif parsed.path == "/api/campaigns":
                 self.create_simple("campaigns", data, {"seller_id": 1, "status": "active"})
             elif parsed.path == "/api/logistics/awb":
@@ -1495,6 +1497,31 @@ class Handler(BaseHTTPRequestHandler):
             )
             con.execute("UPDATE orders SET escrow_status = 'dispute_hold' WHERE id = ?", (order_id,))
         send_json(self, 201, {"ok": True})
+
+    def seller_respond_return(self, data):
+        user = self.require_user("seller")
+        return_id = int(data["return_id"])
+        response = data.get("seller_response", "").strip()
+        if not response:
+            raise ValueError("Seller response is required")
+        with connect() as con:
+            row = con.execute(
+                """
+                SELECT returns.id
+                FROM returns
+                JOIN orders ON orders.id = returns.order_id
+                JOIN products ON products.id = orders.product_id
+                WHERE returns.id = ? AND products.seller_id = ?
+                """,
+                (return_id, user["id"]),
+            ).fetchone()
+            if not row:
+                raise PermissionError("Seller cannot respond to another seller return")
+            con.execute(
+                "UPDATE returns SET seller_response = ?, dispute_status = 'seller_responded' WHERE id = ?",
+                (response, return_id),
+            )
+        send_json(self, 200, {"ok": True, "seller_response": response, "dispute_status": "seller_responded"})
 
     def checkout(self, data):
         user = self.current_user()
