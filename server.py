@@ -352,6 +352,8 @@ def init_db():
               status TEXT DEFAULT 'pending',
               reviewed_at INTEGER DEFAULT 0,
               payout_proof_url TEXT DEFAULT '',
+              payout_reference TEXT DEFAULT '',
+              payout_paid_at INTEGER DEFAULT 0,
               note TEXT DEFAULT '',
               created_at INTEGER NOT NULL
             );
@@ -590,6 +592,8 @@ def postgres_schema_statements():
           status TEXT DEFAULT 'pending',
           reviewed_at INTEGER DEFAULT 0,
           payout_proof_url TEXT DEFAULT '',
+          payout_reference TEXT DEFAULT '',
+          payout_paid_at INTEGER DEFAULT 0,
           note TEXT DEFAULT '',
           created_at INTEGER NOT NULL
         )
@@ -747,6 +751,8 @@ def migrate_wallet(con):
         "status": "TEXT DEFAULT 'pending'",
         "reviewed_at": "INTEGER DEFAULT 0",
         "payout_proof_url": "TEXT DEFAULT ''",
+        "payout_reference": "TEXT DEFAULT ''",
+        "payout_paid_at": "INTEGER DEFAULT 0",
     }
     for name, sql in additions.items():
         if name not in columns:
@@ -1671,7 +1677,8 @@ class Handler(BaseHTTPRequestHandler):
                     row_to_dict(row)
                     for row in con.execute(
                         """
-                        SELECT wallet.*, users.shop_name, users.name AS seller_name, users.bank_name, users.bank_account_name, users.bank_account_number,
+                        SELECT wallet.*, users.shop_name, users.name AS seller_name, users.identity_type, users.identity_number,
+                               users.bank_name, users.bank_account_name, users.bank_account_number,
                                orders.order_status, orders.payment_status, orders.escrow_status
                         FROM wallet
                         LEFT JOIN users ON users.id = wallet.seller_id
@@ -1686,6 +1693,17 @@ class Handler(BaseHTTPRequestHandler):
                 rows = wallet_rows(con)
             else:
                 rows = [row_to_dict(row) for row in con.execute("SELECT * FROM wallet WHERE order_id > 0 ORDER BY created_at DESC, id DESC")]
+        for row in rows:
+            ready, reason = payout_readiness({
+                "name": row.get("seller_name", ""),
+                "identity_type": row.get("identity_type", ""),
+                "identity_number": row.get("identity_number", ""),
+                "bank_name": row.get("bank_name", ""),
+                "bank_account_name": row.get("bank_account_name", ""),
+                "bank_account_number": row.get("bank_account_number", ""),
+            })
+            row["payout_ready"] = ready
+            row["payout_ready_note"] = reason
         summary = wallet_summary(rows)
         send_json(self, 200, {"wallet": rows, "summary": summary})
 
@@ -2329,9 +2347,25 @@ class Handler(BaseHTTPRequestHandler):
             blocked = ("dispute_hold", "refund_approved", "refunded", "cancelled")
             if order and order["escrow_status"] in blocked and status in ("approved", "paid_out"):
                 raise ValueError(f"Payout blocked because order escrow is {order['escrow_status']}")
+            seller = con.execute("SELECT name, identity_type, identity_number, bank_name, bank_account_name, bank_account_number FROM users WHERE id = ?", (int(row["seller_id"] or 0),)).fetchone()
+            ready, ready_note = payout_readiness(row_to_dict(seller) if seller else {})
+            if status in ("approved", "paid_out") and not ready:
+                raise ValueError(f"Payout blocked: {ready_note}")
             reviewed_at = now() if status in ("approved", "paid_out", "held", "rejected") else 0
             final_note = note or row["note"] or f"Payout {status}"
-            con.execute("UPDATE wallet SET status = ?, reviewed_at = ?, payout_proof_url = ?, note = ? WHERE id = ?", (status, reviewed_at, data.get("payout_proof_url", row["payout_proof_url"] or ""), final_note, wallet_id))
+            payout_paid_at = int(data.get("payout_paid_at") or (now() if status == "paid_out" else int(row["payout_paid_at"] or 0)))
+            con.execute(
+                "UPDATE wallet SET status = ?, reviewed_at = ?, payout_proof_url = ?, payout_reference = ?, payout_paid_at = ?, note = ? WHERE id = ?",
+                (
+                    status,
+                    reviewed_at,
+                    data.get("payout_proof_url", row["payout_proof_url"] or ""),
+                    data.get("payout_reference", row["payout_reference"] or ""),
+                    payout_paid_at,
+                    final_note,
+                    wallet_id,
+                ),
+            )
             create_notification(con, "seller", row["seller_id"], f"Payout {status}", final_note, "wallet", "wallet.html")
         self.audit("payout_status_update", "wallet", wallet_id, status)
         send_json(self, 200, {"ok": True, "status": status})
@@ -2392,6 +2426,37 @@ def commission_rate_for_seller(seller):
     if seller.get("business_verification_status") == "verified":
         return 4.0
     return 5.0
+
+
+def normalize_name(value):
+    return " ".join("".join(char.lower() if char.isalnum() else " " for char in str(value or "")).split())
+
+
+def bank_name_matches_identity(seller):
+    account_name = normalize_name(seller.get("bank_account_name"))
+    identity_name = normalize_name(seller.get("name"))
+    if not account_name or not identity_name:
+        return False
+    return account_name == identity_name or account_name in identity_name or identity_name in account_name
+
+
+def payout_readiness(seller):
+    missing = []
+    if not str(seller.get("identity_type") or "").strip():
+        missing.append("identity type")
+    if not str(seller.get("identity_number") or "").strip():
+        missing.append("identity number")
+    if not str(seller.get("bank_name") or "").strip():
+        missing.append("bank name")
+    if not str(seller.get("bank_account_name") or "").strip():
+        missing.append("bank account holder name")
+    if not str(seller.get("bank_account_number") or "").strip():
+        missing.append("bank account number")
+    if missing:
+        return False, "Missing " + ", ".join(missing)
+    if not bank_name_matches_identity(seller):
+        return False, "Bank account holder name must match seller identity name"
+    return True, "Ready for payout"
 
 
 def sync_wallet_settlements(con):
@@ -2459,7 +2524,7 @@ def wallet_rows(con):
         for row in con.execute(
             """
             SELECT wallet.*, users.shop_name, users.name AS seller_name, users.email AS seller_email,
-                   users.bank_name, users.bank_account_name, users.bank_account_number,
+                   users.identity_type, users.identity_number, users.bank_name, users.bank_account_name, users.bank_account_number,
                    orders.order_status, orders.payment_status, orders.escrow_status
             FROM wallet
             LEFT JOIN users ON users.id = wallet.seller_id
