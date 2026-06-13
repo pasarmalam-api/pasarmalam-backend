@@ -2254,6 +2254,10 @@ class Handler(BaseHTTPRequestHandler):
             row = con.execute("SELECT * FROM wallet WHERE id = ?", (wallet_id,)).fetchone()
             if not row:
                 raise ValueError("Wallet record not found")
+            order = con.execute("SELECT escrow_status FROM orders WHERE id = ?", (int(row["order_id"] or 0),)).fetchone()
+            blocked = ("dispute_hold", "refund_approved", "refunded", "cancelled")
+            if order and order["escrow_status"] in blocked and status in ("approved", "paid_out"):
+                raise ValueError(f"Payout blocked because order escrow is {order['escrow_status']}")
             reviewed_at = now() if status in ("approved", "paid_out", "held", "rejected") else 0
             final_note = note or row["note"] or f"Payout {status}"
             con.execute("UPDATE wallet SET status = ?, reviewed_at = ?, payout_proof_url = ?, note = ? WHERE id = ?", (status, reviewed_at, data.get("payout_proof_url", row["payout_proof_url"] or ""), final_note, wallet_id))
@@ -2269,13 +2273,20 @@ class Handler(BaseHTTPRequestHandler):
             ctx = order_context(con, order_id) if order_id else None
             return_status = data.get("status", "requested")
             dispute_status = data.get("dispute_status", "open")
+            if return_status not in ("requested", "reviewing", "approved", "rejected", "refunded"):
+                raise ValueError("Invalid return status")
             con.execute(
                 "UPDATE returns SET status = ?, dispute_status = ?, seller_response = ? WHERE id = ?",
                 (return_status, dispute_status, data.get("seller_response", ""), int(data["return_id"])),
             )
             if ctx:
-                escrow = "refund_approved" if return_status == "approved" else ("refund_rejected" if return_status == "rejected" else "dispute_hold")
+                escrow = "refund_approved" if return_status == "approved" else ("refund_rejected" if return_status == "rejected" else ("refunded" if return_status == "refunded" else "dispute_hold"))
                 con.execute("UPDATE orders SET escrow_status = ?, status_updated_at = ? WHERE id = ?", (escrow, now(), order_id))
+                if return_status in ("approved", "refunded"):
+                    con.execute(
+                        "UPDATE wallet SET status = 'held', note = ?, reviewed_at = ? WHERE order_id = ? AND type = 'settlement' AND status IN ('pending', 'approved')",
+                        (f"Seller payout held because return is {return_status}", now(), order_id),
+                    )
                 create_notification(con, "buyer", ctx["buyer_id"], f"Return PM-{order_id} {return_status}", f"Admin decision: {return_status}.", "return", "returns.html")
                 create_notification(con, "seller", ctx["seller_id"], f"Return PM-{order_id} {return_status}", f"Admin decision: {return_status}.", "return", "returns.html")
                 notify_admins(con, f"Return #{data['return_id']} updated", f"Status: {return_status}, dispute: {dispute_status}.", "return", "returns.html")
@@ -2312,6 +2323,19 @@ def commission_rate_for_seller(seller):
 
 
 def sync_wallet_settlements(con):
+    blocked_escrows = ("dispute_hold", "refund_approved", "refund_rejected", "refunded", "cancelled")
+    con.execute(
+        """
+        UPDATE wallet
+        SET status = 'held',
+            note = 'Payout held because order is in refund/dispute flow',
+            reviewed_at = ?
+        WHERE type = 'settlement'
+          AND order_id IN (SELECT id FROM orders WHERE escrow_status IN (?, ?, ?, ?, ?))
+          AND status IN ('pending', 'approved')
+        """,
+        (now(), *blocked_escrows),
+    )
     rows = [
         row_to_dict(row)
         for row in con.execute(
@@ -2320,8 +2344,10 @@ def sync_wallet_settlements(con):
             FROM orders JOIN products ON products.id = orders.product_id
             WHERE orders.payment_status = 'paid'
               AND orders.order_status IN ('delivered', 'completed')
+              AND orders.escrow_status NOT IN (?, ?, ?, ?, ?)
             ORDER BY orders.created_at DESC, orders.id DESC
-            """
+            """,
+            blocked_escrows,
         )
     ]
     for order in rows:
