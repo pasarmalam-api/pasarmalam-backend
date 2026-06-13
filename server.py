@@ -1048,7 +1048,7 @@ class Handler(BaseHTTPRequestHandler):
             elif parsed.path == "/api/returns/respond":
                 self.seller_respond_return(data)
             elif parsed.path == "/api/campaigns":
-                self.create_simple("campaigns", data, {"seller_id": 1, "status": "active"})
+                self.create_campaign(data)
             elif parsed.path == "/api/logistics/awb":
                 self.awb(data)
             elif parsed.path == "/api/admin/user-status":
@@ -1166,6 +1166,28 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as con:
             cur = con.execute(f"INSERT INTO {table} ({', '.join(keys)}) VALUES ({placeholders})", [payload[key] for key in keys])
         send_json(self, 201, {"id": cur.lastrowid})
+
+    def create_campaign(self, data):
+        user = self.current_user()
+        seller_id = user["id"] if user and user["role"] == "seller" else int(data.get("seller_id", 1))
+        payload = {
+            "seller_id": seller_id,
+            "name": data.get("name", "").strip(),
+            "type": data.get("type", "voucher"),
+            "value": data.get("value", "").strip(),
+            "status": data.get("status", "active"),
+            "created_at": now(),
+        }
+        if not payload["name"]:
+            raise ValueError("Campaign name is required")
+        if not payload["value"]:
+            raise ValueError("Campaign value is required")
+        with connect() as con:
+            cur = con.execute(
+                "INSERT INTO campaigns (seller_id, name, type, value, status, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (payload["seller_id"], payload["name"], payload["type"], payload["value"], payload["status"], payload["created_at"]),
+            )
+        send_json(self, 201, {"id": cur.lastrowid, "ok": True})
 
     def signup(self, data):
         required = ["role", "name", "email", "password"]
