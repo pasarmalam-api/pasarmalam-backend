@@ -1183,8 +1183,7 @@ class Handler(BaseHTTPRequestHandler):
             elif parsed.path.startswith("/api/products/"):
                 self.product_by_id(method, parsed.path, data)
             elif parsed.path == "/api/cart":
-                user = self.current_user()
-                self.create_simple("cart_items", data, {"buyer_id": user["id"] if user and user["role"] == "buyer" else 1, "quantity": 1, "variant": ""})
+                self.cart_route(method, data)
             elif parsed.path == "/api/wishlist":
                 user = self.current_user()
                 self.create_simple("wishlist", data, {"buyer_id": user["id"] if user and user["role"] == "buyer" else 1})
@@ -1566,7 +1565,7 @@ class Handler(BaseHTTPRequestHandler):
                 row_to_dict(row)
                 for row in con.execute(
                     """
-                    SELECT cart_items.*, products.name, products.price, products.shop, products.image_url
+                    SELECT cart_items.*, products.name, products.price, products.shop, products.image_url, products.stock, products.category
                     FROM cart_items JOIN products ON products.id = cart_items.product_id
                     WHERE cart_items.buyer_id = ?
                     ORDER BY cart_items.created_at DESC
@@ -1575,6 +1574,51 @@ class Handler(BaseHTTPRequestHandler):
                 )
             ]
         send_json(self, 200, {"cart": rows})
+
+    def cart_route(self, method, data):
+        user = self.require_user("buyer")
+        buyer_id = int(user["id"])
+        with connect() as con:
+            if method == "DELETE":
+                item_id = int(data.get("id") or data.get("cart_item_id") or 0)
+                if not item_id:
+                    raise ValueError("Cart item id is required")
+                con.execute("DELETE FROM cart_items WHERE id = ? AND buyer_id = ?", (item_id, buyer_id))
+                send_json(self, 200, {"ok": True})
+                return
+            product_id = int(data.get("product_id") or 0)
+            if not product_id:
+                raise ValueError("Product is required")
+            product = con.execute("SELECT id, stock FROM products WHERE id = ?", (product_id,)).fetchone()
+            if not product:
+                raise ValueError("Product not found")
+            quantity = int(data.get("quantity", 1))
+            if quantity < 1:
+                raise ValueError("Quantity must be at least 1")
+            if quantity > int(product["stock"] or 0):
+                raise ValueError(f"Only {product['stock']} item(s) available")
+            variant = str(data.get("variant", "") or "")
+            existing = con.execute(
+                "SELECT id, quantity FROM cart_items WHERE buyer_id = ? AND product_id = ? AND variant = ?",
+                (buyer_id, product_id, variant),
+            ).fetchone()
+            if method == "PUT":
+                item_id = int(data.get("id") or data.get("cart_item_id") or (existing["id"] if existing else 0))
+                if not item_id:
+                    raise ValueError("Cart item id is required")
+                con.execute("UPDATE cart_items SET quantity = ?, variant = ? WHERE id = ? AND buyer_id = ?", (quantity, variant, item_id, buyer_id))
+                send_json(self, 200, {"ok": True, "id": item_id, "quantity": quantity})
+                return
+            if existing:
+                quantity = min(int(existing["quantity"] or 0) + quantity, int(product["stock"] or 0))
+                con.execute("UPDATE cart_items SET quantity = ? WHERE id = ? AND buyer_id = ?", (quantity, existing["id"], buyer_id))
+                send_json(self, 200, {"ok": True, "id": existing["id"], "quantity": quantity})
+                return
+            cur = con.execute(
+                "INSERT INTO cart_items (buyer_id, product_id, quantity, variant, created_at) VALUES (?, ?, ?, ?, ?)",
+                (buyer_id, product_id, quantity, variant, now()),
+            )
+        send_json(self, 201, {"ok": True, "id": cur.lastrowid, "quantity": quantity})
 
     def get_wishlist(self):
         user = self.current_user()
