@@ -1487,7 +1487,7 @@ class Handler(BaseHTTPRequestHandler):
     def update_profile(self, data):
         user = self.require_user()
         allowed = {"name", "phone", "address", "shop_name"}
-        seller_allowed = {"business_type", "ssm_number", "ssm_document_url", "bank_name", "bank_account_name", "bank_account_number"}
+        seller_allowed = {"identity_type", "identity_number", "business_type", "ssm_number", "ssm_document_url", "bank_name", "bank_account_name", "bank_account_number"}
         if user["role"] == "seller":
             allowed |= seller_allowed
         updates = {key: str(data[key]) for key in allowed if key in data}
