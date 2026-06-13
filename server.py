@@ -1770,14 +1770,11 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 200, {"ok": True, "seller_response": response, "dispute_status": "seller_responded"})
 
     def checkout(self, data):
-        user = self.current_user()
-        buyer_id = user["id"] if user and user["role"] == "buyer" else int(data.get("buyer_id", 1))
-        buyer_name = user["name"] if user and user["role"] == "buyer" else data.get("buyer_name", "Buyer")
+        user = self.require_user("buyer")
+        buyer_id = user["id"]
+        buyer_name = user["name"]
         with connect() as con:
-            product = con.execute("SELECT * FROM products WHERE id = ?", (int(data["product_id"]),)).fetchone()
-            if not product:
-                raise ValueError("Product not found")
-            qty = int(data.get("quantity", 1))
+            product, qty, address, payment_method, buyer_phone = self.validate_checkout_payload(con, data, user)
             fee = float(data.get("logistics_fee", shipping_fee(data.get("logistics_method", product["shipping_type"]), product["weight_kg"])))
             total = float(product["price"]) * qty + fee
             tracking = f"PM{now()}{product['id']}"
@@ -1792,7 +1789,7 @@ class Handler(BaseHTTPRequestHandler):
                 (buyer_id, buyer_name, product_id, quantity, variant, address, total, logistics_method, logistics_fee, payment_method, payment_status, payment_reference, payment_url, payment_proof_url, order_status, escrow_status, tracking_no, awb_label, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), data.get("address", ""), total, data.get("logistics_method", product["shipping_type"]), fee, data.get("payment_method", "E-Wallet"), payment_status, data.get("payment_reference", ""), data.get("payment_url", ""), payment_proof_url, order_status, escrow_status, tracking, awb, now()),
+                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), address, total, data.get("logistics_method", product["shipping_type"]), fee, payment_method, payment_status, data.get("payment_reference", ""), data.get("payment_url", ""), payment_proof_url, order_status, escrow_status, tracking, awb, now()),
             )
             if payment_status == "paid":
                 if USE_POSTGRES:
@@ -1801,19 +1798,39 @@ class Handler(BaseHTTPRequestHandler):
                     con.execute("UPDATE products SET stock = MAX(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, product["id"]))
         send_json(self, 201, {"id": cur.lastrowid, "total": total, "tracking_no": tracking, "escrow_status": escrow_status, "payment_status": payment_status})
 
+    def validate_checkout_payload(self, con, data, user):
+        if not user or user.get("role") != "buyer":
+            raise PermissionError("Buyer login is required before checkout")
+        if not data.get("product_id"):
+            raise ValueError("Product is required")
+        product = con.execute("SELECT * FROM products WHERE id = ?", (int(data["product_id"]),)).fetchone()
+        if not product:
+            raise ValueError("Product not found")
+        qty = int(data.get("quantity", 1))
+        if qty < 1:
+            raise ValueError("Quantity must be at least 1")
+        if qty > int(product["stock"] or 0):
+            raise ValueError(f"Only {product['stock']} item(s) available")
+        address = str(data.get("address") or user.get("address") or "").strip()
+        if not address:
+            raise ValueError("Delivery address is required")
+        buyer_phone = str(data.get("buyer_phone") or user.get("phone") or "").strip()
+        if not buyer_phone:
+            raise ValueError("Buyer phone number is required")
+        payment_method = str(data.get("payment_method") or "").strip()
+        if not payment_method:
+            raise ValueError("Payment method is required")
+        return product, qty, address, payment_method, buyer_phone
+
     def create_toyyibpay_payment(self, data):
         if not TOYYIBPAY_SECRET_KEY or not TOYYIBPAY_CATEGORY_CODE:
             raise PermissionError("Set TOYYIBPAY_SECRET_KEY and TOYYIBPAY_CATEGORY_CODE in Render before accepting live payments.")
-        user = self.current_user()
-        buyer_id = user["id"] if user and user["role"] == "buyer" else int(data.get("buyer_id", 1))
-        buyer_name = user["name"] if user and user["role"] == "buyer" else data.get("buyer_name", "Buyer")
-        buyer_email = data.get("buyer_email") or (user.get("email") if user else "") or "buyer@pasarmalam.my"
-        buyer_phone = data.get("buyer_phone") or (user.get("phone") if user else "") or "0123456789"
+        user = self.require_user("buyer")
+        buyer_id = user["id"]
+        buyer_name = user["name"]
+        buyer_email = data.get("buyer_email") or user.get("email", "")
         with connect() as con:
-            product = con.execute("SELECT * FROM products WHERE id = ?", (int(data["product_id"]),)).fetchone()
-            if not product:
-                raise ValueError("Product not found")
-            qty = int(data.get("quantity", 1))
+            product, qty, address, payment_method, buyer_phone = self.validate_checkout_payload(con, data, user)
             fee = float(data.get("logistics_fee", shipping_fee(data.get("logistics_method", product["shipping_type"]), product["weight_kg"])))
             total = float(product["price"]) * qty + fee
             tracking = f"PM{now()}{product['id']}"
@@ -1824,7 +1841,7 @@ class Handler(BaseHTTPRequestHandler):
                 (buyer_id, buyer_name, product_id, quantity, variant, address, total, logistics_method, logistics_fee, payment_method, payment_status, payment_reference, payment_url, order_status, escrow_status, tracking_no, awb_label, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ToyyibPay', 'unpaid', '', '', 'pending_payment', 'pending', ?, ?, ?)
                 """,
-                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), data.get("address", ""), total, data.get("logistics_method", product["shipping_type"]), fee, tracking, awb, now()),
+                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), address, total, data.get("logistics_method", product["shipping_type"]), fee, tracking, awb, now()),
             )
             order_id = cur.lastrowid
 
@@ -1865,16 +1882,12 @@ class Handler(BaseHTTPRequestHandler):
     def create_billplz_payment(self, data):
         if not BILLPLZ_API_KEY or not BILLPLZ_COLLECTION_ID:
             raise PermissionError("Set BILLPLZ_API_KEY and BILLPLZ_COLLECTION_ID in Render before accepting Billplz payments.")
-        user = self.current_user()
-        buyer_id = user["id"] if user and user["role"] == "buyer" else int(data.get("buyer_id", 1))
-        buyer_name = user["name"] if user and user["role"] == "buyer" else data.get("buyer_name", "Buyer")
-        buyer_email = data.get("buyer_email") or (user.get("email") if user else "") or "buyer@pasarmalam.my"
-        buyer_phone = data.get("buyer_phone") or (user.get("phone") if user else "") or "0123456789"
+        user = self.require_user("buyer")
+        buyer_id = user["id"]
+        buyer_name = user["name"]
+        buyer_email = data.get("buyer_email") or user.get("email", "")
         with connect() as con:
-            product = con.execute("SELECT * FROM products WHERE id = ?", (int(data["product_id"]),)).fetchone()
-            if not product:
-                raise ValueError("Product not found")
-            qty = int(data.get("quantity", 1))
+            product, qty, address, payment_method, buyer_phone = self.validate_checkout_payload(con, data, user)
             fee = float(data.get("logistics_fee", shipping_fee(data.get("logistics_method", product["shipping_type"]), product["weight_kg"])))
             total = float(product["price"]) * qty + fee
             tracking = f"PM{now()}{product['id']}"
@@ -1885,7 +1898,7 @@ class Handler(BaseHTTPRequestHandler):
                 (buyer_id, buyer_name, product_id, quantity, variant, address, total, logistics_method, logistics_fee, payment_method, payment_status, payment_reference, payment_url, order_status, escrow_status, tracking_no, awb_label, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Billplz', 'unpaid', '', '', 'pending_payment', 'pending', ?, ?, ?)
                 """,
-                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), data.get("address", ""), total, data.get("logistics_method", product["shipping_type"]), fee, tracking, awb, now()),
+                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), address, total, data.get("logistics_method", product["shipping_type"]), fee, tracking, awb, now()),
             )
             order_id = cur.lastrowid
 
