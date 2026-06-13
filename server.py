@@ -2353,7 +2353,10 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError(f"Payout blocked: {ready_note}")
             reviewed_at = now() if status in ("approved", "paid_out", "held", "rejected") else 0
             final_note = note or row["note"] or f"Payout {status}"
-            payout_paid_at = int(data.get("payout_paid_at") or (now() if status == "paid_out" else int(row["payout_paid_at"] or 0)))
+            if "payout_paid_at" in data:
+                payout_paid_at = int(data.get("payout_paid_at") or 0)
+            else:
+                payout_paid_at = now() if status == "paid_out" else int(row["payout_paid_at"] or 0)
             con.execute(
                 "UPDATE wallet SET status = ?, reviewed_at = ?, payout_proof_url = ?, payout_reference = ?, payout_paid_at = ?, note = ? WHERE id = ?",
                 (
