@@ -1190,7 +1190,9 @@ class Handler(BaseHTTPRequestHandler):
             elif parsed.path == "/api/messages":
                 self.create_message(data)
             elif parsed.path == "/api/reviews":
-                self.create_simple("reviews", data, {"product_id": None, "seller_id": 1, "buyer_name": "Buyer", "seller_reply": ""})
+                self.create_review(data)
+            elif parsed.path == "/api/reviews/reply":
+                self.reply_review(data)
             elif parsed.path == "/api/checkout":
                 self.checkout(data)
             elif parsed.path == "/api/payments/toyyibpay/create":
@@ -1364,6 +1366,64 @@ class Handler(BaseHTTPRequestHandler):
                     create_notification(con, "buyer", buyer["id"], f"Seller replied{product_label}", body, "message", "chat.html")
                 notify_admins(con, "Seller chat reply", body, "message", "tickets.html")
         send_json(self, 201, {"id": message_id, "ok": True})
+
+    def create_review(self, data):
+        user = self.current_user()
+        product_id = int(data.get("product_id") or 0)
+        rating = int(data.get("rating") or 0)
+        title = str(data.get("title", "")).strip()
+        body = str(data.get("body", "")).strip()
+        if not product_id:
+            raise ValueError("Product is required")
+        if rating < 1 or rating > 5:
+            raise ValueError("Rating must be between 1 and 5")
+        if not title or not body:
+            raise ValueError("Review title and body are required")
+        buyer_name = data.get("buyer_name") or (user["name"] if user and user["role"] == "buyer" else "Buyer")
+        with connect() as con:
+            product = con.execute("SELECT id, seller_id, name FROM products WHERE id = ?", (product_id,)).fetchone()
+            if not product:
+                raise ValueError("Product not found")
+            seller_id = int(product["seller_id"] or data.get("seller_id") or 1)
+            cur = con.execute(
+                "INSERT INTO reviews (product_id, seller_id, buyer_name, rating, title, body, seller_reply, created_at) VALUES (?, ?, ?, ?, ?, ?, '', ?)",
+                (product_id, seller_id, buyer_name, rating, title, body, now()),
+            )
+            avg = con.execute("SELECT COALESCE(AVG(rating), 0) AS rating FROM reviews WHERE product_id = ?", (product_id,)).fetchone()
+            con.execute("UPDATE products SET rating = ? WHERE id = ?", (round(as_float(avg["rating"]), 1), product_id))
+            create_notification(con, "seller", seller_id, f"New review for {product['name']}", f"{rating} stars: {title}", "review", "reviews.html")
+            notify_admins(con, "New product review", f"{product['name']}: {rating} stars - {title}", "review", "products.html")
+        send_json(self, 201, {"id": cur.lastrowid, "ok": True})
+
+    def reply_review(self, data):
+        user = self.require_user("seller")
+        review_id = int(data.get("review_id") or 0)
+        reply = str(data.get("seller_reply", "")).strip()
+        if not review_id:
+            raise ValueError("Review id is required")
+        if not reply:
+            raise ValueError("Seller reply is required")
+        with connect() as con:
+            review = con.execute(
+                """
+                SELECT reviews.*, products.seller_id, products.name AS product_name
+                FROM reviews LEFT JOIN products ON products.id = reviews.product_id
+                WHERE reviews.id = ?
+                """,
+                (review_id,),
+            ).fetchone()
+            if not review:
+                raise ValueError("Review not found")
+            if int(review["seller_id"] or 0) != int(user["id"]):
+                raise PermissionError("Seller cannot reply to another seller review")
+            con.execute("UPDATE reviews SET seller_reply = ? WHERE id = ?", (reply, review_id))
+            buyer = con.execute("SELECT id FROM users WHERE role = 'buyer' AND name = ? ORDER BY id LIMIT 1", (review["buyer_name"],)).fetchone()
+            if not buyer:
+                buyer = con.execute("SELECT id FROM users WHERE role = 'buyer' ORDER BY id LIMIT 1").fetchone()
+            if buyer:
+                create_notification(con, "buyer", buyer["id"], f"Seller replied to your review", reply, "review", "reviews.html")
+            notify_admins(con, "Seller replied to review", f"{review['product_name']}: {reply}", "review", "products.html")
+        send_json(self, 200, {"ok": True, "seller_reply": reply})
 
     def create_campaign(self, data):
         user = self.current_user()
