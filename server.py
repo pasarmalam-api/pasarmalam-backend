@@ -1188,7 +1188,7 @@ class Handler(BaseHTTPRequestHandler):
                 user = self.current_user()
                 self.create_simple("wishlist", data, {"buyer_id": user["id"] if user and user["role"] == "buyer" else 1})
             elif parsed.path == "/api/messages":
-                self.create_simple("messages", data, {"product_id": None, "buyer_name": "Buyer", "seller_name": "PasarMalam Seller"})
+                self.create_message(data)
             elif parsed.path == "/api/reviews":
                 self.create_simple("reviews", data, {"product_id": None, "seller_id": 1, "buyer_name": "Buyer", "seller_reply": ""})
             elif parsed.path == "/api/checkout":
@@ -1329,6 +1329,41 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as con:
             cur = con.execute(f"INSERT INTO {table} ({', '.join(keys)}) VALUES ({placeholders})", [payload[key] for key in keys])
         send_json(self, 201, {"id": cur.lastrowid})
+
+    def create_message(self, data):
+        user = self.current_user()
+        sender_role = data.get("sender_role") or (user["role"] if user and user["role"] in ("buyer", "seller") else "buyer")
+        if sender_role not in ("buyer", "seller"):
+            raise ValueError("sender_role must be buyer or seller")
+        body = str(data.get("body", "")).strip()
+        if not body:
+            raise ValueError("Message cannot be empty")
+        product_id = int(data.get("product_id") or 0) or None
+        buyer_name = data.get("buyer_name") or (user["name"] if user and user["role"] == "buyer" else "Buyer")
+        seller_name = data.get("seller_name") or (user.get("shop_name") or user.get("name") if user and user["role"] == "seller" else "PasarMalam Seller")
+        with connect() as con:
+            product = con.execute("SELECT seller_id, shop, name FROM products WHERE id = ?", (product_id,)).fetchone() if product_id else None
+            seller_id = int(product["seller_id"]) if product else 0
+            if product and not seller_name:
+                seller_name = product["shop"]
+            cur = con.execute(
+                "INSERT INTO messages (product_id, buyer_name, seller_name, sender_role, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                (product_id, buyer_name, seller_name, sender_role, body, now()),
+            )
+            message_id = cur.lastrowid
+            product_label = f" about {product['name']}" if product else ""
+            if sender_role == "buyer":
+                if seller_id:
+                    create_notification(con, "seller", seller_id, f"New buyer message{product_label}", body, "message", "messages.html")
+                notify_admins(con, "Buyer-seller chat message", body, "message", "tickets.html")
+            else:
+                buyer = con.execute("SELECT id FROM users WHERE role = 'buyer' AND name = ? ORDER BY id LIMIT 1", (buyer_name,)).fetchone()
+                if not buyer:
+                    buyer = con.execute("SELECT id FROM users WHERE role = 'buyer' ORDER BY id LIMIT 1").fetchone()
+                if buyer:
+                    create_notification(con, "buyer", buyer["id"], f"Seller replied{product_label}", body, "message", "chat.html")
+                notify_admins(con, "Seller chat reply", body, "message", "tickets.html")
+        send_json(self, 201, {"id": message_id, "ok": True})
 
     def create_campaign(self, data):
         user = self.current_user()
