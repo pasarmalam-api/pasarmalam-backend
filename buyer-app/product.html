@@ -5,14 +5,81 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PasarMalam Product</title>
   <style>
-    :root{--brand:#0f9f8f;--purple:#6d5dfc;--pink:#e43f8f;--gold:#f6c85f;--line:#e6e9ef;--muted:#687282;--bg:#f5f7fb}*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:#202124}button,input,select{font:inherit}header{background:linear-gradient(180deg,var(--brand),var(--purple));color:#fff;position:sticky;top:0;z-index:4}.bar,main{max-width:1180px;margin:auto}.bar{display:flex;gap:14px;align-items:center;justify-content:space-between;padding:14px 16px}.brand{display:flex;gap:10px;align-items:center;cursor:pointer}.logo{width:50px;height:50px;border-radius:13px;background:conic-gradient(from 160deg,var(--brand),var(--purple),var(--pink),var(--brand));display:grid;place-items:center;font-weight:900;box-shadow:inset 0 0 0 3px #ffffffcc}.cart,.primary,.soft{border:0;border-radius:6px;min-height:38px;padding:0 14px;font-weight:900}.cart,.soft{background:#fff;color:var(--brand);border:1px solid #b8fff5}.primary{background:var(--brand);color:#fff}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px}.panel{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px}.photo{aspect-ratio:1/1;border-radius:8px;background:linear-gradient(135deg,var(--brand),var(--purple));display:grid;place-items:center;color:#fff;font-size:52px;font-weight:900;overflow:hidden}.photo img{width:100%;height:100%;object-fit:cover}.price{color:var(--brand);font-size:28px;font-weight:900}.tag{display:inline-block;border:1px solid #b8fff5;background:#f0fffc;color:var(--brand);border-radius:4px;padding:5px 7px;font-size:12px;font-weight:900;margin:0 5px 6px 0}.trust{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.trust div{border:1px solid var(--line);border-radius:6px;background:#fafafa;padding:10px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}.muted{color:var(--muted);font-size:13px}.stars{color:var(--gold);font-weight:900}@media(max-width:760px){.grid,.trust{grid-template-columns:1fr}.bar{flex-wrap:wrap}}
+    :root{--brand:#0f9f8f;--purple:#6d5dfc;--pink:#e43f8f;--gold:#f6c85f;--line:#e6e9ef;--muted:#687282;--bg:#f5f7fb}
+    *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:#202124}button,input,select{font:inherit}
+    header{background:linear-gradient(180deg,var(--brand),var(--purple));color:#fff;position:sticky;top:0;z-index:4}.bar,main{max-width:1180px;margin:auto}
+    .bar{display:flex;gap:14px;align-items:center;justify-content:space-between;padding:14px 16px}.brand{display:flex;gap:10px;align-items:center;cursor:pointer}
+    .logo{width:50px;height:50px;border-radius:13px;background:conic-gradient(from 160deg,var(--brand),var(--purple),var(--pink),var(--brand));display:grid;place-items:center;font-weight:900;box-shadow:inset 0 0 0 3px #ffffffcc}
+    .cart,.primary,.soft{border:0;border-radius:6px;min-height:38px;padding:0 14px;font-weight:900}.cart,.soft{background:#fff;color:var(--brand);border:1px solid #b8fff5}.primary{background:var(--brand);color:#fff}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px}.panel{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px}
+    .photo{aspect-ratio:1/1;border-radius:8px;background:linear-gradient(135deg,var(--brand),var(--purple));display:grid;place-items:center;color:#fff;font-size:52px;font-weight:900;overflow:hidden}.photo img{width:100%;height:100%;object-fit:cover}
+    .price{color:var(--brand);font-size:28px;font-weight:900}.tag{display:inline-block;border:1px solid #b8fff5;background:#f0fffc;color:var(--brand);border-radius:4px;padding:5px 7px;font-size:12px;font-weight:900;margin:0 5px 6px 0}.bad{border-color:#fecdd3;background:#fff0f3;color:#be123c}
+    .trust{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.trust div{border:1px solid var(--line);border-radius:6px;background:#fafafa;padding:10px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+    .muted{color:var(--muted);font-size:13px}.stars{color:var(--gold);font-weight:900}.error{color:#be123c;font-weight:900}@media(max-width:760px){.grid,.trust{grid-template-columns:1fr}.bar{flex-wrap:wrap}}
   </style>
 </head>
 <body>
-  <header><div class="bar"><div class="brand" onclick="location.href='index.html'"><div class="logo">PM</div><div><h2>PasarMalam</h2><div>Product Detail</div></div></div><div><button class="soft" onclick="location.href='index.html'">Home</button> <button class="cart" onclick="location.href='cart.html'">Cart</button></div></div></header>
-  <main><div class="grid"><div class="panel"><div class="photo" id="photo">P</div></div><div class="panel" id="detail">Loading...</div></div><section class="panel" style="margin:0 16px 16px"><h3>Reviews</h3><div id="reviews"></div></section></main>
+  <header>
+    <div class="bar">
+      <div class="brand" onclick="location.href='index.html'"><div class="logo">PM</div><div><h2>PasarMalam</h2><div>Product Detail</div></div></div>
+      <div><button class="soft" onclick="location.href='index.html'">Home</button> <button class="cart" onclick="location.href='cart.html'">Cart</button></div>
+    </div>
+  </header>
+  <main>
+    <div class="grid"><div class="panel"><div class="photo" id="photo">P</div></div><div class="panel" id="detail">Loading...</div></div>
+    <section class="panel" style="margin:0 16px 16px"><h3>Reviews</h3><div id="reviews"></div></section>
+  </main>
   <script>
-    const API_BASE="https://pasarmalam-backend.onrender.com";const id=new URLSearchParams(location.search).get("id")||1;const money=v=>`RM${Number(v).toFixed(2)}`;async function api(p,o={}){const token=localStorage.getItem("pm_token")||"",headers={"Content-Type":"application/json",...(o.headers||{})};if(token)headers.Authorization=`Bearer ${token}`;const r=await fetch(API_BASE+p,{...o,headers});if(!r.ok)throw new Error(await r.text());return r.json()}function imgFor(p){const src=(p.images&&p.images[0])||p.image_url;return src?`<img src="${src}" alt="${p.name}">`:(p.category||"P")[0]}async function addCart(){await api("/api/cart",{method:"POST",body:JSON.stringify({product_id:Number(id),quantity:Number(qty.value)||1,variant:variant.value})});location.href="cart.html"}async function load(){const products=(await api("/api/products")).products;const p=products.find(x=>String(x.id)===String(id))||products[0];photo.innerHTML=imgFor(p);detail.innerHTML=`<h1>${p.name}</h1><p class="price">${money(p.price)}</p><span class="tag">${p.condition}</span><span class="tag">${p.price_mode}</span><span class="tag">Preferred Seller</span><div class="stars">★ ${p.rating||4.8}</div><div class="trust"><div><b>Voucher</b><br><span class="muted">RM5 off above RM50</span></div><div><b>Shipping</b><br><span class="muted">${p.shipping_type}</span></div><div><b>Protection</b><br><span class="muted">Escrow until complete</span></div></div><p>${p.description||""}</p><p><b>Seller:</b> <a href="seller-store.html">${p.shop}</a></p><p><b>Warranty:</b> ${p.warranty||"Seller warranty"}</p><p><b>Return rule:</b> Request refund/change goods from Orders page</p><div class="row"><select id="variant">${(p.variants&&p.variants.length?p.variants:["Default"]).map(v=>`<option>${v}</option>`).join("")}</select><input id="qty" type="number" value="1" min="1"></div><button class="primary" onclick="addCart()">Add to cart</button> <button class="soft" onclick="location.href='checkout.html?product_id=${p.id}'">Buy Now</button> <button class="soft" onclick="location.href='chat.html'">Chat Seller</button>`;const rev=(await api("/api/reviews")).reviews;reviews.innerHTML=rev.map(r=>`<div><div class="stars">${"★".repeat(r.rating)}</div><b>${r.title}</b><p class="muted">${r.body}</p></div>`).join("")}load();
+    const API_BASE="https://pasarmalam-backend.onrender.com";
+    const id=new URLSearchParams(location.search).get("id")||1;
+    let currentProduct=null;
+    const money=v=>`RM${Number(v||0).toFixed(2)}`;
+    async function api(p,o={}){
+      const token=localStorage.getItem("pm_token")||"";
+      const headers={"Content-Type":"application/json",...(o.headers||{})};
+      if(token)headers.Authorization=`Bearer ${token}`;
+      const r=await fetch(API_BASE+p,{...o,headers});
+      const d=await r.json().catch(async()=>({error:await r.text()}));
+      if(!r.ok||d.error)throw new Error(d.error||"Request failed");
+      return d;
+    }
+    function imgFor(p){
+      const src=(p.images&&p.images[0])||p.image_url;
+      return src?`<img src="${src}" alt="${p.name}">`:(p.category||"P")[0];
+    }
+    function selectedQty(){
+      return Math.max(1,Number(document.getElementById("qty")?.value)||1);
+    }
+    function validateQty(){
+      const q=selectedQty();
+      const stock=Number(currentProduct?.stock||0);
+      const status=document.getElementById("productStatus");
+      if(q>stock){status.textContent=`Only ${stock} item(s) available.`;return false}
+      status.textContent="";
+      return true;
+    }
+    async function addCart(){
+      try{
+        if(!validateQty())return;
+        await api("/api/cart",{method:"POST",body:JSON.stringify({product_id:Number(id),quantity:selectedQty(),variant:variant.value})});
+        location.href="cart.html";
+      }catch(e){productStatus.textContent=e.message}
+    }
+    function buyNow(){
+      if(!validateQty())return;
+      location.href=`checkout.html?product_id=${currentProduct.id}&quantity=${selectedQty()}&variant=${encodeURIComponent(variant.value||"")}`;
+    }
+    async function load(){
+      const products=(await api("/api/products")).products;
+      const p=products.find(x=>String(x.id)===String(id))||products[0];
+      currentProduct=p;
+      const stock=Number(p.stock||0);
+      photo.innerHTML=imgFor(p);
+      detail.innerHTML=`<h1>${p.name}</h1><p class="price">${money(p.price)}</p><span class="tag">${p.condition}</span><span class="tag">${p.price_mode}</span><span class="tag">Preferred Seller</span><span class="tag ${stock>0?"":"bad"}">Stock ${stock}</span><div class="stars">&#9733; ${p.rating||4.8}</div><div class="trust"><div><b>Voucher</b><br><span class="muted">RM5 off above RM50</span></div><div><b>Shipping</b><br><span class="muted">${p.shipping_type||"Standard Rider"}</span></div><div><b>Protection</b><br><span class="muted">Escrow until complete</span></div></div><p>${p.description||""}</p><p><b>Seller:</b> <a href="seller-store.html">${p.shop}</a></p><p><b>Warranty:</b> ${p.warranty||"Seller warranty"}</p><p><b>Return rule:</b> Request refund/change goods from Orders page</p><div class="row"><select id="variant">${(p.variants&&p.variants.length?p.variants:["Default"]).map(v=>`<option>${v}</option>`).join("")}</select><input id="qty" type="number" value="1" min="1" max="${stock}" onchange="validateQty()" oninput="validateQty()"></div><p id="productStatus" class="error"></p><button class="primary" onclick="addCart()" ${stock<1?"disabled":""}>Add to cart</button> <button class="soft" onclick="buyNow()" ${stock<1?"disabled":""}>Buy Now</button> <button class="soft" onclick="location.href='chat.html'">Chat Seller</button>`;
+      const rev=(await api("/api/reviews")).reviews;
+      reviews.innerHTML=rev.map(r=>`<div><div class="stars">${"&#9733;".repeat(r.rating)}</div><b>${r.title}</b><p class="muted">${r.body}</p></div>`).join("");
+    }
+    load().catch(e=>detail.innerHTML=`<p class="error">${e.message}</p>`);
   </script>
 </body>
 </html>
