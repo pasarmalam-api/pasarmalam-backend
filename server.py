@@ -1915,27 +1915,34 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as con:
             product, qty, address, payment_method, buyer_phone = self.validate_checkout_payload(con, data, user)
             fee = float(data.get("logistics_fee", shipping_fee(data.get("logistics_method", product["shipping_type"]), product["weight_kg"])))
-            total = float(product["price"]) * qty + fee
+            subtotal = float(product["price"]) * qty
+            discount, voucher_code = campaign_discount(con, product["seller_id"], data.get("voucher_code", ""), subtotal)
+            if voucher_code and str(data.get("voucher_code", "")).strip() and str(voucher_code).lower() != str(data.get("voucher_code", "")).strip().lower():
+                voucher_code = data.get("voucher_code", "")
+            total = max(subtotal + fee - discount, 0)
             tracking = f"PM{now()}{product['id']}"
             awb = f"AWB-{tracking}-{data.get('logistics_method', product['shipping_type']).replace(' ', '-')}"
             payment_status = data.get("payment_status", "paid")
             order_status = data.get("order_status", "placed")
             escrow_status = data.get("escrow_status", "holding")
             payment_proof_url = data.get("payment_proof_url", "")
+            payment_reference = data.get("payment_reference", "")
+            if voucher_code:
+                payment_reference = f"{payment_reference} Voucher:{voucher_code} Discount:{discount}".strip()
             cur = con.execute(
                 """
                 INSERT INTO orders
                 (buyer_id, buyer_name, product_id, quantity, variant, address, total, logistics_method, logistics_fee, payment_method, payment_status, payment_reference, payment_url, payment_proof_url, order_status, escrow_status, tracking_no, awb_label, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), address, total, data.get("logistics_method", product["shipping_type"]), fee, payment_method, payment_status, data.get("payment_reference", ""), data.get("payment_url", ""), payment_proof_url, order_status, escrow_status, tracking, awb, now()),
+                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), address, total, data.get("logistics_method", product["shipping_type"]), fee, payment_method, payment_status, payment_reference, data.get("payment_url", ""), payment_proof_url, order_status, escrow_status, tracking, awb, now()),
             )
             if payment_status == "paid":
                 if USE_POSTGRES:
                     con.execute("UPDATE products SET stock = GREATEST(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, product["id"]))
                 else:
                     con.execute("UPDATE products SET stock = MAX(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, product["id"]))
-        send_json(self, 201, {"id": cur.lastrowid, "total": total, "tracking_no": tracking, "escrow_status": escrow_status, "payment_status": payment_status})
+        send_json(self, 201, {"id": cur.lastrowid, "total": total, "discount": discount, "voucher_code": voucher_code, "tracking_no": tracking, "escrow_status": escrow_status, "payment_status": payment_status})
 
     def validate_checkout_payload(self, con, data, user):
         if not user or user.get("role") != "buyer":
@@ -1971,7 +1978,9 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as con:
             product, qty, address, payment_method, buyer_phone = self.validate_checkout_payload(con, data, user)
             fee = float(data.get("logistics_fee", shipping_fee(data.get("logistics_method", product["shipping_type"]), product["weight_kg"])))
-            total = float(product["price"]) * qty + fee
+            subtotal = float(product["price"]) * qty
+            discount, voucher_code = campaign_discount(con, product["seller_id"], data.get("voucher_code", ""), subtotal)
+            total = max(subtotal + fee - discount, 0)
             tracking = f"PM{now()}{product['id']}"
             awb = f"AWB-{tracking}-{data.get('logistics_method', product['shipping_type']).replace(' ', '-')}"
             cur = con.execute(
@@ -2016,7 +2025,7 @@ class Handler(BaseHTTPRequestHandler):
                 "INSERT INTO payments (order_id, provider, bill_code, amount, status, checkout_url, raw_response, created_at, updated_at) VALUES (?, 'ToyyibPay', ?, ?, 'pending', ?, ?, ?, ?)",
                 (order_id, bill_code, total, checkout_url, json.dumps(response), now(), now()),
             )
-        send_json(self, 201, {"ok": True, "order_id": order_id, "bill_code": bill_code, "checkout_url": checkout_url, "total": total})
+        send_json(self, 201, {"ok": True, "order_id": order_id, "bill_code": bill_code, "checkout_url": checkout_url, "total": total, "discount": discount, "voucher_code": voucher_code})
 
     def create_billplz_payment(self, data):
         if not BILLPLZ_API_KEY or not BILLPLZ_COLLECTION_ID:
@@ -2028,7 +2037,9 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as con:
             product, qty, address, payment_method, buyer_phone = self.validate_checkout_payload(con, data, user)
             fee = float(data.get("logistics_fee", shipping_fee(data.get("logistics_method", product["shipping_type"]), product["weight_kg"])))
-            total = float(product["price"]) * qty + fee
+            subtotal = float(product["price"]) * qty
+            discount, voucher_code = campaign_discount(con, product["seller_id"], data.get("voucher_code", ""), subtotal)
+            total = max(subtotal + fee - discount, 0)
             tracking = f"PM{now()}{product['id']}"
             awb = f"AWB-{tracking}-{data.get('logistics_method', product['shipping_type']).replace(' ', '-')}"
             cur = con.execute(
@@ -2064,7 +2075,7 @@ class Handler(BaseHTTPRequestHandler):
                 "INSERT INTO payments (order_id, provider, bill_code, amount, status, checkout_url, raw_response, created_at, updated_at) VALUES (?, 'Billplz', ?, ?, 'pending', ?, ?, ?, ?)",
                 (order_id, bill_id, total, checkout_url, json.dumps(response), now(), now()),
             )
-        send_json(self, 201, {"ok": True, "order_id": order_id, "bill_code": bill_id, "checkout_url": checkout_url, "total": total})
+        send_json(self, 201, {"ok": True, "order_id": order_id, "bill_code": bill_id, "checkout_url": checkout_url, "total": total, "discount": discount, "voucher_code": voucher_code})
 
     def toyyibpay_callback(self, data):
         bill_code = str(data.get("billcode", data.get("billCode", "")))
@@ -2571,6 +2582,30 @@ class Handler(BaseHTTPRequestHandler):
 def shipping_fee(method, weight):
     fees = {"In-Store Pickup": 0, "Standard Rider": 4.9, "Express Rider": 8.9, "Bulky Item": 12.9, "Seller Own Fleet": 6.9}
     return fees.get(method, 4.9) + max(float(weight) - 1, 0) * 1.5
+
+
+def campaign_discount(con, seller_id, code, subtotal):
+    if not code:
+        return 0.0, ""
+    row = con.execute(
+        "SELECT * FROM campaigns WHERE seller_id = ? AND status = 'active' AND LOWER(name) = LOWER(?) ORDER BY id DESC LIMIT 1",
+        (int(seller_id or 0), str(code).strip()),
+    ).fetchone()
+    if not row:
+        raise ValueError("Voucher not found or inactive")
+    if row["type"] not in ("voucher", "flash_sale", "bundle_deal", "free_shipping"):
+        raise ValueError("Campaign type cannot be applied at checkout")
+    value = str(row["value"] or "").strip()
+    discount = 0.0
+    if row["type"] == "free_shipping":
+        return 0.0, row["name"]
+    if value.endswith("%"):
+        percent = max(0.0, min(float(value[:-1] or 0), 100.0))
+        discount = subtotal * percent / 100
+    else:
+        cleaned = "".join(ch for ch in value if ch.isdigit() or ch == ".")
+        discount = float(cleaned or 0)
+    return round(min(discount, subtotal), 2), row["name"]
 
 
 def commission_rate_for_seller(seller):
