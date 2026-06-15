@@ -1129,6 +1129,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/admin/sellers": self.admin_sellers,
                 "/api/admin/products": self.admin_products,
                 "/api/admin/orders": self.admin_orders,
+                "/api/admin/payments": self.admin_payments,
                 "/api/admin/returns": self.admin_returns,
                 "/api/admin/metrics": self.admin_metrics,
                 "/api/admin/analytics": self.admin_analytics,
@@ -2341,6 +2342,45 @@ class Handler(BaseHTTPRequestHandler):
                 )
             ]
         send_json(self, 200, {"orders": rows})
+
+    def admin_payments(self):
+        self.require_user("admin")
+        with connect() as con:
+            rows = [
+                row_to_dict(row)
+                for row in con.execute(
+                    """
+                    SELECT orders.id AS order_id, orders.buyer_name, orders.total, orders.payment_method,
+                           orders.payment_status, orders.payment_reference, orders.payment_url,
+                           orders.payment_proof_url, orders.payment_review_note, orders.payment_reviewed_at,
+                           orders.order_status, orders.escrow_status, orders.created_at,
+                           products.name AS product_name, products.shop AS seller_shop,
+                           payments.provider, payments.bill_code, payments.amount AS gateway_amount,
+                           payments.status AS gateway_status, payments.checkout_url,
+                           payments.created_at AS payment_created_at, payments.updated_at AS payment_updated_at
+                    FROM orders
+                    JOIN products ON products.id = orders.product_id
+                    LEFT JOIN payments ON payments.order_id = orders.id
+                    ORDER BY orders.created_at DESC, orders.id DESC
+                    LIMIT 200
+                    """
+                )
+            ]
+        summary = {"paid": 0, "unpaid": 0, "pending_review": 0, "rejected": 0, "pending_payment": 0, "mismatch": 0}
+        for row in rows:
+            status = row.get("payment_status") or "unpaid"
+            summary[status] = summary.get(status, 0) + 1
+            issues = []
+            if status == "paid" and row.get("order_status") == "pending_payment":
+                issues.append("paid order still pending")
+            if row.get("gateway_status") and row.get("gateway_status") != status:
+                issues.append("gateway/order status mismatch")
+            if status == "paid" and row.get("escrow_status") in ("pending", ""):
+                issues.append("paid order escrow not holding")
+            row["reconciliation_issues"] = issues
+            if issues:
+                summary["mismatch"] += 1
+        send_json(self, 200, {"payments": rows, "summary": summary})
 
     def admin_returns(self):
         self.require_user("admin")
