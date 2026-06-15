@@ -179,5 +179,5 @@ async function loadRates(){const d=await api("/api/logistics/rates");ratesBox.in
 async function loadReviews(){const d=await api("/api/reviews");reviewsBox.innerHTML=(d.reviews||[]).slice(0,3).map(r=>`<div class="msg"><div class="stars">${"*".repeat(Number(r.rating)||5)}</div><b>${r.title}</b><div class="muted">${r.body}</div></div>`).join("")}
 loadMetrics();loadProducts();loadOrders();loadReturns();loadWallet();loadMessages();loadRates();loadReviews();
 </script>
-</body>
+<script src="badges.js"></script></body>
 </html>

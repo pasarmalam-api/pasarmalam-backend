@@ -58,5 +58,5 @@
     function drawReviews(rows){reviewsList.innerHTML=rows.map(r=>`<div class="msg"><div class="stars">${"★".repeat(r.rating)}</div><b>${r.title}</b><span>${r.body}</span></div>`).join("")}reviewBtn.onclick=async()=>{await api("/api/reviews",{method:"POST",body:JSON.stringify({product_id:selectedProduct?.id||1,buyer_name:"Buyer",rating:Number(reviewRating.value),title:reviewTitle.value,body:reviewBody.value})});drawReviews((await api("/api/reviews")).reviews)}
     drawCats();load();
   </script>
-</body>
+<script src="badges.js"></script></body>
 </html>

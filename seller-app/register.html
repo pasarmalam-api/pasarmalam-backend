@@ -19,4 +19,4 @@ async function applySeller(){try{
   await post("/api/auth/signup",{role:"seller",name:$("sellerName").value.trim(),email:$("sellerEmail").value.trim(),password:$("sellerPassword").value,phone:$("sellerPhone").value.trim(),address:$("sellerAddress").value.trim(),shop_name:$("shopName").value.trim(),identity_type:$("identityType").value,identity_number:$("identityNumber").value.trim(),business_type:$("businessType").value,ssm_number:$("ssmNumber").value.trim(),bank_name:$("bankName").value.trim(),bank_account_name:$("bankAccountName").value.trim(),bank_account_number:$("bankAccountNumber").value.trim(),email_otp_token:sellerOtpToken});
   setText("applyStatus","Application submitted. Admin must approve before seller login works.");
 }catch(e){setText("applyStatus",e.message)}}
-</script></body></html>
+</script><script src="badges.js"></script></body></html>
