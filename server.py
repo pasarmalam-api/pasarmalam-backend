@@ -1133,6 +1133,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/admin/returns": self.admin_returns,
                 "/api/admin/metrics": self.admin_metrics,
                 "/api/admin/analytics": self.admin_analytics,
+                "/api/admin/risk": self.admin_risk,
                 "/api/admin/tickets": self.admin_tickets,
                 "/api/admin/logistics": self.admin_logistics,
                 "/api/admin/settings": self.admin_settings,
@@ -2444,6 +2445,129 @@ class Handler(BaseHTTPRequestHandler):
             return_rate = con.execute("SELECT COUNT(*) AS returns FROM returns").fetchone()
             orders = con.execute("SELECT COUNT(*) AS orders FROM orders").fetchone()
         send_json(self, 200, {"order_status": order_status, "product_categories": product_categories, "seller_rank": seller_rank, "return_rate": round((return_rate["returns"] / max(orders["orders"], 1)) * 100, 1)})
+
+    def admin_risk(self):
+        self.require_user("admin")
+        cutoff = now() - (24 * 60 * 60)
+        with connect() as con:
+            high_value_orders = [
+                row_to_dict(row)
+                for row in con.execute(
+                    """
+                    SELECT orders.id, orders.buyer_name, orders.total, orders.payment_status, orders.order_status,
+                           orders.escrow_status, orders.created_at, products.name AS product_name, products.shop AS seller_shop
+                    FROM orders JOIN products ON products.id = orders.product_id
+                    WHERE orders.total >= 500
+                    ORDER BY orders.total DESC, orders.created_at DESC
+                    LIMIT 50
+                    """
+                )
+            ]
+            old_pending_payments = [
+                row_to_dict(row)
+                for row in con.execute(
+                    """
+                    SELECT orders.id, orders.buyer_name, orders.total, orders.payment_method, orders.payment_status,
+                           orders.order_status, orders.created_at, products.name AS product_name, products.shop AS seller_shop
+                    FROM orders JOIN products ON products.id = orders.product_id
+                    WHERE orders.payment_status IN ('unpaid', 'pending_review') AND orders.created_at < ?
+                    ORDER BY orders.created_at ASC
+                    LIMIT 50
+                    """,
+                    (cutoff,),
+                )
+            ]
+            payment_mismatches = [
+                row_to_dict(row)
+                for row in con.execute(
+                    """
+                    SELECT orders.id, orders.total, orders.payment_status, orders.order_status, orders.escrow_status,
+                           payments.provider, payments.status AS gateway_status, payments.bill_code,
+                           products.name AS product_name, products.shop AS seller_shop
+                    FROM orders
+                    JOIN products ON products.id = orders.product_id
+                    LEFT JOIN payments ON payments.order_id = orders.id
+                    WHERE (payments.status IS NOT NULL AND payments.status != orders.payment_status)
+                       OR (orders.payment_status = 'paid' AND orders.order_status = 'pending_payment')
+                       OR (orders.payment_status = 'paid' AND orders.escrow_status IN ('pending', ''))
+                    ORDER BY orders.created_at DESC
+                    LIMIT 50
+                    """
+                )
+            ]
+            open_disputes = [
+                row_to_dict(row)
+                for row in con.execute(
+                    """
+                    SELECT returns.id, returns.order_id, returns.buyer_name, returns.reason, returns.status,
+                           returns.dispute_status, returns.created_at, products.name AS product_name, products.shop AS seller_shop
+                    FROM returns
+                    LEFT JOIN orders ON orders.id = returns.order_id
+                    LEFT JOIN products ON products.id = orders.product_id
+                    WHERE returns.dispute_status != 'closed'
+                    ORDER BY returns.created_at DESC
+                    LIMIT 50
+                    """
+                )
+            ]
+            payout_blocks = [
+                row_to_dict(row)
+                for row in con.execute(
+                    """
+                    SELECT wallet.id, wallet.order_id, wallet.seller_id, wallet.seller_earning, wallet.status,
+                           wallet.note, users.shop_name, users.name AS seller_name, orders.escrow_status
+                    FROM wallet
+                    LEFT JOIN users ON users.id = wallet.seller_id
+                    LEFT JOIN orders ON orders.id = wallet.order_id
+                    WHERE wallet.status = 'held' OR orders.escrow_status IN ('dispute_hold', 'refund_approved', 'refunded', 'cancelled')
+                    ORDER BY wallet.created_at DESC
+                    LIMIT 50
+                    """
+                )
+            ]
+            account_flags = [
+                row_to_dict(row)
+                for row in con.execute(
+                    """
+                    SELECT id, role, name, email, phone, status, seller_status, business_verification_status, shop_name
+                    FROM users
+                    WHERE status != 'active' OR seller_status IN ('pending', 'rejected')
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT 50
+                    """
+                )
+            ]
+            product_flags = [
+                row_to_dict(row)
+                for row in con.execute(
+                    """
+                    SELECT id, name, shop, category, stock, moderation_status, created_at
+                    FROM products
+                    WHERE moderation_status != 'approved' OR stock <= 1
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT 50
+                    """
+                )
+            ]
+        summary = {
+            "high_value_orders": len(high_value_orders),
+            "old_pending_payments": len(old_pending_payments),
+            "payment_mismatches": len(payment_mismatches),
+            "open_disputes": len(open_disputes),
+            "payout_blocks": len(payout_blocks),
+            "account_flags": len(account_flags),
+            "product_flags": len(product_flags),
+        }
+        send_json(self, 200, {
+            "summary": summary,
+            "high_value_orders": high_value_orders,
+            "old_pending_payments": old_pending_payments,
+            "payment_mismatches": payment_mismatches,
+            "open_disputes": open_disputes,
+            "payout_blocks": payout_blocks,
+            "account_flags": account_flags,
+            "product_flags": product_flags,
+        })
 
     def admin_tickets(self):
         self.require_user("admin")
