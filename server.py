@@ -396,6 +396,22 @@ def init_db():
               read_at INTEGER DEFAULT 0,
               created_at INTEGER NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS support_tickets (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              user_id INTEGER DEFAULT 0,
+              role TEXT NOT NULL DEFAULT 'buyer',
+              name TEXT NOT NULL,
+              email TEXT DEFAULT '',
+              category TEXT NOT NULL DEFAULT 'General',
+              subject TEXT NOT NULL,
+              message TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'open',
+              priority TEXT NOT NULL DEFAULT 'normal',
+              admin_response TEXT DEFAULT '',
+              updated_at INTEGER DEFAULT 0,
+              created_at INTEGER NOT NULL
+            );
             """
         )
         migrate_products(con)
@@ -412,6 +428,7 @@ def init_db():
         ensure_admin_settings(con)
         migrate_email_otps(con)
         migrate_notifications(con)
+        migrate_support_tickets(con)
 
 
 def postgres_schema_statements():
@@ -641,6 +658,23 @@ def postgres_schema_statements():
           created_at INTEGER NOT NULL
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS support_tickets (
+          id SERIAL PRIMARY KEY,
+          user_id INTEGER DEFAULT 0,
+          role TEXT NOT NULL DEFAULT 'buyer',
+          name TEXT NOT NULL,
+          email TEXT DEFAULT '',
+          category TEXT NOT NULL DEFAULT 'General',
+          subject TEXT NOT NULL,
+          message TEXT NOT NULL,
+          status TEXT NOT NULL DEFAULT 'open',
+          priority TEXT NOT NULL DEFAULT 'normal',
+          admin_response TEXT DEFAULT '',
+          updated_at INTEGER DEFAULT 0,
+          created_at INTEGER NOT NULL
+        )
+        """,
     ]
 
 
@@ -821,6 +855,49 @@ def migrate_notifications(con):
               type TEXT DEFAULT 'info',
               target_url TEXT DEFAULT '',
               read_at INTEGER DEFAULT 0,
+              created_at INTEGER NOT NULL
+            )
+            """
+        )
+
+
+def migrate_support_tickets(con):
+    if USE_POSTGRES:
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS support_tickets (
+              id SERIAL PRIMARY KEY,
+              user_id INTEGER DEFAULT 0,
+              role TEXT NOT NULL DEFAULT 'buyer',
+              name TEXT NOT NULL,
+              email TEXT DEFAULT '',
+              category TEXT NOT NULL DEFAULT 'General',
+              subject TEXT NOT NULL,
+              message TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'open',
+              priority TEXT NOT NULL DEFAULT 'normal',
+              admin_response TEXT DEFAULT '',
+              updated_at INTEGER DEFAULT 0,
+              created_at INTEGER NOT NULL
+            )
+            """
+        )
+    else:
+        con.execute(
+            """
+            CREATE TABLE IF NOT EXISTS support_tickets (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              user_id INTEGER DEFAULT 0,
+              role TEXT NOT NULL DEFAULT 'buyer',
+              name TEXT NOT NULL,
+              email TEXT DEFAULT '',
+              category TEXT NOT NULL DEFAULT 'General',
+              subject TEXT NOT NULL,
+              message TEXT NOT NULL,
+              status TEXT NOT NULL DEFAULT 'open',
+              priority TEXT NOT NULL DEFAULT 'normal',
+              admin_response TEXT DEFAULT '',
+              updated_at INTEGER DEFAULT 0,
               created_at INTEGER NOT NULL
             )
             """
@@ -1115,6 +1192,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/cart": lambda: self.get_cart(query),
                 "/api/wishlist": self.get_wishlist,
                 "/api/notifications": self.get_notifications,
+                "/api/support/tickets": self.get_support_tickets,
                 "/api/returns": self.get_returns,
                 "/api/campaigns": lambda: self.list_table("campaigns", "campaigns"),
                 "/api/wallet": self.get_wallet,
@@ -1214,6 +1292,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.seller_respond_return(data)
             elif parsed.path == "/api/notifications/read":
                 self.mark_notifications_read(data)
+            elif parsed.path == "/api/support/tickets":
+                self.create_support_ticket(data)
             elif parsed.path == "/api/campaigns":
                 self.create_campaign(data)
             elif parsed.path == "/api/logistics/awb":
@@ -1230,6 +1310,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.admin_update_payout_status(data)
             elif parsed.path == "/api/admin/return-status":
                 self.admin_update_return_status(data)
+            elif parsed.path == "/api/admin/support-status":
+                self.admin_update_support_ticket(data)
             elif parsed.path == "/api/admin/settings":
                 self.admin_update_settings(data)
             else:
@@ -1766,6 +1848,59 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 con.execute("UPDATE notifications SET read_at = ? WHERE role = ? AND (user_id = 0 OR user_id = ?)", (now(), role, user_id))
         send_json(self, 200, {"ok": True})
+
+    def get_support_tickets(self):
+        user = self.current_user()
+        with connect() as con:
+            if user and user["role"] == "admin":
+                rows = [row_to_dict(row) for row in con.execute("SELECT * FROM support_tickets ORDER BY updated_at DESC, created_at DESC, id DESC LIMIT 200")]
+            elif user:
+                rows = [row_to_dict(row) for row in con.execute("SELECT * FROM support_tickets WHERE user_id = ? ORDER BY updated_at DESC, created_at DESC, id DESC", (user["id"],))]
+            else:
+                rows = []
+        send_json(self, 200, {"tickets": rows})
+
+    def create_support_ticket(self, data):
+        user = self.current_user()
+        role = user["role"] if user and user.get("role") in ("buyer", "seller") else data.get("role", "buyer")
+        if role not in ("buyer", "seller"):
+            role = "buyer"
+        name = (user["name"] if user else data.get("name", "")).strip() or "PasarMalam User"
+        email = (user["email"] if user else data.get("email", "")).strip()
+        subject = data.get("subject", "").strip()
+        message = data.get("message", "").strip()
+        if not subject:
+            raise ValueError("Ticket subject is required")
+        if not message:
+            raise ValueError("Ticket message is required")
+        category = data.get("category", "General").strip() or "General"
+        priority = data.get("priority", "normal").strip() or "normal"
+        if priority not in ("low", "normal", "high", "urgent"):
+            priority = "normal"
+        with connect() as con:
+            values = (int(user["id"]) if user else 0, role, name, email, category, subject, message, priority, now(), now())
+            if USE_POSTGRES:
+                cur = con.execute(
+                    """
+                    INSERT INTO support_tickets (user_id, role, name, email, category, subject, message, status, priority, updated_at, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?) RETURNING id
+                    """,
+                    values,
+                )
+                ticket_id = cur.fetchone()["id"]
+            else:
+                cur = con.execute(
+                    """
+                    INSERT INTO support_tickets (user_id, role, name, email, category, subject, message, status, priority, updated_at, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?)
+                    """,
+                    values,
+                )
+                ticket_id = cur.lastrowid
+            notify_admins(con, f"Support ticket #{ticket_id}", f"{role}: {subject}", "support", "tickets.html")
+            if user:
+                create_notification(con, role, user["id"], f"Support ticket #{ticket_id} opened", subject, "support", "support.html")
+        send_json(self, 201, {"ok": True, "id": ticket_id})
 
     def get_orders(self):
         user = self.current_user()
@@ -2572,9 +2707,10 @@ class Handler(BaseHTTPRequestHandler):
     def admin_tickets(self):
         self.require_user("admin")
         with connect() as con:
+            tickets = [row_to_dict(row) for row in con.execute("SELECT * FROM support_tickets ORDER BY updated_at DESC, created_at DESC, id DESC LIMIT 100")]
             messages = [row_to_dict(row) for row in con.execute("SELECT * FROM messages ORDER BY created_at DESC, id DESC LIMIT 100")]
             returns = [row_to_dict(row) for row in con.execute("SELECT * FROM returns WHERE dispute_status != 'closed' ORDER BY created_at DESC, id DESC LIMIT 100")]
-        send_json(self, 200, {"messages": messages, "open_disputes": returns})
+        send_json(self, 200, {"tickets": tickets, "messages": messages, "open_disputes": returns})
 
     def admin_logistics(self):
         self.require_user("admin")
@@ -2734,6 +2870,26 @@ class Handler(BaseHTTPRequestHandler):
                 notify_admins(con, f"Return #{data['return_id']} updated", f"Status: {return_status}, dispute: {dispute_status}.", "return", "returns.html")
         self.audit("return_dispute_update", "return", data["return_id"], f"{data.get('status')} / {data.get('dispute_status')}")
         send_json(self, 200, {"ok": True})
+
+    def admin_update_support_ticket(self, data):
+        self.require_user("admin")
+        ticket_id = int(data["ticket_id"])
+        status = data.get("status", "open")
+        if status not in ("open", "in_progress", "waiting_user", "resolved", "closed"):
+            raise ValueError("Invalid ticket status")
+        response = data.get("admin_response", "")
+        with connect() as con:
+            row = con.execute("SELECT * FROM support_tickets WHERE id = ?", (ticket_id,)).fetchone()
+            if not row:
+                raise ValueError("Support ticket not found")
+            con.execute(
+                "UPDATE support_tickets SET status = ?, admin_response = ?, updated_at = ? WHERE id = ?",
+                (status, response, now(), ticket_id),
+            )
+            if int(row["user_id"] or 0):
+                create_notification(con, row["role"], row["user_id"], f"Support ticket #{ticket_id} {status}", response or "Admin updated your support ticket.", "support", "support.html")
+        self.audit("support_ticket_update", "support", ticket_id, status)
+        send_json(self, 200, {"ok": True, "status": status})
 
     def admin_update_settings(self, data):
         self.require_user("admin")
