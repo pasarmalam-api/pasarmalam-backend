@@ -164,7 +164,7 @@ def verify_password(password, stored):
 
 
 def make_token(user):
-    payload = {"id": user["id"], "role": user["role"], "name": user["name"], "shop_name": user.get("shop_name", ""), "exp": now() + 60 * 60 * 24 * 30}
+    payload = {"id": user["id"], "role": user["role"], "name": user["name"], "email": user.get("email", ""), "shop_name": user.get("shop_name", ""), "exp": now() + 60 * 60 * 24 * 30}
     body = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode("utf-8")).decode("ascii")
     sig = hmac.new(AUTH_SECRET.encode("utf-8"), body.encode("utf-8"), hashlib.sha256).hexdigest()
     return f"{body}.{sig}"
@@ -1866,7 +1866,7 @@ class Handler(BaseHTTPRequestHandler):
         if role not in ("buyer", "seller"):
             role = "buyer"
         name = (user["name"] if user else data.get("name", "")).strip() or "PasarMalam User"
-        email = (user["email"] if user else data.get("email", "")).strip()
+        email = (user.get("email", "") if user else data.get("email", "")).strip()
         subject = data.get("subject", "").strip()
         message = data.get("message", "").strip()
         if not subject:
