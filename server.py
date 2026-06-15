@@ -1306,6 +1306,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.admin_update_product_status(data)
             elif parsed.path == "/api/admin/payment-status":
                 self.admin_update_payment_status(data)
+            elif parsed.path == "/api/admin/payment-cancel":
+                self.admin_cancel_pending_payment(data)
             elif parsed.path == "/api/admin/payout-status":
                 self.admin_update_payout_status(data)
             elif parsed.path == "/api/admin/return-status":
@@ -2799,6 +2801,28 @@ class Handler(BaseHTTPRequestHandler):
                     con.execute("UPDATE products SET stock = MAX(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, order["product_id"]))
         self.audit("manual_payment_review", "order", order_id, f"{decision}: {note}")
         send_json(self, 200, {"ok": True, "payment_status": decision, "order_status": order_status, "escrow_status": escrow_status})
+
+    def admin_cancel_pending_payment(self, data):
+        self.require_user("admin")
+        order_id = int(data["order_id"])
+        note = data.get("note", "Admin cancelled stale unpaid order")
+        with connect() as con:
+            order = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+            if not order:
+                raise ValueError("Order not found")
+            if order["payment_status"] == "paid":
+                raise ValueError("Paid orders cannot be cancelled from payment reconciliation")
+            con.execute(
+                "UPDATE orders SET payment_status = 'rejected', order_status = 'cancelled', escrow_status = 'cancelled', payment_review_note = ?, payment_reviewed_at = ?, status_updated_at = ? WHERE id = ?",
+                (note, now(), now(), order_id),
+            )
+            con.execute("UPDATE payments SET status = 'cancelled', updated_at = ? WHERE order_id = ?", (now(), order_id))
+            ctx = order_context(con, order_id)
+            if ctx:
+                create_notification(con, "buyer", ctx["buyer_id"], f"Order PM-{order_id} cancelled", "Payment was not completed before admin review.", "payment", "orders.html")
+                create_notification(con, "seller", ctx["seller_id"], f"Order PM-{order_id} cancelled", "The unpaid order was cancelled. Do not fulfill this order.", "order", "orders.html")
+        self.audit("manual_payment_review", "order", order_id, f"cancelled: {note}")
+        send_json(self, 200, {"ok": True, "payment_status": "rejected", "order_status": "cancelled", "escrow_status": "cancelled"})
 
     def admin_update_payout_status(self, data):
         self.require_user("admin")
