@@ -1914,7 +1914,7 @@ class Handler(BaseHTTPRequestHandler):
                         """
                         SELECT orders.*
                         FROM orders JOIN products ON products.id = orders.product_id
-                        WHERE products.seller_id = ? AND orders.payment_status = 'paid'
+                        WHERE products.seller_id = ?
                         ORDER BY orders.created_at DESC, orders.id DESC
                         """,
                         (user["id"],),
