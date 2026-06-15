@@ -1259,6 +1259,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def create_product(self, data):
         user = self.current_user()
+        if not user or user["role"] not in ("seller", "admin"):
+            raise PermissionError("Seller or admin login is required to create products")
         required = ["name", "shop", "category", "price", "stock", "condition", "price_mode"]
         for key in required:
             if key not in data:
@@ -1298,6 +1300,8 @@ class Handler(BaseHTTPRequestHandler):
     def product_by_id(self, method, path, data):
         product_id = int(path.rsplit("/", 1)[-1])
         user = self.current_user()
+        if method in ("PUT", "DELETE") and (not user or user["role"] not in ("seller", "admin")):
+            raise PermissionError("Seller or admin login is required to manage products")
         with connect() as con:
             product = con.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
             if not product:
@@ -2191,6 +2195,9 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 200, {"ok": True, "order": row_to_dict(order), "gateway": raw})
 
     def update_order_status(self, data):
+        user = self.current_user()
+        if not user or user["role"] not in ("seller", "admin"):
+            raise PermissionError("Seller or admin login is required to update order status")
         aliases = {
             "placed": "to_pack",
             "paid": "to_pack",
@@ -2222,7 +2229,6 @@ class Handler(BaseHTTPRequestHandler):
             escrow = "released"
         elif status == "cancelled":
             escrow = "cancelled"
-        user = self.current_user()
         with connect() as con:
             order = con.execute("SELECT * FROM orders WHERE id = ?", (int(data["order_id"]),)).fetchone()
             if not order:
