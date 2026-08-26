@@ -229,7 +229,7 @@ def init_db():
               moderation_status TEXT DEFAULT 'approved',
               rating REAL DEFAULT 4.8,
               sold INTEGER DEFAULT 0,
-              shipping_type TEXT DEFAULT 'Standard Rider',
+              shipping_type TEXT DEFAULT 'Lalamove Regular',
               weight_kg REAL DEFAULT 0.5,
               created_at INTEGER NOT NULL
             );
@@ -477,7 +477,7 @@ def postgres_schema_statements():
           moderation_status TEXT DEFAULT 'approved',
           rating DOUBLE PRECISION DEFAULT 4.8,
           sold INTEGER DEFAULT 0,
-          shipping_type TEXT DEFAULT 'Standard Rider',
+          shipping_type TEXT DEFAULT 'Lalamove Regular',
           weight_kg DOUBLE PRECISION DEFAULT 0.5,
           created_at INTEGER NOT NULL
         )
@@ -703,7 +703,7 @@ def migrate_products(con):
         "moderation_status": "TEXT DEFAULT 'approved'",
         "rating": "REAL DEFAULT 4.8",
         "sold": "INTEGER DEFAULT 0",
-        "shipping_type": "TEXT DEFAULT 'Standard Rider'",
+        "shipping_type": "TEXT DEFAULT 'Lalamove Regular'",
         "weight_kg": "REAL DEFAULT 0.5",
     }
     for name, sql in additions.items():
@@ -962,12 +962,12 @@ def seed(con):
         )
     if con.execute("SELECT COUNT(*) AS c FROM products").fetchone()["c"] == 0:
         rows = [
-            ("Used iPhone 12 128GB", "Mobile Malam", "Phones", 899, 3, "Used", "Negotiable", "Verified used phone", "7-day shop warranty", '["128GB","Black","Used A grade"]', "Standard Rider", 0.4),
-            ("USB-C fast charger 30W", "Gerai Gadget", "Chargers", 29.9, 20, "New", "Negotiable", "Fast charging adapter", "7-day shop warranty", '["30W","White","Type-C"]', "Standard Rider", 0.2),
-            ("Bluetooth speaker mini", "Tech Lane", "Electronics", 45, 16, "New", "Fixed", "Portable speaker", "14-day warranty", '["Black","Blue"]', "Standard Rider", 0.6),
-            ("Used Myvi headlamp", "Auto Parts Corner", "Car Parts", 120, 2, "Used", "Negotiable", "Left side headlamp", "No warranty for used part", '["Left side","Used"]', "Bulky Item", 2.8),
-            ("Running shoes size 42", "Lorong Bundle", "Shoes", 55, 6, "Used", "Negotiable", "Clean used shoes", "As-is", '["Size 42","Used"]', "Standard Rider", 0.8),
-            ("Cotton baju kurung set", "Cantik Craft", "Clothes", 38, 18, "New", "Fixed", "Local clothing", "Exchange size in 7 days", '["S","M","L"]', "Standard Rider", 0.5),
+            ("Used iPhone 12 128GB", "Mobile Malam", "Phones", 899, 3, "Used", "Negotiable", "Verified used phone", "7-day shop warranty", '["128GB","Black","Used A grade"]', "Lalamove Regular", 0.4),
+            ("USB-C fast charger 30W", "Gerai Gadget", "Chargers", 29.9, 20, "New", "Negotiable", "Fast charging adapter", "7-day shop warranty", '["30W","White","Type-C"]', "Lalamove Regular", 0.2),
+            ("Bluetooth speaker mini", "Tech Lane", "Electronics", 45, 16, "New", "Fixed", "Portable speaker", "14-day warranty", '["Black","Blue"]', "Lalamove Regular", 0.6),
+            ("Used Myvi headlamp", "Auto Parts Corner", "Car Parts", 120, 2, "Used", "Negotiable", "Left side headlamp", "No warranty for used part", '["Left side","Used"]', "Lalamove Regular", 2.8),
+            ("Running shoes size 42", "Lorong Bundle", "Shoes", 55, 6, "Used", "Negotiable", "Clean used shoes", "As-is", '["Size 42","Used"]', "Lalamove Regular", 0.8),
+            ("Cotton baju kurung set", "Cantik Craft", "Clothes", 38, 18, "New", "Fixed", "Local clothing", "Exchange size in 7 days", '["S","M","L"]', "Lalamove Regular", 0.5),
             ("Satay ayam set", "Abang Din Satay", "Food", 12.9, 48, "New", "Fixed", "Fresh pasar malam food", "Fresh item, no return", '["10 sticks","20 sticks"]', "In-Store Pickup", 0.3),
             ("Air balang mango float", "Balang Boss", "Drinks", 6.5, 35, "New", "Fixed", "Cold drink", "Fresh item, no return", '["Small","Large"]', "In-Store Pickup", 0.7),
         ]
@@ -980,9 +980,9 @@ def seed(con):
             [(*row, now()) for row in rows],
         )
     extra_products = [
-        ("Cordless drill set", "Hardware Lane", "Hardware", 159, 8, "New", "Fixed", "Home repair drill kit with bits", "30-day shop warranty", '["12V","Tool kit"]', "Bulky Item", 2.2),
-        ("A4 notebook bundle", "Stationery Corner", "Stationery", 12.5, 40, "New", "Fixed", "Exercise books and pens bundle", "No warranty", '["5 books","Blue pen"]', "Standard Rider", 0.9),
-        ("Kids building blocks", "Toy Night", "Toys", 28, 15, "New", "Negotiable", "Creative toy set for kids", "7-day shop warranty", '["Small set","Large set"]', "Standard Rider", 0.8),
+        ("Cordless drill set", "Hardware Lane", "Hardware", 159, 8, "New", "Fixed", "Home repair drill kit with bits", "30-day shop warranty", '["12V","Tool kit"]', "Lalamove Regular", 2.2),
+        ("A4 notebook bundle", "Stationery Corner", "Stationery", 12.5, 40, "New", "Fixed", "Exercise books and pens bundle", "No warranty", '["5 books","Blue pen"]', "Lalamove Regular", 0.9),
+        ("Kids building blocks", "Toy Night", "Toys", 28, 15, "New", "Negotiable", "Creative toy set for kids", "7-day shop warranty", '["Small set","Large set"]', "Lalamove Regular", 0.8),
         ("Nasi lemak ayam", "Malam Meals", "Meals", 9.9, 30, "New", "Fixed", "Fresh cooked meal for pickup", "Fresh item, no return", '["Normal","Extra sambal"]', "In-Store Pickup", 0.4),
         ("Char kuey teow special", "Street Wok", "Street Food", 11.5, 25, "New", "Fixed", "Hot street food cooked fresh", "Fresh item, no return", '["Regular","Spicy"]', "In-Store Pickup", 0.5),
     ]
@@ -1376,7 +1376,7 @@ class Handler(BaseHTTPRequestHandler):
                     json.dumps(variants),
                     json.dumps(images),
                     images[0] if images else data.get("image_url", ""),
-                    data.get("shipping_type", "Standard Rider"),
+                    data.get("shipping_type", "Lalamove Regular"),
                     float(data.get("weight_kg", 0.5)),
                     now(),
                 ),
@@ -2412,11 +2412,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def get_logistics_rates(self):
         rows = [
-            {"method": "In-Store Pickup", "fee": 0, "eta": "Tonight", "tracking": False},
-            {"method": "Standard Rider", "fee": 4.9, "eta": "1-2 days", "tracking": True},
-            {"method": "Express Rider", "fee": 8.9, "eta": "Same night", "tracking": True},
-            {"method": "Bulky Item", "fee": 12.9, "eta": "2-4 days", "tracking": True},
-            {"method": "Seller Own Fleet", "fee": 6.9, "eta": "Seller arranged", "tracking": False},
+            {"method": "In-Store Pickup", "fee": 0, "eta": "Tonight", "tracking": False, "provider": "Seller"},
+            {"method": "Lalamove Instant", "fee": 8.9, "eta": "Same day / ASAP", "tracking": True, "provider": "Lalamove"},
+            {"method": "Lalamove Regular", "fee": 4.9, "eta": "Scheduled / regular", "tracking": True, "provider": "Lalamove"},
         ]
         send_json(self, 200, {"rates": rows})
 
@@ -2717,13 +2715,11 @@ class Handler(BaseHTTPRequestHandler):
     def admin_logistics(self):
         self.require_user("admin")
         rates = [
-            {"method": "In-Store Pickup", "fee": 0, "eta": "Tonight", "tracking": False, "enabled": True},
-            {"method": "Standard Rider", "fee": 4.9, "eta": "1-2 days", "tracking": True, "enabled": True},
-            {"method": "Express Rider", "fee": 8.9, "eta": "Same night", "tracking": True, "enabled": True},
-            {"method": "Bulky Item", "fee": 12.9, "eta": "2-4 days", "tracking": True, "enabled": True},
-            {"method": "Seller Own Fleet", "fee": 6.9, "eta": "Seller arranged", "tracking": False, "enabled": True},
+            {"method": "In-Store Pickup", "fee": 0, "eta": "Tonight", "tracking": False, "enabled": True, "provider": "Seller"},
+            {"method": "Lalamove Instant", "fee": 8.9, "eta": "Same day / ASAP", "tracking": True, "enabled": True, "provider": "Lalamove"},
+            {"method": "Lalamove Regular", "fee": 4.9, "eta": "Scheduled / regular", "tracking": True, "enabled": True, "provider": "Lalamove"},
         ]
-        send_json(self, 200, {"rates": rates, "awb_prefix": "PM-AWB", "mass_shipping": True, "return_shipping_review": True})
+        send_json(self, 200, {"rates": rates, "awb_prefix": "PM-LALA", "mass_shipping": True, "return_shipping_review": True})
 
     def admin_settings(self):
         self.require_user("admin")
@@ -2930,7 +2926,15 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def shipping_fee(method, weight):
-    fees = {"In-Store Pickup": 0, "Standard Rider": 4.9, "Express Rider": 8.9, "Bulky Item": 12.9, "Seller Own Fleet": 6.9}
+    fees = {
+        "In-Store Pickup": 0,
+        "Lalamove Regular": 4.9,
+        "Lalamove Instant": 8.9,
+        "Standard Rider": 4.9,
+        "Express Rider": 8.9,
+        "Bulky Item": 12.9,
+        "Seller Own Fleet": 6.9,
+    }
     return fees.get(method, 4.9) + max(float(weight) - 1, 0) * 1.5
 
 
