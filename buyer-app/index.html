@@ -19,6 +19,11 @@
   <header><div class="utility"><span id="utilityLeft">Pusat Penjual | Muat Turun Aplikasi | Ikuti PasarMalam</span><span><a id="notifLink" href="notifications.html" style="color:#fff">Notifikasi</a> | <span id="helpText">Bantuan</span> | <a id="loginLink" href="login.html" style="color:#fff">Log Masuk</a></span></div><div class="bar"><div class="brand"><div class="logo" id="homeLogo" title="Home">PM</div><div><h1>PasarMalam</h1><div class="label" id="buyerLabel">Aplikasi Pembeli</div><div class="version">Malaysia Marketplace</div></div></div><div><div class="search"><input id="search" placeholder="Cari telefon, hardware, stationery, toys, meals, street food"><button>Cari</button></div><div class="quick"><button onclick="location.href='category.html?category=Phones'">phones</button><button onclick="location.href='category.html?category=Hardware'">hardware</button><button onclick="location.href='category.html?category=Stationery'">stationery</button><button onclick="location.href='category.html?category=Street%20Food'">street food</button><button onclick="location.href='vouchers.html'">free shipping</button></div></div><div style="display:flex;gap:8px;align-items:center"><button class="lang" id="langToggle">English</button><button class="cart" id="ordersButton" onclick="location.href='orders.html'">Orders</button><button class="cart" id="cartButton">Troli 0</button></div></div></header>
   <main>
     <section class="hero"><div class="hero-main"><div class="hero-copy"><h2 id="heroTitle">Belanja pasar malam, barang rumah dan gadget dalam satu marketplace.</h2><p id="heroText">Temui makanan, telefon, charger, elektronik, car parts, pakaian, kasut, toys, hardware, stationery dan barangan terpakai dengan checkout, tracking, chat seller dan buyer protection.</p><div class="hero-tags"><span id="tagLocal">Local sellers</span><span id="tagUsed">New & used</span><span id="tagNego">Can nego</span><span id="tagEscrow">Escrow protection</span></div></div></div><div class="side"><div class="promo"><b id="promoTitle1">Jualan Malam Ini</b><span id="promoText1">Voucher, bundle, free shipping dan pilihan pickup</span></div><div class="promo"><b id="promoTitle2">Buyer Protection</b><span id="promoText2">Bayaran dipegang sampai pesanan selesai</span></div></div></section>
+    <section class="app-download-strip" aria-label="Download PasarMalam apps">
+      <div><b>Get PasarMalam</b><span>Buy on the app or start selling from Seller Centre.</span></div>
+      <button onclick="location.href='https://play.google.com/store/apps/details?id=com.pasarmalam.app'">Download Buyer App</button>
+      <button onclick="location.href='https://violet-crissie-18.tiiny.site/register.html?from=buyer-download'">Open Seller App</button>
+    </section>
     <section class="pm-home-menu section">
       <details>
         <summary>Menu</summary>
@@ -36,6 +41,8 @@
           <button onclick="location.href='chat.html'">Chat</button>
           <button onclick="location.href='policies.html'">Privacy & Terms</button>
           <button onclick="location.href='support.html'">Support</button>
+          <button onclick="location.href='https://play.google.com/store/apps/details?id=com.pasarmalam.app'">Download Buyer App</button>
+          <button onclick="location.href='https://violet-crissie-18.tiiny.site/register.html?from=buyer-menu'">Open Seller App</button>
         </div>
       </details>
       <details>
@@ -91,6 +98,7 @@
     function imgFor(p){const src=(p.images&&p.images[0])||p.image_url;return src?`<img src="${src}" alt="${p.name}">`:(p.category||"P")[0]}
     function drawCats(){cats.innerHTML=catsData.map(c=>`<button class="cat ${c===active?"active":""}" onclick="location.href='category.html?category=${encodeURIComponent(c)}'">${c}</button>`).join("")}
     function filteredProducts(){const q=search.value.toLowerCase(),min=Number(minPrice.value)||0,max=Number(maxPrice.value)||Infinity,rate=Number(ratingFilter.value)||0;return apiProducts.filter(p=>(active==="All"||p.category===active)&&`${p.name} ${p.shop} ${p.category}`.toLowerCase().includes(q)&&p.price>=min&&p.price<=max&&(conditionFilter.value==="All"||p.condition===conditionFilter.value)&&Number(p.rating||0)>=rate&&(shippingFilter.value==="All"||p.shipping_type===shippingFilter.value))}
+    function drawProducts(){products.innerHTML=filteredProducts().map(p=>`<article class="card"><div class="photo" onclick="openDetail(${p.id})"><span class="badge">${p.condition}</span>${imgFor(p)}</div><div class="body"><div class="name">${p.name}</div><div class="shop">${p.shop} | ${p.category}</div><span class="tag ${p.condition==="Used"?"used":""}">${p.condition}</span><span class="tag ${p.price_mode==="Negotiable"?"nego":""}">${p.price_mode==="Negotiable"?tr("nego"):tr("fixed")}</span><div class="stars">â˜… ${p.rating||4.8}</div><p class="price">${money(p.price)} <span class="muted">${p.sold||0} ${tr("sold")}</span></p><div class="actions"><button class="buy" onclick="addCart(${p.id},event)">${tr("addCart")}</button><button class="heart" onclick="wish(${p.id},event)">â™¡</button></div></div></article>`).join("")}
     function drawProducts(){const list=filteredProducts();const limit=window.innerWidth<=760?8:12;const visible=document.body.classList.contains("buyer-home")?list.slice(0,limit):list;products.innerHTML=visible.map(p=>`<article class="card"><div class="photo" onclick="openDetail(${p.id})"><span class="badge">${p.condition}</span>${imgFor(p)}</div><div class="body"><div class="name">${p.name}</div><div class="shop">${p.shop} | ${p.category}</div><span class="tag ${p.condition==="Used"?"used":""}">${p.condition}</span><span class="tag ${p.price_mode==="Negotiable"?"nego":""}">${p.price_mode==="Negotiable"?tr("nego"):tr("fixed")}</span><div class="stars">4.8 rating</div><p class="price">${money(p.price)} <span class="muted">${p.sold||0} ${tr("sold")}</span></p><div class="actions"><button class="buy" onclick="addCart(${p.id},event)">${tr("addCart")}</button><button class="heart" onclick="wish(${p.id},event)">Save</button></div></div></article>`).join("")}
     function openDetail(id){location.href=`product.html?id=${id}`}
     closeModal.onclick=()=>productModal.classList.remove("open");[search,minPrice,maxPrice,conditionFilter,ratingFilter,shippingFilter].forEach(el=>el.oninput=drawProducts);
@@ -110,3 +118,5 @@
   </script>
 <script src="badges.js"></script></body>
 </html>
+
+

@@ -37,6 +37,11 @@ img{max-width:100%}
 .buyer-home .hero h2{font-size:32px!important;line-height:1.12!important;max-width:720px}
 .buyer-home .hero p{font-size:15px!important;line-height:1.5!important;max-width:720px}
 .buyer-home .hero-tags span{font-size:12px!important;padding:7px 10px!important}
+.app-download-strip{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;background:#fff;border:1px solid #dbe4ea;border-left:4px solid #0f9f8f;border-radius:8px;margin:10px 0;padding:10px 12px}
+.app-download-strip b{display:block;color:#202124;font-size:15px;line-height:1.2}
+.app-download-strip span{display:block;color:#687282;font-size:12px;line-height:1.35;margin-top:2px}
+.app-download-strip button{border:0;border-radius:6px;background:#0f9f8f;color:#fff;font-weight:900;min-height:38px;padding:0 12px;white-space:nowrap}
+.app-download-strip button:last-child{background:#fff;color:#0f9f8f;border:1px solid #b8fff5}
 .buyer-home .section{margin-top:10px!important;border-radius:8px!important;box-shadow:none!important}
 .buyer-home .head{padding:12px 14px!important}
 .buyer-home .head h3{font-size:18px!important}
@@ -72,6 +77,11 @@ img{max-width:100%}
   .buyer-home .hero-main{min-height:190px!important}
   .buyer-home .hero h2{font-size:24px!important}
   .buyer-home .hero p{display:none!important}
+  .app-download-strip{grid-template-columns:1fr 1fr!important;gap:8px!important;padding:10px!important}
+  .app-download-strip div{grid-column:1/-1}
+  .app-download-strip b{font-size:14px!important}
+  .app-download-strip span{font-size:11px!important}
+  .app-download-strip button{min-height:40px!important;padding:0 8px!important;font-size:12px!important}
   .buyer-home .grid{grid-template-columns:repeat(2,1fr)!important;gap:8px!important;padding:8px!important}
   .buyer-home .photo{height:92px!important;min-height:0!important;font-size:23px!important}
   .buyer-home .body{padding:7px!important}
