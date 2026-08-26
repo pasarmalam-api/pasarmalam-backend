@@ -1,0 +1,90 @@
+/* PasarMalam mobile marketplace shell: cleaner Shopee-style page split */
+html,body{max-width:100%;overflow-x:hidden}
+body{background:#f5f7fb;color:#202124;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+button{touch-action:manipulation}
+img{max-width:100%}
+.deep-flow{display:none!important}
+.pm-page-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
+.pm-page-tabs button{border:1px solid #dbe4ea;background:#fff;color:#0f9f8f;border-radius:8px;min-height:44px;font-weight:900;padding:8px}
+.pm-mobile-note{display:none}
+@media(max-width:760px){
+  body{font-size:15px;background:#f4f6fa}
+  header{border-bottom-left-radius:0;border-bottom-right-radius:0}
+  .utility{display:none!important}
+  .bar{display:grid!important;grid-template-columns:1fr!important;padding:10px 12px!important;gap:10px!important}
+  .brand{min-width:0}.brand h1,.brand h2{font-size:24px!important;line-height:1.1;margin:0}.logo{width:48px!important;height:48px!important;min-width:48px!important}
+  .search{min-height:44px}.search input{font-size:15px}.quick{overflow-x:auto;flex-wrap:nowrap!important;padding-bottom:2px}.quick button{white-space:nowrap}
+  main{padding:10px 10px 76px!important;max-width:100%!important}
+  .hero{display:block!important}.side{display:none!important}.hero-main{min-height:245px!important;padding:18px!important;border-radius:8px!important}.hero h2{font-size:28px!important;line-height:1.12!important}.hero p{font-size:14px!important}.hero-tags{gap:6px!important}.hero-tags span{font-size:11px!important;padding:6px 8px!important}
+  .trust-strip{grid-template-columns:1fr 1fr!important;margin:10px 0!important}.trust{padding:10px!important;min-height:74px}.trust b{font-size:13px}.trust span{font-size:11px!important}
+  .services{grid-template-columns:repeat(4,1fr)!important;gap:8px!important;margin:10px 0!important}.service{min-height:58px!important;font-size:12px!important;padding:6px!important}
+  .section,.panel,.card,.service,.trust,.strip-card{border-radius:8px!important;box-shadow:none!important}.section{margin-top:10px!important}.head{padding:11px 12px!important;align-items:flex-start!important}.head h3{font-size:17px!important}.head span{font-size:12px!important}
+  .market-strip,.cats{grid-template-columns:repeat(2,1fr)!important;gap:8px!important}.strip-card{padding:10px!important}.cat{min-height:52px!important;font-size:13px!important}
+  .filters{grid-template-columns:1fr 1fr!important;padding:10px!important;gap:8px!important}.filters input,.filters select,input,select,textarea{min-height:42px!important;font-size:15px!important}
+  .grid{grid-template-columns:repeat(2,1fr)!important;padding:10px!important;gap:8px!important}.photo{font-size:28px!important}.body{padding:9px!important}.name{min-height:36px!important;font-size:13px!important}.price{font-size:17px!important}.tag{font-size:11px!important}.actions{grid-template-columns:1fr 38px!important}
+  .two,.row,.rates,.paygrid,.status-grid{grid-template-columns:1fr!important}.bottom-nav{position:fixed!important;left:8px;right:8px;bottom:8px;margin:0!important;border-radius:10px!important;box-shadow:0 10px 25px #0002}.bottom-nav button{font-size:11px!important;min-height:50px!important;padding:4px!important}
+  .pm-page-tabs{grid-template-columns:repeat(2,1fr)}.pm-mobile-note{display:block;color:#687282;font-size:12px;margin:8px 0 0}
+  table{display:block;width:100%;overflow-x:auto;white-space:nowrap}.line{overflow:hidden}.panel{margin:10px!important;padding:12px!important}.voucher{margin:10px 0!important}
+}
+/* July 4 tester fixes: keep homepage actions inside menu and fix product detail mobile layout */
+.buyer-home .home-inline-block{display:none!important}
+.buyer-home .pm-home-menu{display:block!important}
+.buyer-home .buyer-quick-actions{display:none!important}
+.buyer-home .side{display:none!important}
+.buyer-home .hero{display:block!important;margin-top:10px!important}
+.buyer-home .hero-main{min-height:210px!important;padding:22px!important;border-radius:8px!important}
+.buyer-home .hero h2{font-size:32px!important;line-height:1.12!important;max-width:720px}
+.buyer-home .hero p{font-size:15px!important;line-height:1.5!important;max-width:720px}
+.buyer-home .hero-tags span{font-size:12px!important;padding:7px 10px!important}
+.buyer-home .section{margin-top:10px!important;border-radius:8px!important;box-shadow:none!important}
+.buyer-home .head{padding:12px 14px!important}
+.buyer-home .head h3{font-size:18px!important}
+.buyer-home .head span{font-size:12px!important}
+.buyer-home .grid{grid-template-columns:repeat(6,1fr)!important;gap:9px!important;padding:10px!important}
+.buyer-home .card{border-radius:8px!important;box-shadow:none!important}
+.buyer-home .photo{aspect-ratio:auto!important;height:106px!important;min-height:0!important;font-size:26px!important}
+.buyer-home .badge{top:5px!important;left:5px!important;padding:3px 5px!important;font-size:10px!important}
+.buyer-home .body{padding:8px!important}
+.buyer-home .name{font-size:13px!important;line-height:1.22!important;min-height:32px!important;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.buyer-home .shop,.buyer-home .muted{font-size:10px!important}
+.buyer-home .tag{display:inline-block!important;margin:3px 3px 0 0!important;padding:3px 5px!important;font-size:10px!important}
+.buyer-home .stars{font-size:11px!important;margin-top:3px!important}
+.buyer-home .price{font-size:16px!important;margin:5px 0!important}
+.buyer-home .actions{grid-template-columns:1fr!important}
+.buyer-home .heart{display:none!important}
+.pm-home-menu{display:none}
+.pm-home-menu details{background:#fff;border:1px solid #e6e9ef;border-radius:8px;margin:8px 0;overflow:hidden}
+.pm-home-menu summary{list-style:none;cursor:pointer;padding:14px 16px;font-weight:900;color:#0f9f8f;display:flex;justify-content:space-between;align-items:center}
+.pm-home-menu summary::-webkit-details-marker{display:none}
+.pm-home-menu summary:after{content:"+";font-weight:900;color:#687282}
+.pm-home-menu details[open] summary:after{content:"-"}
+.pm-menu-grid,.pm-filter-buttons{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;padding:0 12px 12px}
+.pm-menu-grid button,.pm-filter-buttons button{border:1px solid #dbe4ea;background:#fff;color:#202124;border-radius:8px;min-height:46px;font-weight:900;padding:8px;text-align:center}
+.pm-filter-buttons{grid-template-columns:1fr}
+.product-detail-grid{align-items:start}
+.product-page .product-info-panel h1{font-size:30px;line-height:1.12;margin:0 0 10px}.product-page .product-info-panel .price{margin:8px 0 12px}
+@media(max-width:760px){
+  .buyer-home .home-inline-block{display:none!important}
+  .buyer-home .pm-page-tabs{display:none!important}
+  .buyer-home .pm-mobile-note{display:none!important}
+  .pm-home-menu{display:block!important}
+  .buyer-home .hero-main{min-height:190px!important}
+  .buyer-home .hero h2{font-size:24px!important}
+  .buyer-home .hero p{display:none!important}
+  .buyer-home .grid{grid-template-columns:repeat(2,1fr)!important;gap:8px!important;padding:8px!important}
+  .buyer-home .photo{height:92px!important;min-height:0!important;font-size:23px!important}
+  .buyer-home .body{padding:7px!important}
+  .buyer-home .name{font-size:12px!important;min-height:30px!important}
+  .buyer-home .price{font-size:15px!important}
+  .buyer-home .actions{grid-template-columns:1fr!important}
+  .buyer-home .heart{display:none!important}
+  .product-page .product-detail-grid{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;padding:10px!important}
+  .product-page .product-image-panel,.product-page .product-info-panel{margin:0!important;padding:12px!important;width:100%!important}
+  .product-page .photo{aspect-ratio:1/1!important;max-height:none!important;font-size:42px!important}
+  .product-page .product-info-panel h1{font-size:24px!important;line-height:1.15!important;word-break:break-word}
+  .product-page .price{font-size:24px!important}
+  .product-page .trust{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+  .product-page .row{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+  .product-page .primary,.product-page .soft{width:100%;margin:4px 0;min-height:44px}
+}
