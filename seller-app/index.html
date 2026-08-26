@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ms">
 <head>
   <meta charset="utf-8">
@@ -62,6 +62,11 @@
       </div>
     </header>
     <main>
+      <section class="seller-download-strip" aria-label="PasarMalam app download links">
+        <div><b>PasarMalam apps</b><span>Install the buyer app or open Seller Centre tools.</span></div>
+        <button class="google-play-badge" onclick="location.href='https://play.google.com/store/apps/details?id=com.pasarmalam.app'"><span>GET IT ON</span><b>Google Play</b></button>
+        <button class="seller-app-badge" onclick="location.href='https://tomato-germain-74.tiiny.site/?from=seller-download'"><span>BUYER APP</span><b>Open Buyer</b></button>
+      </section>
       <section class="hero">
         <div>
           <h2>Professional seller workspace for PasarMalam merchants</h2>
@@ -76,7 +81,7 @@
         <div class="stat"><span>Store Rating</span><b id="ratingScore">0</b></div>
       </section>
 
-      <section class="panel section">
+      <section class="panel section mobile-dashboard-extra">
         <div class="panel-head">
           <h3>Launch Commission Structure</h3>
           <span class="tag">No RM0.50 order fee during launch</span>
@@ -93,7 +98,7 @@
         </table>
       </section>
 
-      <section class="three section">
+      <section class="three section mobile-dashboard-extra">
         <div class="stat"><span>Response Rate</span><b id="responseRate">0%</b></div>
         <div class="stat"><span>Late Shipment</span><b id="lateShipment">0%</b></div>
         <div class="stat"><span>Cancellation</span><b id="cancelRate">0%</b></div>
@@ -106,14 +111,14 @@
         <a href="campaigns.html">Campaign Tools</a>
       </section>
 
-      <section class="mini-grid">
+      <section class="mini-grid section">
         <div class="panel">
           <div class="panel-head">
             <h3>Product Listings</h3>
             <button class="soft" onclick="location.href='products.html'">Open Products</button>
           </div>
           <div style="overflow:auto">
-            <table>
+            <table class="product-preview-table">
               <thead><tr><th>Product</th><th>Price</th><th>Stock</th><th>Status</th><th>Action</th></tr></thead>
               <tbody id="productRows"></tbody>
             </table>
@@ -128,7 +133,7 @@
         </div>
       </section>
 
-      <section class="two section">
+      <section class="two section mobile-dashboard-extra">
         <div class="panel">
           <div class="panel-head">
             <h3>Orders To Handle</h3>
@@ -145,7 +150,7 @@
         </div>
       </section>
 
-      <section class="three section">
+      <section class="three section mobile-dashboard-extra">
         <div class="panel">
           <div class="panel-head"><h3>Buyer Messages</h3><a class="soft" href="messages.html">Reply</a></div>
           <div id="messagesBox"></div>
@@ -167,10 +172,13 @@
 const API="https://pasarmalam-backend.onrender.com";
 const money=v=>`RM${Number(v||0).toFixed(2)}`;
 async function api(path){const r=await fetch(API+path);return r.json()}
+const seedWords=/\b(Cloudinary|Postgres|Auth Seller|Voucher Test|Test Item|System test|Automated return|Buyer Bad|Seller Test|Bad Product|demo|test)\b/gi;
+function cleanText(v){return String(v??"").replace(seedWords,"").replace(/\b\d{5,}\b/g,"").replace(/\s{2,}/g," ").trim()}
+function cleanProduct(p){const fallback={Phones:"Smartphone",Chargers:"USB-C charger",Electronics:"Bluetooth speaker",Hardware:"Home tool set",Toys:"Toy set",Clothes:"Clothing item",Food:"Fresh food","Street Food":"Street food special",Drinks:"Fresh drink",Meals:"Meal set",Stationery:"Stationery bundle",Shoes:"Shoes"};let n=cleanText(p.name);if(!n||/bad|test|^charger\s*$/i.test(n)||/\d{5,}/.test(String(p.name||"")))n=fallback[p.category]||"Marketplace item";return {...p,name:n,shop:cleanText(p.shop)||"PasarMalam Seller",category:cleanText(p.category)||"Marketplace",condition:cleanText(p.condition)||"New"}}
 function img(p){const src=(p.images&&p.images[0])||p.image_url;return src?`<img class="thumb" src="${src}" alt="">`:""}
 async function loadMetrics(){try{const m=await api("/api/metrics");orderCount.textContent=m.orders||0;salesCount.textContent=money(m.sales);ratingScore.textContent=m.rating||"4.8";responseRate.textContent=(m.response_rate||98)+"%";lateShipment.textContent=(m.late_shipment_rate||0)+"%";cancelRate.textContent=(m.cancellation_rate||0)+"%"}catch(e){}}
-async function loadProducts(){const d=await api("/api/products");const rows=d.products||[];productCount.textContent=rows.length;drawProducts(rows);search.oninput=()=>drawProducts(rows)}
-function drawProducts(rows){const q=(search.value||"").toLowerCase();productRows.innerHTML=rows.filter(p=>`${p.name} ${p.category} ${p.shop}`.toLowerCase().includes(q)).slice(0,8).map(p=>`<tr><td><div class="product-title">${img(p)}<div><b>${p.name}</b><div class="muted">${p.shop} | ${p.category}</div></div></div></td><td>${money(p.price)}</td><td><span class="tag ${p.stock<=5?"warn":""}">${p.stock}</span></td><td><span class="tag ${p.condition==="Used"?"warn":""}">${p.condition}</span></td><td><button class="soft" onclick="location.href='edit-product.html?id=${p.id}'">Edit</button></td></tr>`).join("")}
+async function loadProducts(){const d=await api("/api/products");const rows=(d.products||[]).map(cleanProduct);productCount.textContent=rows.length;drawProducts(rows);search.oninput=()=>drawProducts(rows)}
+function drawProducts(rows){const q=(search.value||"").toLowerCase();const limit=window.matchMedia("(max-width:700px)").matches?4:8;productRows.innerHTML=rows.filter(p=>`${p.name} ${p.category} ${p.shop}`.toLowerCase().includes(q)).slice(0,limit).map(p=>`<tr><td><div class="product-title">${img(p)}<div><b>${p.name}</b><div class="muted">${p.shop} | ${p.category}</div></div></div></td><td>${money(p.price)}</td><td><span class="tag ${p.stock<=5?"warn":""}">${p.stock}</span></td><td><span class="tag ${p.condition==="Used"?"warn":""}">${p.condition}</span></td><td><button class="soft" onclick="location.href='edit-product.html?id=${p.id}'">Edit</button></td></tr>`).join("")}
 async function loadOrders(){const d=await api("/api/orders");const rows=(d.orders||[]).slice(0,5);ordersBox.innerHTML=rows.map(o=>`<div class="order"><b>PM-${o.id}</b> <span class="tag">${o.order_status}</span><p class="muted">${o.logistics_method||"Shipping"} | ${money(o.total)}</p></div>`).join("")||"<p class='muted'>No orders yet.</p>"}
 async function loadReturns(){const d=await api("/api/returns");const rows=(d.returns||[]).slice(0,5);returnsBox.innerHTML=rows.map(r=>`<div class="order"><b>${r.request_type}</b><p>${r.reason}</p><span class="tag warn">${r.status}</span></div>`).join("")||"<p class='muted'>No return requests.</p>"}
 async function loadWallet(){const d=await api("/api/wallet");walletBox.innerHTML=(d.wallet||[]).slice(0,5).map(w=>`<div class="wallet-line"><span>${w.type}<br><small class="muted">${w.note}</small></span><b>${money(w.amount)}</b></div>`).join("")}
@@ -181,3 +189,5 @@ loadMetrics();loadProducts();loadOrders();loadReturns();loadWallet();loadMessage
 </script>
 <script src="badges.js"></script></body>
 </html>
+
+
