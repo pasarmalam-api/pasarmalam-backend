@@ -21,8 +21,8 @@
     <section class="hero"><div class="hero-main"><div class="hero-copy"><h2 id="heroTitle">Belanja pasar malam, barang rumah dan gadget dalam satu marketplace.</h2><p id="heroText">Temui makanan, telefon, charger, elektronik, car parts, pakaian, kasut, toys, hardware, stationery dan barangan terpakai dengan checkout, tracking, chat seller dan buyer protection.</p><div class="hero-tags"><span id="tagLocal">Local sellers</span><span id="tagUsed">New & used</span><span id="tagNego">Can nego</span><span id="tagEscrow">Escrow protection</span></div></div></div><div class="side"><div class="promo"><b id="promoTitle1">Jualan Malam Ini</b><span id="promoText1">Voucher, bundle, free shipping dan pilihan pickup</span></div><div class="promo"><b id="promoTitle2">Buyer Protection</b><span id="promoText2">Bayaran dipegang sampai pesanan selesai</span></div></div></section>
     <section class="app-download-strip" aria-label="Download PasarMalam apps">
       <div><b>Get PasarMalam</b><span>Buy on the app or start selling from Seller Centre.</span></div>
-      <button onclick="location.href='https://play.google.com/store/apps/details?id=com.pasarmalam.app'">Download Buyer App</button>
-      <button onclick="location.href='https://violet-crissie-18.tiiny.site/register.html?from=buyer-download'">Open Seller App</button>
+      <button class="google-play-badge" onclick="location.href='https://play.google.com/store/apps/details?id=com.pasarmalam.app'"><span>GET IT ON</span><b>Google Play</b></button>
+      <button class="seller-app-badge" onclick="location.href='https://violet-crissie-18.tiiny.site/register.html?from=buyer-download'"><span>SELLER CENTRE</span><b>Open Seller App</b></button>
     </section>
     <section class="pm-home-menu section">
       <details>
@@ -41,8 +41,8 @@
           <button onclick="location.href='chat.html'">Chat</button>
           <button onclick="location.href='policies.html'">Privacy & Terms</button>
           <button onclick="location.href='support.html'">Support</button>
-          <button onclick="location.href='https://play.google.com/store/apps/details?id=com.pasarmalam.app'">Download Buyer App</button>
-          <button onclick="location.href='https://violet-crissie-18.tiiny.site/register.html?from=buyer-menu'">Open Seller App</button>
+          <button class="google-play-badge compact" onclick="location.href='https://play.google.com/store/apps/details?id=com.pasarmalam.app'"><span>GET IT ON</span><b>Google Play</b></button>
+          <button class="seller-app-badge compact" onclick="location.href='https://violet-crissie-18.tiiny.site/register.html?from=buyer-menu'"><span>SELLER</span><b>Open App</b></button>
         </div>
       </details>
       <details>
@@ -103,7 +103,7 @@
     function openDetail(id){location.href=`product.html?id=${id}`}
     closeModal.onclick=()=>productModal.classList.remove("open");[search,minPrice,maxPrice,conditionFilter,ratingFilter,shippingFilter].forEach(el=>el.oninput=drawProducts);
     async function api(path,options={}){const token=localStorage.getItem("pm_token")||"";const headers={"Content-Type":"application/json",...(options.headers||{})};if(token)headers.Authorization=`Bearer ${token}`;const res=await fetch(API_BASE+path,{...options,headers});if(!res.ok)throw new Error(await res.text());return res.json()}
-    async function load(){try{apiProducts=((await api("/api/products")).products||[]).map(cleanProduct);drawProducts();cart=(await api("/api/cart")).cart;drawCart();drawOrders((await api("/api/orders")).orders);drawReturns((await api("/api/returns")).returns);drawRates((await api("/api/logistics/rates")).rates);drawReviews((await api("/api/reviews")).reviews);drawChat((await api("/api/messages")).messages)}catch(e){console.log(e)}}
+    async function load(){try{apiProducts=((await api("/api/products")).products||[]).map(cleanProduct);drawProducts();cart=(await api("/api/cart")).cart;drawCart();drawOrders((await api("/api/orders")).orders);drawReturns((await api("/api/returns")).returns);drawRates((await api("/api/logistics/rates")).rates);drawReviews((await api("/api/reviews")).reviews);drawChat((await api("/api/messages")).messages)}catch(e){console.log(e)}} 
     async function addCart(id,event){if(event)event.stopPropagation();await api("/api/cart",{method:"POST",body:JSON.stringify({product_id:id,quantity:1})});location.href="cart.html"}function drawCart(){cartButton.textContent=`${tr("cart")} ${cart.length}`;cartList.innerHTML=cart.length?cart.map(i=>`<div class="cart-line"><b>${i.name}</b><span class="muted"> ${i.shop}</span><br>Qty ${i.quantity} | ${money(i.price)}</div>`).join(""):`<p class='muted'>${tr("emptyCart")}</p>`}
     checkoutBtn.onclick=async()=>{const item=cart[0]||{product_id:apiProducts[0]?.id,quantity:1};if(!item.product_id)return alert("No product");const o=await api("/api/checkout",{method:"POST",body:JSON.stringify({product_id:item.product_id,quantity:item.quantity,address:checkoutAddress.value,logistics_method:checkoutShipping.value,payment_method:paymentMethod.value,buyer_name:"Buyer"})});alert(`Payment confirmed. Tracking ${o.tracking_no}. Escrow ${o.escrow_status}`);drawOrders((await api("/api/orders")).orders)}
     function drawOrders(rows){ordersList.innerHTML=rows.map(o=>`<div class="order-line"><b>PM-${o.id}</b> ${o.order_status} | ${o.payment_status} | Escrow ${o.escrow_status}<br><span class="muted">${o.logistics_method} ${o.tracking_no}</span></div>`).join("")||"<p class='muted'>No orders yet</p>"}
