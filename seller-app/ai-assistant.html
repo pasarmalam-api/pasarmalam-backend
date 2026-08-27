@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PasarMalam Seller AI</title>
+  <link rel="stylesheet" href="seller.css">
+  <style>
+    textarea{width:100%;min-height:132px;border:1px solid var(--line);border-radius:8px;padding:12px;font:inherit;resize:vertical}
+    .answer{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:14px;line-height:1.55}
+    .chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.chips button{border:1px solid #b8fff5;background:#fff;color:var(--brand);border-radius:7px;min-height:38px;padding:0 12px;font-weight:900}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside><a class="brand" href="index.html"><div class="logo">PM</div><div><h1>PasarMalam</h1><div class="label">Seller Centre</div></div></a><nav><a href="index.html">Dashboard</a><a href="products.html">Products</a><a href="add-product.html">Add Product</a><a class="active" href="ai-assistant.html">AI Listing Helper</a><a href="orders.html">Orders</a><a href="messages.html">Messages</a><a href="logistics.html">Logistics</a><a href="wallet.html">Wallet</a><a href="settings.html">Settings</a></nav></aside>
+    <div>
+      <header><div class="top"><h2>AI Listing Helper</h2><button class="soft" onclick="location.href='add-product.html'">Add Product</button></div></header>
+      <main>
+        <section class="panel">
+          <h3>Create better product listings</h3>
+          <p class="muted">Enter item details. AI will draft a title, description, fair-pricing guidance, photo checklist and shipping suggestion.</p>
+          <div class="chips">
+            <button onclick="askPreset('Used iPhone, good condition, 128GB, needs fair price and safe delivery.')">Used phone</button>
+            <button onclick="askPreset('Homemade nasi lemak for Cyberjaya buyers, available tonight, Lalamove needed.')">Food listing</button>
+            <button onclick="askPreset('New phone charger with warranty, stock 20, want simple seller description.')">Charger listing</button>
+          </div>
+          <textarea id="prompt" placeholder="Example: New black school shoes, sizes 38 to 43, stock 18, seller pickup and Lalamove Regular available."></textarea>
+          <p><button class="primary" onclick="askAi()">Generate Listing Help</button></p>
+          <div id="answer" class="answer">AI listing guidance will appear here.</div>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script>
+    const API="https://pasarmalam-backend.onrender.com";
+    function askPreset(text){prompt.value=text;askAi()}
+    async function askAi(){
+      const text=prompt.value.trim();
+      if(!text){answer.textContent="Enter product details first.";return}
+      answer.textContent="Thinking...";
+      try{
+        const res=await fetch(API+"/api/ai/assistant",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"seller",prompt:text})});
+        const data=await res.json();
+        if(!res.ok||data.error)throw new Error(data.error||"AI request failed");
+        answer.textContent=data.answer;
+      }catch(e){answer.textContent="AI is not reachable right now. Check Render first, then try again. "+e.message}
+    }
+  </script>
+  <script src="badges.js"></script>
+</body>
+</html>
