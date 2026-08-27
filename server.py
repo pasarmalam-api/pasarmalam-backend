@@ -33,6 +33,8 @@ BILLPLZ_COLLECTION_ID = os.environ.get("BILLPLZ_COLLECTION_ID", "")
 BILLPLZ_X_SIGNATURE_KEY = os.environ.get("BILLPLZ_X_SIGNATURE_KEY", "")
 BILLPLZ_MODE = os.environ.get("BILLPLZ_MODE", "sandbox").lower()
 BILLPLZ_BASE_URL = "https://www.billplz-sandbox.com" if BILLPLZ_MODE != "live" else "https://www.billplz.com"
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 
 
 if USE_POSTGRES:
@@ -1072,6 +1074,92 @@ def read_json(handler):
     return json.loads(raw)
 
 
+def compact_product_context(limit=24):
+    try:
+        with connect() as con:
+            rows = [
+                row_to_dict(row)
+                for row in con.execute(
+                    "SELECT name, category, price, stock, condition, price_mode, shop, shipping_type, rating FROM products ORDER BY id DESC LIMIT ?",
+                    (limit,),
+                )
+            ]
+    except Exception:
+        rows = []
+    if not rows:
+        return "No live product context is available."
+    return "\n".join(
+        f"- {r.get('name')} | {r.get('category')} | RM{as_float(r.get('price')):.2f} | stock {r.get('stock')} | {r.get('condition')} | {r.get('price_mode')} | {r.get('shipping_type')} | {r.get('shop')}"
+        for r in rows
+    )
+
+
+def local_ai_fallback(mode, prompt):
+    text = str(prompt or "").strip()
+    if mode == "seller":
+        return {
+            "answer": (
+                "AI setup is waiting for the server API key, but here is a seller-ready draft:\n\n"
+                f"Title: {text[:70] or 'Quality marketplace item'}\n"
+                "Description: Describe the item condition, size/model, what is included, pickup or Lalamove option, and return rule. "
+                "Add clear photos, weight, stock count, warranty notes and whether the price is fixed or negotiable.\n"
+                "Pricing tip: Compare similar items nearby and avoid overpricing so buyers close to your location can buy faster."
+            ),
+            "source": "local_fallback",
+        }
+    return {
+        "answer": (
+            "AI setup is waiting for the server API key, but here is a buyer guide:\n\n"
+            "Search by item name, category and location. Check seller rating, item condition, stock, return rule and shipping option. "
+            "Use Lalamove Instant for urgent orders, Lalamove Regular for normal delivery, and chat with the seller before paying when details are unclear."
+        ),
+        "source": "local_fallback",
+    }
+
+
+def call_openai_ai(mode, prompt):
+    if not OPENAI_API_KEY:
+        return local_ai_fallback(mode, prompt)
+    role = "seller listing assistant" if mode == "seller" else "buyer shopping assistant"
+    system = (
+        "You are PasarMalam AI, a practical Malaysia marketplace assistant. "
+        "Keep answers concise, safe, policy-compliant and commerce-focused. "
+        "Do not promise unavailable payment, refund, delivery or warranty terms. "
+        "Recommend fair prices and nearby transactions where useful."
+    )
+    user = (
+        f"Mode: {role}\n"
+        f"User request: {str(prompt or '').strip()}\n\n"
+        f"Current marketplace context:\n{compact_product_context()}\n\n"
+        "Answer in simple English unless the user asks for Malay. "
+        "For sellers, include title, description, category, pricing, photos, condition and shipping tips when relevant. "
+        "For buyers, suggest relevant categories, what to check, and next action."
+    )
+    payload = {"model": OPENAI_MODEL, "input": [{"role": "system", "content": system}, {"role": "user", "content": user}]}
+    req = urllib.request.Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {OPENAI_API_KEY}"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as res:
+            data = json.loads(res.read().decode("utf-8"))
+        answer = data.get("output_text", "")
+        if not answer:
+            chunks = []
+            for item in data.get("output", []):
+                for content in item.get("content", []):
+                    if content.get("type") in ("output_text", "text"):
+                        chunks.append(content.get("text", ""))
+            answer = "\n".join(chunks).strip()
+        return {"answer": answer or local_ai_fallback(mode, prompt)["answer"], "source": "openai"}
+    except Exception as exc:
+        fallback = local_ai_fallback(mode, prompt)
+        fallback["warning"] = f"AI provider unavailable: {exc}"
+        return fallback
+
+
 def send_json(handler, status, payload):
     body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     handler.send_response(status)
@@ -1294,6 +1382,14 @@ class Handler(BaseHTTPRequestHandler):
                 self.mark_notifications_read(data)
             elif parsed.path == "/api/support/tickets":
                 self.create_support_ticket(data)
+            elif parsed.path == "/api/ai/assistant":
+                mode = str(data.get("mode", "buyer")).lower()
+                if mode not in ("buyer", "seller"):
+                    mode = "buyer"
+                prompt = str(data.get("prompt", "")).strip()
+                if not prompt:
+                    raise ValueError("Prompt is required")
+                send_json(self, 200, {"ok": True, **call_openai_ai(mode, prompt)})
             elif parsed.path == "/api/campaigns":
                 self.create_campaign(data)
             elif parsed.path == "/api/logistics/awb":
