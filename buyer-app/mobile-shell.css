@@ -52,8 +52,6 @@ img{max-width:100%}
 .google-play-badge.image-badge{display:inline-flex!important;align-items:center!important;justify-content:center!important;grid-template-columns:none!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important;min-height:0!important;padding:0!important;width:auto!important;white-space:normal!important}
 .google-play-badge.image-badge:before{display:none!important;content:none!important}
 .google-play-badge.image-badge img{display:block;width:176px;max-width:100%;height:auto;border-radius:9px;box-shadow:0 8px 18px #11182722}
-.google-play-badge.image-badge.compact{width:100%!important;justify-content:center!important;min-height:44px!important}
-.google-play-badge.image-badge.compact img{width:158px}
 .buyer-home .section{margin-top:10px!important;border-radius:8px!important;box-shadow:none!important}
 .buyer-home .head{padding:12px 14px!important}
 .buyer-home .head h3{font-size:18px!important}
@@ -98,7 +96,6 @@ img{max-width:100%}
   .app-download-strip .google-play-badge span,.app-download-strip .seller-app-badge span{font-size:8px!important}
   .app-download-strip .google-play-badge.image-badge{width:auto!important;justify-content:start!important;min-height:0!important;padding:0!important}
   .google-play-badge.image-badge img{width:154px}
-  .google-play-badge.image-badge.compact img{width:144px}
   .buyer-home .grid{grid-template-columns:repeat(2,1fr)!important;gap:8px!important;padding:8px!important}
   .buyer-home .photo{height:92px!important;min-height:0!important;font-size:23px!important}
   .buyer-home .body{padding:7px!important}
