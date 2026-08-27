@@ -37,17 +37,17 @@ img{max-width:100%}
 .buyer-home .hero h2{font-size:32px!important;line-height:1.12!important;max-width:720px}
 .buyer-home .hero p{font-size:15px!important;line-height:1.5!important;max-width:720px}
 .buyer-home .hero-tags span{font-size:12px!important;padding:7px 10px!important}
-.app-download-strip{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;background:#fff;border:1px solid #dbe4ea;border-left:4px solid #0f9f8f;border-radius:8px;margin:10px 0;padding:10px 12px}
+.app-download-strip{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;background:linear-gradient(135deg,#ffffff,#f4fffc);border:1px solid #dbe4ea;border-left:4px solid #0f9f8f;border-radius:10px;margin:10px 0;padding:12px 14px;box-shadow:0 10px 26px #1118270d}
 .app-download-strip b{display:block;color:#202124;font-size:15px;line-height:1.2}
 .app-download-strip span{display:block;color:#687282;font-size:12px;line-height:1.35;margin-top:2px}
-.google-play-badge,.seller-app-badge{display:inline-grid!important;grid-template-columns:28px 1fr;align-items:center;gap:8px;border:0!important;border-radius:8px!important;min-height:44px!important;padding:6px 12px!important;text-align:left!important;white-space:nowrap;box-shadow:0 8px 18px #11182722}
-.google-play-badge{background:#111827!important;color:#fff!important}
+.google-play-badge,.seller-app-badge{display:inline-grid!important;grid-template-columns:34px 1fr;align-items:center;gap:10px;border:0!important;border-radius:10px!important;min-height:52px!important;padding:8px 16px!important;text-align:left!important;white-space:nowrap;box-shadow:0 10px 24px #1118272b}
+.google-play-badge{background:linear-gradient(135deg,#0b1220,#111827 55%,#172554)!important;color:#fff!important}
 .seller-app-badge{background:#fff!important;color:#0f9f8f!important;border:1px solid #b8fff5!important}
-.google-play-badge:before{content:"";width:0;height:0;border-top:11px solid transparent;border-bottom:11px solid transparent;border-left:19px solid #34a853;filter:drop-shadow(6px 0 0 #4285f4) drop-shadow(12px 0 0 #fbbc04)}
+.google-play-badge:before{content:"";width:0;height:0;border-top:14px solid transparent;border-bottom:14px solid transparent;border-left:25px solid #34a853;filter:drop-shadow(7px 0 0 #4285f4) drop-shadow(14px 0 0 #fbbc04) drop-shadow(21px 0 0 #ea4335)}
 .seller-app-badge:before{content:"PM";width:28px;height:28px;border-radius:7px;display:grid;place-items:center;background:linear-gradient(135deg,#0f9f8f,#6d5dfc);color:#fff;font-size:12px;font-weight:900}
-.google-play-badge span,.seller-app-badge span{display:block!important;font-size:9px!important;line-height:1!important;margin:0!important;color:#cfd7e3!important;letter-spacing:0!important}
+.google-play-badge span,.seller-app-badge span{display:block!important;font-size:10px!important;line-height:1!important;margin:0!important;color:#cfd7e3!important;letter-spacing:0!important;text-transform:uppercase}
 .seller-app-badge span{color:#687282!important}
-.google-play-badge b,.seller-app-badge b{display:block!important;font-size:14px!important;line-height:1.05!important;margin:0!important;color:inherit!important}
+.google-play-badge b,.seller-app-badge b{display:block!important;font-size:16px!important;line-height:1.08!important;margin:1px 0 0!important;color:inherit!important}
 .google-play-badge.compact,.seller-app-badge.compact{width:100%;justify-content:start;min-height:48px!important}
 .buyer-home .section{margin-top:10px!important;border-radius:8px!important;box-shadow:none!important}
 .buyer-home .head{padding:12px 14px!important}
@@ -84,12 +84,12 @@ img{max-width:100%}
   .buyer-home .hero-main{min-height:190px!important}
   .buyer-home .hero h2{font-size:24px!important}
   .buyer-home .hero p{display:none!important}
-  .app-download-strip{grid-template-columns:1fr 1fr!important;gap:8px!important;padding:10px!important}
+  .app-download-strip{grid-template-columns:1fr!important;gap:8px!important;padding:10px!important}
   .app-download-strip div{grid-column:1/-1}
   .app-download-strip b{font-size:14px!important}
   .app-download-strip span{font-size:11px!important}
-  .app-download-strip .google-play-badge,.app-download-strip .seller-app-badge{min-height:42px!important;padding:6px 8px!important;gap:6px!important}
-  .app-download-strip .google-play-badge b,.app-download-strip .seller-app-badge b{font-size:12px!important}
+  .app-download-strip .google-play-badge{width:100%;min-height:46px!important;padding:7px 12px!important;gap:8px!important}
+  .app-download-strip .google-play-badge b{font-size:14px!important}
   .app-download-strip .google-play-badge span,.app-download-strip .seller-app-badge span{font-size:8px!important}
   .buyer-home .grid{grid-template-columns:repeat(2,1fr)!important;gap:8px!important;padding:8px!important}
   .buyer-home .photo{height:92px!important;min-height:0!important;font-size:23px!important}
