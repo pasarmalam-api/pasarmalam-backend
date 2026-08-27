@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PasarMalam AI Assistant</title>
+  <link rel="stylesheet" href="mobile-shell.css">
+  <style>
+    :root{--brand:#0f9f8f;--purple:#6d5dfc;--line:#e6e9ef;--muted:#687282;--bg:#f5f7fb;--ink:#202124}
+    *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--ink)}
+    header{background:linear-gradient(180deg,var(--brand),var(--purple));color:#fff}.bar,main{max-width:920px;margin:auto}
+    .bar{display:flex;align-items:center;justify-content:space-between;padding:14px 16px}.brand{display:flex;gap:10px;align-items:center;cursor:pointer}
+    .logo{width:48px;height:48px;border-radius:13px;background:conic-gradient(from 160deg,var(--brand),var(--purple),#e43f8f,var(--brand));display:grid;place-items:center;font-weight:900;box-shadow:inset 0 0 0 3px #ffffffcc}
+    main{padding:16px}.panel{background:#fff;border:1px solid var(--line);border-radius:8px;padding:16px}.muted{color:var(--muted)}
+    .chips{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.chips button,.soft,.primary{border:0;border-radius:7px;min-height:40px;padding:0 13px;font-weight:900}
+    .chips button,.soft{background:#fff;color:var(--brand);border:1px solid #b8fff5}.primary{background:var(--brand);color:#fff}
+    textarea{width:100%;min-height:128px;border:1px solid var(--line);border-radius:8px;padding:12px;font:inherit;resize:vertical}
+    .answer{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:14px;line-height:1.55}
+    @media(max-width:640px){.bar{align-items:flex-start}.bar h2{font-size:20px}.panel{padding:13px}textarea{min-height:118px}}
+  </style>
+</head>
+<body>
+  <header><div class="bar"><div class="brand" onclick="location.href='index.html'"><div class="logo">PM</div><div><h2>PasarMalam AI</h2><div>Buyer assistant</div></div></div><button class="soft" onclick="location.href='index.html'">Home</button></div></header>
+  <main>
+    <section class="panel">
+      <h2>Find what to buy</h2>
+      <p class="muted">Ask for product ideas, what to check before paying, or which shipping option fits your order.</p>
+      <div class="chips">
+        <button onclick="askPreset('I need a phone charger under RM50. What should I check before buying?')">Charger under RM50</button>
+        <button onclick="askPreset('Which shipping should I choose for urgent food or fragile items?')">Shipping advice</button>
+        <button onclick="askPreset('Help me compare new and used items before checkout.')">New vs used</button>
+      </div>
+      <textarea id="prompt" placeholder="Example: I want a used phone near me with fair price and safe delivery."></textarea>
+      <p><button class="primary" onclick="askAi()">Ask PasarMalam AI</button></p>
+      <div id="answer" class="answer">AI answers will appear here.</div>
+    </section>
+  </main>
+  <script>
+    const API="https://pasarmalam-backend.onrender.com";
+    function askPreset(text){prompt.value=text;askAi()}
+    async function askAi(){
+      const text=prompt.value.trim();
+      if(!text){answer.textContent="Enter a question first.";return}
+      answer.textContent="Thinking...";
+      try{
+        const res=await fetch(API+"/api/ai/assistant",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"buyer",prompt:text})});
+        const data=await res.json();
+        if(!res.ok||data.error)throw new Error(data.error||"AI request failed");
+        answer.textContent=data.answer;
+      }catch(e){answer.textContent="AI is not reachable right now. Check Render first, then try again. "+e.message}
+    }
+  </script>
+  <script src="badges.js"></script>
+</body>
+</html>
