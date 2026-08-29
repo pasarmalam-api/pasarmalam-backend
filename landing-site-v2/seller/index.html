@@ -1,30 +1,196 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ms">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Seller Centre - PasarMalam</title><link rel="stylesheet" href="style.css?v=20260828g"><style id="pm-phone-browser-fix">
-.hero{display:block!important;min-height:0!important;padding:0!important;color:#172033!important;background:linear-gradient(180deg,rgba(16,24,40,.06),rgba(16,24,40,.03)),url("pasarmalam-banner.png") center top/cover no-repeat!important;border:1px solid #e6eaf0!important;border-radius:8px!important;overflow:hidden!important}
-.hero:before{content:""!important;display:block!important;height:320px!important}
-.small-hero:before{height:250px!important}
-.hero-copy{display:block!important;position:relative!important;max-width:none!important;width:100%!important;background:#fff!important;border-top:1px solid #e6eaf0!important;padding:18px!important;color:#172033!important;text-shadow:none!important}
-.hero h1{font-size:26px!important;line-height:1.05!important;margin:0 0 8px!important;color:#172033!important;text-shadow:none!important;letter-spacing:0!important}
-.hero p{font-size:14px!important;line-height:1.38!important;max-width:720px!important;margin:0 0 14px!important;color:#344054!important;text-shadow:none!important}
-.store-badge{background:transparent!important;border:0!important;padding:0!important;min-width:0!important;min-height:0!important;box-shadow:none!important}
-.store-badge:before{content:none!important;display:none!important}
-.store-badge img{display:block!important;width:178px!important;max-width:100%!important;height:auto!important;border-radius:8px!important}
-@media(max-width:900px){main{padding:12px!important}.hero{background-position:center top!important}.hero:before{height:190px!important}.small-hero:before{height:155px!important}.hero-copy{padding:14px!important}.hero h1{font-size:22px!important}.hero p{font-size:12.5px!important;line-height:1.34!important;max-width:none!important}.store-badge img{width:148px!important}.actions{gap:8px!important}.cta,.soft{min-height:38px!important;padding:9px 12px!important;font-size:14px!important}}
-</style>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PasarMalam Seller Centre</title>
+  <link rel="stylesheet" href="seller.css">
+  <style>
+    .hero{min-height:214px;border-radius:8px;padding:22px;color:#fff;display:flex;align-items:flex-end;background:linear-gradient(90deg,#101828e6,#10182891,#10182822),url("pasar-malam-real.jpg") center/cover;margin-bottom:14px}
+    .hero h2{font-size:34px;max-width:760px;margin-bottom:6px}
+    .hero p{max-width:760px;margin:0;color:#edf4ff}
+    .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .search{max-width:420px}
+    .section{margin-top:14px}
+    .mini-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:14px}
+    .quick{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    .quick a{border:1px solid var(--line);border-radius:8px;background:#fff;padding:13px;font-weight:900;color:var(--brand)}
+    .product-title{display:flex;align-items:center;gap:10px}
+    @media(max-width:980px){.mini-grid,.quick{grid-template-columns:1fr}.hero h2{font-size:27px}.search{max-width:none}}
+  </style>
 </head>
-<body data-page="seller">
-<header><nav class="nav"><a class="brand" href="index.html"><div class="logo">PM</div><div><b>PasarMalam</b><div class="muted" data-i18n="nav_seller">Penjual</div></div></a><button class="lang-toggle" type="button" data-lang-toggle data-i18n="language_button">Bahasa: Melayu</button><div class="links"><a href="index.html" data-i18n="nav_home">Laman Utama</a><a href="buyer.html" data-i18n="nav_buyer">Pembeli</a><a href="policies.html" data-i18n="nav_policies">Polisi</a></div></nav></header>
-<main>
-  <section class="hero small-hero"><div class="hero-copy"><h1 data-i18n="seller_title">Pusat Penjual</h1><p data-i18n="seller_intro">Buka kedai, tambah produk, urus pesanan, penghantaran, chat pelanggan, pulangan dan dompet penjual.</p><div class="actions"><a class="store-badge" href="https://play.google.com/store/apps/details?id=com.pasarmalam.app" aria-label="Download on Google Play"><img src="google-play-badge.png?v=20260828g" alt="Download on Google Play"></a><a class="cta" href="https://play.google.com/store/apps/details?id=com.pasarmalam.app" data-i18n="seller_register">Daftar Penjual</a><a class="soft" href="https://play.google.com/store/apps/details?id=com.pasarmalam.app" data-i18n="seller_open">Buka Pusat Penjual</a></div></div></section>
-  <section class="grid"><div class="card"><b data-i18n="seller_card_1">Produk</b><p data-i18n="seller_card_1_text">Muat naik foto, stok, harga, kategori, waranti, barang baharu atau terpakai.</p></div><div class="card"><b data-i18n="seller_card_2">Operasi</b><p data-i18n="seller_card_2_text">Urus pesanan, penghantaran Lalamove, mesej, promosi, prestasi dan pulangan.</p></div><div class="card"><b data-i18n="seller_card_3">Dompet</b><p data-i18n="seller_card_3_text">Semak komisen, rekod settlement, status payout dan bukti bayaran admin.</p></div></section>
-</main>
-<footer><a href="index.html">PasarMalam</a><a href="policies.html" data-i18n="nav_policies">Polisi</a></footer>
-<script src="pm-lang.js?v=20260828g"></script>
-</body></html>
+<body>
+<div class="app">
+  <aside>
+    <a class="brand" href="index.html">
+      <div class="logo">PM</div>
+      <div><h1>PasarMalam</h1><div class="label">Seller Centre</div></div>
+    </a>
+    <nav>
+      <a class="active" href="index.html">Dashboard</a>
+      <a href="login.html">Sign In</a>
+      <a href="register.html">Register Seller</a>
+      <a href="business-verification.html">Business Verification</a>
+      <a href="products.html">Products</a>
+      <a href="add-product.html">Add Product</a>
+      <a href="ai-assistant.html">AI Listing Helper</a>
+      <a href="orders.html">Orders</a>
+      <a href="returns.html">Returns</a>
+      <a href="messages.html">Messages</a>
+      <a href="logistics.html">Logistics</a>
+      <a href="wallet.html">Wallet</a>
+      <a href="campaigns.html">Campaigns</a>
+      <a href="reviews.html">Reviews</a>
+      <a href="performance.html">Performance</a>
+      <a href="notifications.html">Notifications</a><a href="support.html">Support</a><a href="settings.html">Settings</a>
+      <a href="policies.html">Policies</a>
+    </nav>
+  </aside>
+  <div>
+    <header>
+      <div class="top">
+        <div>
+          <h2>Merchant Dashboard</h2>
+          <span>Manage listings, orders, returns, chat, logistics and payouts.</span>
+        </div>
+        <div class="toolbar">
+          <input class="search" id="search" placeholder="Search product, category or shop">
+          <button class="soft" onclick="location.href='login.html'">Sign In</button>
+          <button class="soft" onclick="location.href='register.html'">Register</button>
+          <button class="soft" onclick="location.href='business-verification.html'">SSM</button>
+          <button class="soft" onclick="location.href='ai-assistant.html'">AI Helper</button>
+          <button class="primary" onclick="location.href='add-product.html'">Add Product</button>
+        </div>
+      </div>
+    </header>
+    <main>
+      <section class="seller-download-strip" aria-label="PasarMalam app download links">
+        <div><b>PasarMalam mobile app</b><span>Install PasarMalam from Google Play.</span></div>
+        <button class="google-play-badge image-badge" aria-label="Download PasarMalam on Google Play" onclick="location.href='https://play.google.com/store/apps/details?id=com.pasarmalam.app'"><img src="google-play-badge.png" alt="Download on Google Play"></button>
+      </section>
+      <section class="hero">
+        <div>
+          <h2>Professional seller workspace for PasarMalam merchants</h2>
+          <p>Track sales, publish products with photos, manage shipping, reply to buyers and handle refunds from one dashboard.</p>
+        </div>
+      </section>
 
+      <section class="grid">
+        <div class="stat"><span>Live Products</span><b id="productCount">0</b></div>
+        <div class="stat"><span>Orders</span><b id="orderCount">0</b></div>
+        <div class="stat"><span>Gross Sales</span><b id="salesCount">RM0</b></div>
+        <div class="stat"><span>Store Rating</span><b id="ratingScore">0</b></div>
+      </section>
 
+      <section class="panel section mobile-dashboard-extra">
+        <div class="panel-head">
+          <h3>Launch Commission Structure</h3>
+          <span class="tag">No RM0.50 order fee during launch</span>
+        </div>
+        <table>
+          <thead><tr><th>Seller Type</th><th>Commission</th></tr></thead>
+          <tbody>
+            <tr><td>New seller first 30 days</td><td><b>3%</b></td></tr>
+            <tr><td>Basic seller after 30 days</td><td><b>5%</b></td></tr>
+            <tr><td>Verified SSM seller</td><td><b>4%</b></td></tr>
+            <tr><td>High-volume seller</td><td><b>3% negotiated</b></td></tr>
+            <tr><td>Fixed platform/order fee</td><td><b>RM0.00 for launch</b></td></tr>
+          </tbody>
+        </table>
+      </section>
 
+      <section class="three section mobile-dashboard-extra">
+        <div class="stat"><span>Response Rate</span><b id="responseRate">0%</b></div>
+        <div class="stat"><span>Late Shipment</span><b id="lateShipment">0%</b></div>
+        <div class="stat"><span>Cancellation</span><b id="cancelRate">0%</b></div>
+      </section>
 
+      <section class="quick section">
+        <a href="products.html">Product Management</a>
+        <a href="orders.html">Order Processing</a>
+        <a href="logistics.html">Logistics / AWB</a>
+        <a href="campaigns.html">Campaign Tools</a>
+      </section>
+
+      <section class="mini-grid section">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Product Listings</h3>
+            <button class="soft" onclick="location.href='products.html'">Open Products</button>
+          </div>
+          <div style="overflow:auto">
+            <table class="product-preview-table">
+              <thead><tr><th>Product</th><th>Price</th><th>Stock</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody id="productRows"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Wallet / Settlement</h3>
+            <button class="soft" onclick="loadWallet()">Refresh</button>
+          </div>
+          <div id="walletBox"></div>
+        </div>
+      </section>
+
+      <section class="two section mobile-dashboard-extra">
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Orders To Handle</h3>
+            <button class="soft" onclick="location.href='orders.html'">Open Orders</button>
+          </div>
+          <div id="ordersBox"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Returns / Disputes</h3>
+            <button class="soft" onclick="location.href='returns.html'">Open Returns</button>
+          </div>
+          <div id="returnsBox"></div>
+        </div>
+      </section>
+
+      <section class="three section mobile-dashboard-extra">
+        <div class="panel">
+          <div class="panel-head"><h3>Buyer Messages</h3><a class="soft" href="messages.html">Reply</a></div>
+          <div id="messagesBox"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Logistics Rate</h3><a class="soft" href="logistics.html">AWB</a></div>
+          <div id="ratesBox"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h3>Reviews</h3><a class="soft" href="reviews.html">View</a></div>
+          <div id="reviewsBox"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+const API="https://pasarmalam-backend.onrender.com";
+const money=v=>`RM${Number(v||0).toFixed(2)}`;
+async function api(path){const r=await fetch(API+path);return r.json()}
+const seedWords=/\b(Cloudinary|Postgres|Auth Seller|Voucher Test|Test Item|System test|Automated return|Buyer Bad|Seller Test|Bad Product|demo|test)\b/gi;
+function cleanText(v){return String(v??"").replace(seedWords,"").replace(/\b\d{5,}\b/g,"").replace(/\s{2,}/g," ").trim()}
+function cleanProduct(p){const fallback={Phones:"Smartphone",Chargers:"USB-C charger",Electronics:"Bluetooth speaker",Hardware:"Home tool set",Toys:"Toy set",Clothes:"Clothing item",Food:"Fresh food","Street Food":"Street food special",Drinks:"Fresh drink",Meals:"Meal set",Stationery:"Stationery bundle",Shoes:"Shoes"};let n=cleanText(p.name);if(!n||/bad|test|^charger\s*$/i.test(n)||/\d{5,}/.test(String(p.name||"")))n=fallback[p.category]||"Marketplace item";return {...p,name:n,shop:cleanText(p.shop)||"PasarMalam Seller",category:cleanText(p.category)||"Marketplace",condition:cleanText(p.condition)||"New"}}
+function img(p){const src=(p.images&&p.images[0])||p.image_url;return src?`<img class="thumb" src="${src}" alt="">`:""}
+function hasSellerSession(){return Boolean(localStorage.getItem("pm_token"))}
+function showSignedOutDashboard(){orderCount.textContent="0";salesCount.textContent="RM0.00";ratingScore.textContent="0";responseRate.textContent="0%";lateShipment.textContent="0%";cancelRate.textContent="0%";productCount.textContent="0";productRows.innerHTML="<tr><td colspan='5' class='muted'>Log masuk untuk melihat produk kedai.</td></tr>";ordersBox.innerHTML="<p class='muted'>Log masuk untuk melihat pesanan.</p>";returnsBox.innerHTML="<p class='muted'>Log masuk untuk melihat pulangan.</p>";walletBox.innerHTML="<p class='muted'>Log masuk untuk melihat dompet.</p>";messagesBox.innerHTML="<p class='muted'>Log masuk untuk melihat mesej.</p>";ratesBox.innerHTML="<p class='muted'>Lalamove Segera dan Lalamove Biasa tersedia semasa checkout.</p>";reviewsBox.innerHTML="<p class='muted'>Belum ada ulasan.</p>"}
+async function loadMetrics(){if(!hasSellerSession()){showSignedOutDashboard();return}try{const m=await api("/api/metrics");orderCount.textContent=m.orders||0;salesCount.textContent=money(m.sales);ratingScore.textContent=m.rating||"0";responseRate.textContent=(m.response_rate||0)+"%";lateShipment.textContent=(m.late_shipment_rate||0)+"%";cancelRate.textContent=(m.cancellation_rate||0)+"%"}catch(e){}}
+async function loadProducts(){if(!hasSellerSession())return;const d=await api("/api/products");const rows=(d.products||[]).map(cleanProduct);productCount.textContent=rows.length;drawProducts(rows);search.oninput=()=>drawProducts(rows)}
+function drawProducts(rows){const q=(search.value||"").toLowerCase();const limit=window.matchMedia("(max-width:700px)").matches?4:8;productRows.innerHTML=rows.filter(p=>`${p.name} ${p.category} ${p.shop}`.toLowerCase().includes(q)).slice(0,limit).map(p=>`<tr><td><div class="product-title">${img(p)}<div><b>${p.name}</b><div class="muted">${p.shop} | ${p.category}</div></div></div></td><td>${money(p.price)}</td><td><span class="tag ${p.stock<=5?"warn":""}">${p.stock}</span></td><td><span class="tag ${p.condition==="Used"?"warn":""}">${p.condition}</span></td><td><button class="soft" onclick="location.href='edit-product.html?id=${p.id}'">Edit</button></td></tr>`).join("")}
+async function loadOrders(){if(!hasSellerSession())return;const d=await api("/api/orders");const rows=(d.orders||[]).slice(0,5);ordersBox.innerHTML=rows.map(o=>`<div class="order"><b>PM-${o.id}</b> <span class="tag">${o.order_status}</span><p class="muted">${o.logistics_method||"Shipping"} | ${money(o.total)}</p></div>`).join("")||"<p class='muted'>No orders yet.</p>"}
+async function loadReturns(){if(!hasSellerSession())return;const d=await api("/api/returns");const rows=(d.returns||[]).slice(0,5);returnsBox.innerHTML=rows.map(r=>`<div class="order"><b>${r.request_type}</b><p>${r.reason}</p><span class="tag warn">${r.status}</span></div>`).join("")||"<p class='muted'>No return requests.</p>"}
+async function loadWallet(){if(!hasSellerSession())return;const d=await api("/api/wallet");walletBox.innerHTML=(d.wallet||[]).slice(0,5).map(w=>`<div class="wallet-line"><span>${w.type}<br><small class="muted">${w.note}</small></span><b>${money(w.amount)}</b></div>`).join("")}
+async function loadMessages(){if(!hasSellerSession())return;const d=await api("/api/messages");messagesBox.innerHTML=(d.messages||[]).slice(0,4).map(m=>`<div class="msg"><b>${m.sender_role}</b><div class="muted">${m.body}</div></div>`).join("")||"<p class='muted'>No messages.</p>"}
+async function loadRates(){if(!hasSellerSession())return;const d=await api("/api/logistics/rates");ratesBox.innerHTML=(d.rates||[]).slice(0,4).map(r=>`<div class="rate"><span>${r.method}<br><small class="muted">${r.eta}</small></span><strong>${money(r.fee||r.rate)}</strong></div>`).join("")}
+async function loadReviews(){if(!hasSellerSession())return;const d=await api("/api/reviews");reviewsBox.innerHTML=(d.reviews||[]).slice(0,3).map(r=>`<div class="msg"><div class="stars">${"*".repeat(Number(r.rating)||5)}</div><b>${r.title}</b><div class="muted">${r.body}</div></div>`).join("")}
+loadMetrics();loadProducts();loadOrders();loadReturns();loadWallet();loadMessages();loadRates();loadReviews();
+</script>
+<script src="badges.js"></script></body>
+</html>
 
 

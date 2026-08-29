@@ -1,0 +1,15 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.pasarmalam.app",
+      "sha256_cert_fingerprints": [
+        "5F:5A:0B:32:D9:1B:FA:B9:5F:20:BA:C5:77:88:52:D5:CB:A6:7B:47:0C:93:3C:14:43:3A:C3:EB:C0:2E:B1:F9",
+        "INSERT_PLAY_CONSOLE_APP_SIGNING_SHA256_HERE"
+      ]
+    }
+  }
+]

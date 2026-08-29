@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: pasarmalam-landing-site
+    env: static
+    buildCommand: ""
+    staticPublishPath: .
+    routes:
+      - type: rewrite
+        source: /buyer
+        destination: /buyer/index.html
+      - type: rewrite
+        source: /seller
+        destination: /seller/index.html
+      - type: rewrite
+        source: /policies
+        destination: /policies/index.html
+      - type: rewrite
+        source: /contact
+        destination: /contact/index.html
