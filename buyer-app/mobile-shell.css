@@ -4,6 +4,9 @@ body{background:#f5f7fb;color:#202124;-webkit-font-smoothing:antialiased}
 a{color:inherit}
 button{touch-action:manipulation}
 img{max-width:100%}
+.search{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:6px!important;align-items:center!important}
+.search input{min-width:0!important;width:100%!important}
+.search button{width:64px!important;min-width:64px!important;padding:0 10px!important;white-space:nowrap!important}
 .deep-flow{display:none!important}
 .pm-page-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0}
 .pm-page-tabs button{border:1px solid #dbe4ea;background:#fff;color:#0f9f8f;border-radius:8px;min-height:44px;font-weight:900;padding:8px}
@@ -14,7 +17,7 @@ img{max-width:100%}
   .utility{display:none!important}
   .bar{display:grid!important;grid-template-columns:1fr!important;padding:10px 12px!important;gap:10px!important}
   .brand{min-width:0}.brand h1,.brand h2{font-size:24px!important;line-height:1.1;margin:0}.logo{width:48px!important;height:48px!important;min-width:48px!important}
-  .search{min-height:44px}.search input{font-size:15px}.quick{overflow-x:auto;flex-wrap:nowrap!important;padding-bottom:2px}.quick button{white-space:nowrap}
+  .search{min-height:44px}.search input{font-size:14px!important}.search button{width:56px!important;min-width:56px!important;font-size:13px!important;padding:0 8px!important}.quick{overflow-x:auto;flex-wrap:nowrap!important;padding-bottom:2px}.quick button{white-space:nowrap}
   main{padding:10px 10px 76px!important;max-width:100%!important}
   .hero{display:block!important}.side{display:none!important}.hero-main{min-height:245px!important;padding:18px!important;border-radius:8px!important}.hero h2{font-size:28px!important;line-height:1.12!important}.hero p{font-size:14px!important}.hero-tags{gap:6px!important}.hero-tags span{font-size:11px!important;padding:6px 8px!important}
   .trust-strip{grid-template-columns:1fr 1fr!important;margin:10px 0!important}.trust{padding:10px!important;min-height:74px}.trust b{font-size:13px}.trust span{font-size:11px!important}
@@ -113,28 +116,547 @@ img{max-width:100%}
   .product-page .primary,.product-page .soft{width:100%;margin:4px 0;min-height:44px}
 }
 
-
-/* Render hotfix 2026-08-29: phone overlap cleanup */
-@media(max-width:760px){
-  html,body{max-width:100%;overflow-x:hidden!important;}
-  header,.app-header,.sticky-header{position:sticky!important;top:0!important;z-index:50!important;background:#fff!important;}
-  main,.app-main,.page,.content,.main-container{padding-bottom:18px!important;overflow-x:hidden!important;}
-  .bottom-nav{position:sticky!important;left:auto!important;right:auto!important;bottom:0!important;width:100%!important;margin:12px 0 0!important;z-index:40!important;border-radius:8px 8px 0 0!important;background:#fff!important;box-shadow:0 -6px 16px #11182714!important;}
-  .bottom-nav button{min-height:46px!important;padding:3px 2px!important;font-size:9px!important;line-height:1.08!important;min-width:0!important;}
-  .pm-mobile-links{display:grid!important;grid-template-columns:1fr 1fr!important;gap:8px!important;margin:12px 8px 0!important;}
-  .pm-mobile-links .pm-seller-switch,.pm-mobile-links .pm-policy-link{position:static!important;left:auto!important;right:auto!important;bottom:auto!important;z-index:1!important;box-shadow:none!important;width:100%!important;justify-content:center!important;min-height:42px!important;border-radius:8px!important;}
-  .buyer-home .hero-main{min-height:168px!important;padding:0!important;align-items:stretch!important;background-position:center!important;}
-  .buyer-home .hero-copy{display:none!important;}
-  .grid,.buyer-home .grid,.product-feed,.product-grid,.products-grid,[data-product-feed]{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:8px!important;}
-  .grid>.card,.product-card,.products-grid>.card,.product-grid>.card,[data-product-feed]>.card{display:flex!important;flex-direction:column!important;height:auto!important;min-height:0!important;overflow:hidden!important;z-index:1!important;}
-  .grid>.card .body,.product-card .body{display:flex!important;flex:1 1 auto!important;flex-direction:column!important;min-height:0!important;}
-  .name,.product-title,.grid>.card .body>b,.product-card .body>b{display:-webkit-box!important;-webkit-box-orient:vertical!important;-webkit-line-clamp:2!important;overflow:hidden!important;word-break:break-word!important;font-size:12px!important;line-height:1.25!important;}
-  .actions,.product-actions{margin-top:auto!important;}
-  .photo,.product-card .photo,.buyer-home .photo{height:150px!important;min-height:0!important;aspect-ratio:auto!important;}
-  .search{display:grid!important;grid-template-columns:minmax(0,1fr) 54px!important;gap:6px!important;}
-  .search input{min-width:0!important;width:100%!important;font-size:14px!important;}
-  .search button{width:54px!important;min-width:54px!important;padding:0 6px!important;font-size:12px!important;white-space:nowrap!important;}
-}
+/* Android split-screen: keep the buyer app usable in very narrow windows. */
+.bottom-nav{max-width:100%}
+.chatinput,.chat-actions,.message-actions,[data-chat-actions]{max-width:100%;min-width:0}
+.chatinput input,.chat-actions input,.message-actions input,[data-chat-actions] input{min-width:0}
 @media(max-width:400px){
-  .grid,.buyer-home .grid,.product-feed,.product-grid,.products-grid,[data-product-feed]{grid-template-columns:1fr!important;}
+  html,body{width:100%;max-width:100%;overflow-x:hidden!important}
+  main{max-width:100vw!important;overflow-x:hidden!important;padding-left:8px!important;padding-right:8px!important}
+  .bar,.brand,.hero,.hero-main,.section,.panel,.card,.body,.filters,.toolbar,.row,.line,.actions{min-width:0!important;max-width:100%!important}
+  .grid,.buyer-home .grid,.market-strip,.cats,.services,.rates,.paygrid,.status-grid,.trust-strip,.product-feed,.product-grid,.products-grid,[data-product-feed]{grid-template-columns:1fr!important}
+  .photo,.buyer-home .photo{height:auto!important;min-height:0!important;aspect-ratio:1/1!important}
+  .name,.buyer-home .name{min-height:0!important;font-size:12px!important;line-height:1.25!important}
+  .price,.buyer-home .price{font-size:14px!important;line-height:1.2!important}
+  .filters,.toolbar,.search,.chatinput,.chat-actions,.message-actions,[data-chat-actions]{grid-template-columns:minmax(0,1fr)!important}
+  .search button{width:100%!important;min-width:0!important}
+  .bottom-nav{position:fixed!important;left:6px!important;right:6px!important;bottom:6px!important;width:auto!important;grid-template-columns:repeat(3,1fr)!important;z-index:50!important}
+  .bottom-nav button{min-width:0!important;font-size:10px!important;line-height:1.1!important}
+  .chatinput,.chat-actions,.message-actions,[data-chat-actions]{position:sticky!important;bottom:64px!important;z-index:51!important;background:#fff!important;padding:8px!important;border:1px solid #e6e9ef!important;border-radius:8px!important}
+}
+
+/* Android physical-device layout fix: keep cards clear of fixed nav and prevent clipped product content. */
+header,
+.app-header,
+.sticky-header{
+  position:sticky!important;
+  top:0!important;
+  z-index:50!important;
+  background:linear-gradient(180deg,#0f9f8f,#6d5dfc)!important;
+}
+
+main,
+.app-main,
+.page,
+.content,
+.main-container{
+  padding-bottom:90px!important;
+  overflow-x:hidden!important;
+}
+
+.bottom-nav{
+  position:fixed!important;
+  left:8px!important;
+  right:8px!important;
+  bottom:8px!important;
+  z-index:40!important;
+  background:#e6e9ef!important;
+}
+
+.grid > .card,
+.product-card,
+.products-grid > .card,
+.product-grid > .card,
+[data-product-feed] > .card{
+  position:relative!important;
+  z-index:1!important;
+  display:flex!important;
+  flex-direction:column!important;
+  height:auto!important;
+  min-height:0!important;
+  overflow:hidden!important;
+}
+
+.grid > .card .body,
+.product-card .body,
+.products-grid > .card .body,
+.product-grid > .card .body,
+[data-product-feed] > .card .body{
+  display:flex!important;
+  flex:1 1 auto!important;
+  flex-direction:column!important;
+  min-height:0!important;
+}
+
+.name,
+.product-title,
+.grid > .card .body > b,
+.product-card .body > b{
+  display:-webkit-box!important;
+  -webkit-box-orient:vertical!important;
+  -webkit-line-clamp:2!important;
+  overflow:hidden!important;
+  min-height:0!important;
+  max-height:none!important;
+  word-break:break-word!important;
+}
+
+.actions,
+.product-actions{
+  margin-top:auto!important;
+}
+
+.actions .buy,
+.actions .primary,
+.actions .soft,
+.product-actions button{
+  margin-top:auto!important;
+}
+
+.chatinput,
+.chat-actions,
+.message-actions,
+[data-chat-actions]{
+  z-index:45!important;
+  background:#fff!important;
+}
+
+@media(max-width:400px){
+  main,
+  .app-main,
+  .page,
+  .content,
+  .main-container{
+    padding-bottom:76px!important;
+  }
+
+  .grid,
+  .buyer-home .grid,
+  .product-feed,
+  .product-grid,
+  .products-grid,
+  [data-product-feed]{
+    grid-template-columns:1fr!important;
+  }
+
+  .bottom-nav{
+    left:6px!important;
+    right:6px!important;
+    bottom:6px!important;
+    grid-template-columns:repeat(6,1fr)!important;
+    z-index:40!important;
+    border-radius:10px!important;
+  }
+
+  .bottom-nav button{
+    min-height:48px!important;
+    padding:3px 2px!important;
+    font-size:9px!important;
+    line-height:1.08!important;
+  }
+
+  .grid > .card .photo,
+  .product-card .photo,
+  .buyer-home .photo{
+    height:168px!important;
+    aspect-ratio:auto!important;
+    min-height:0!important;
+  }
+
+  .buyer-home .hero-main{
+    min-height:176px!important;
+    align-items:flex-start!important;
+    background-position:center!important;
+  }
+
+  .buyer-home .hero-copy{
+    max-width:72%!important;
+  }
+
+  .buyer-home .hero h2{
+    font-size:18px!important;
+    line-height:1.12!important;
+    max-width:100%!important;
+    text-shadow:0 2px 8px #000a!important;
+  }
+
+  .buyer-home .hero-tags{
+    margin-top:8px!important;
+    gap:4px!important;
+  }
+
+  .buyer-home .hero-tags span{
+    font-size:10px!important;
+    padding:4px 6px!important;
+  }
+}
+
+/* Final phone override: keep navigation in the page flow so it cannot cover product buttons. */
+@media(max-width:760px){
+  main,
+  .app-main,
+  .page,
+  .content,
+  .main-container{
+    padding-bottom:18px!important;
+  }
+
+  .bottom-nav{
+    position:sticky!important;
+    left:auto!important;
+    right:auto!important;
+    bottom:0!important;
+    width:100%!important;
+    margin:12px 0 0!important;
+    grid-template-columns:repeat(6,minmax(0,1fr))!important;
+    z-index:40!important;
+    border-radius:8px 8px 0 0!important;
+    box-shadow:0 -6px 16px #11182714!important;
+  }
+
+  .bottom-nav button{
+    min-height:46px!important;
+    padding:3px 2px!important;
+    font-size:9px!important;
+    line-height:1.08!important;
+  }
+
+  .buyer-home .hero-main{
+    min-height:168px!important;
+    padding:0!important;
+    align-items:stretch!important;
+  }
+
+  .buyer-home .hero-copy{
+    display:none!important;
+  }
+
+  .grid > .card,
+  .buyer-home .grid > .card{
+    margin-bottom:10px!important;
+  }
+}
+
+/* Production buyer cleanup: keep home simple and phone-readable. */
+.buyer-home .app-download-strip,
+.buyer-home .pm-home-menu,
+.buyer-home .buyer-quick-actions,
+.buyer-home .deep-flow,
+.buyer-home .trust-strip,
+.buyer-home .market-strip,
+.buyer-home .section:has(.filters){
+  display:none!important;
+}
+
+.buyer-home .section:has(#cats),
+.buyer-home .section:has(#products){
+  display:block!important;
+}
+
+.buyer-home .hero-main{
+  position:relative!important;
+  isolation:isolate!important;
+  overflow:hidden!important;
+}
+
+.buyer-home .hero-copy{
+  position:relative!important;
+  z-index:1!important;
+  max-width:560px!important;
+}
+
+.buyer-home .card,
+.buyer-home .grid>.card,
+.product-card{
+  display:flex!important;
+  flex-direction:column!important;
+  height:auto!important;
+  min-height:0!important;
+}
+
+.buyer-home .card .body,
+.product-card .body{
+  display:flex!important;
+  flex:1 1 auto!important;
+  flex-direction:column!important;
+}
+
+.buyer-home .actions,
+.product-card .actions,
+.product-actions{
+  margin-top:auto!important;
+}
+
+.buyer-home .name,
+.product-title{
+  display:-webkit-box!important;
+  -webkit-line-clamp:2!important;
+  -webkit-box-orient:vertical!important;
+  overflow:hidden!important;
+}
+
+@media(max-width:760px){
+  body{font-size:14px!important}
+  header{position:sticky!important;top:0!important;z-index:50!important;background:linear-gradient(180deg,#0f9f8f,#6d5dfc)!important}
+  .bar{grid-template-columns:1fr!important}
+  .bar>div:last-child{display:grid!important;grid-template-columns:1fr 1fr 1fr!important;gap:6px!important}
+  .lang,.cart,.soft,.primary,.buy,.send{font-size:12px!important;min-height:38px!important;padding:0 8px!important}
+  .search{grid-template-columns:minmax(0,1fr) 52px!important}
+  .search input{font-size:13px!important;padding:8px!important}
+  .search button{width:52px!important;min-width:52px!important;font-size:12px!important;padding:0 4px!important}
+  .quick{display:none!important}
+  .buyer-home .hero-main{min-height:156px!important;padding:0!important;background-position:center!important}
+  .buyer-home .hero-copy{display:none!important}
+  .buyer-home .section{margin-top:8px!important}
+  .buyer-home .head{padding:9px 10px!important}
+  .buyer-home .head h3{font-size:15px!important}
+  .buyer-home .head span{display:none!important}
+  .buyer-home .cats{grid-template-columns:repeat(4,1fr)!important;gap:6px!important;padding:8px!important}
+  .buyer-home .cat{min-height:42px!important;font-size:11px!important;padding:4px!important;border:1px solid #e6e9ef!important;border-radius:8px!important}
+  .buyer-home .grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:7px!important;padding:8px!important}
+  .buyer-home .photo{height:86px!important;aspect-ratio:auto!important}
+  .buyer-home .body{padding:7px!important}
+  .buyer-home .name{font-size:11px!important;line-height:1.2!important}
+  .buyer-home .shop{font-size:9px!important;line-height:1.2!important}
+  .buyer-home .tag,.buyer-home .badge{font-size:9px!important}
+  .buyer-home .stars{font-size:10px!important}
+  .buyer-home .price{font-size:13px!important;line-height:1.15!important}
+  .buyer-home .buy{font-size:11px!important;min-height:34px!important}
+  .bottom-nav{position:sticky!important;bottom:0!important;grid-template-columns:repeat(5,minmax(0,1fr))!important}
+  .bottom-nav button:nth-child(2){display:none!important}
+  .bottom-nav button{font-size:9px!important;min-height:44px!important}
+}
+
+@media(max-width:400px){
+  .buyer-home .grid{grid-template-columns:1fr!important}
+  .buyer-home .photo{height:132px!important}
+  .buyer-home .cats{grid-template-columns:repeat(3,1fr)!important}
+}
+
+/* Production phone pass: Shopee-style compact buyer home with no overlaps. */
+@media(max-width:760px){
+  html,body{
+    width:100%!important;
+    max-width:100%!important;
+    overflow-x:hidden!important;
+    font-size:13px!important;
+  }
+
+  header{
+    position:sticky!important;
+    top:0!important;
+    z-index:50!important;
+    background:#fff!important;
+    color:#202124!important;
+    box-shadow:0 1px 0 #e6e9ef!important;
+  }
+
+  header .bar{
+    display:grid!important;
+    grid-template-columns:1fr!important;
+    gap:8px!important;
+    padding:9px 10px!important;
+  }
+
+  header .brand h1{
+    color:#202124!important;
+    font-size:19px!important;
+    line-height:1.05!important;
+  }
+
+  header .label,
+  header .version{
+    color:#687282!important;
+    font-size:11px!important;
+  }
+
+  header .bar>div:last-child{
+    display:grid!important;
+    grid-template-columns:1fr 1fr 1fr!important;
+    width:100%!important;
+    gap:6px!important;
+  }
+
+  .search{
+    display:grid!important;
+    grid-template-columns:minmax(0,1fr) 48px!important;
+    width:100%!important;
+    padding:3px!important;
+    border:1px solid #e6e9ef!important;
+    border-radius:8px!important;
+    background:#fff!important;
+    overflow:hidden!important;
+  }
+
+  .search input{
+    min-width:0!important;
+    width:100%!important;
+    font-size:12px!important;
+    padding:8px!important;
+  }
+
+  .search button{
+    width:48px!important;
+    min-width:48px!important;
+    max-width:48px!important;
+    padding:0!important;
+    font-size:11px!important;
+    border-radius:6px!important;
+    overflow:hidden!important;
+  }
+
+  main{
+    padding:9px 9px 0!important;
+    max-width:100vw!important;
+    overflow-x:hidden!important;
+  }
+
+  .buyer-home .hero{
+    display:block!important;
+    margin:8px 0!important;
+    border-radius:8px!important;
+    overflow:hidden!important;
+    background:#fff!important;
+  }
+
+  .buyer-home .hero-main{
+    min-height:0!important;
+    height:180px!important;
+    padding:0!important;
+    display:block!important;
+    background-image:url("pasarmalam-buyer-banner.png")!important;
+    background-size:cover!important;
+    background-position:center!important;
+  }
+
+  .buyer-home .hero-copy,
+  .buyer-home .hero h2,
+  .buyer-home .hero p,
+  .buyer-home .hero-tags{
+    display:none!important;
+  }
+
+  .buyer-home .app-download-strip,
+  .buyer-home .pm-home-menu,
+  .buyer-home .buyer-quick-actions,
+  .buyer-home .deep-flow,
+  .buyer-home .trust-strip,
+  .buyer-home .market-strip,
+  .buyer-home .section:has(.filters){
+    display:none!important;
+  }
+
+  .buyer-home .section:has(#cats),
+  .buyer-home .section:has(#products){
+    display:block!important;
+  }
+
+  .buyer-home .cats{
+    display:grid!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
+    gap:6px!important;
+    padding:7px!important;
+  }
+
+  .buyer-home .cat{
+    min-height:38px!important;
+    padding:4px!important;
+    font-size:10px!important;
+    line-height:1.12!important;
+  }
+
+  .buyer-home .grid{
+    display:grid!important;
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    gap:7px!important;
+    padding:7px!important;
+  }
+
+  .buyer-home .card{
+    min-width:0!important;
+    overflow:hidden!important;
+  }
+
+  .buyer-home .photo{
+    height:84px!important;
+    min-height:0!important;
+    aspect-ratio:auto!important;
+    font-size:22px!important;
+  }
+
+  .buyer-home .body{
+    display:flex!important;
+    flex-direction:column!important;
+    padding:7px!important;
+  }
+
+  .buyer-home .name{
+    font-size:11px!important;
+    line-height:1.2!important;
+    min-height:0!important;
+  }
+
+  .buyer-home .shop,
+  .buyer-home .muted{
+    font-size:9px!important;
+    line-height:1.2!important;
+  }
+
+  .buyer-home .tag,
+  .buyer-home .badge{
+    font-size:8px!important;
+    line-height:1.1!important;
+    padding:3px 4px!important;
+  }
+
+  .buyer-home .price{
+    font-size:13px!important;
+    line-height:1.15!important;
+    margin:4px 0!important;
+  }
+
+  .buyer-home .actions{
+    margin-top:auto!important;
+    display:grid!important;
+    grid-template-columns:1fr!important;
+  }
+
+  .buyer-home .buy{
+    min-height:32px!important;
+    font-size:10px!important;
+    padding:0 6px!important;
+  }
+
+  .bottom-nav{
+    position:sticky!important;
+    bottom:0!important;
+    z-index:40!important;
+    display:grid!important;
+    grid-template-columns:repeat(5,minmax(0,1fr))!important;
+    width:calc(100% + 18px)!important;
+    margin:10px -9px 0!important;
+    border-radius:0!important;
+    box-shadow:0 -4px 12px #11182712!important;
+  }
+
+  .bottom-nav button:nth-child(2){
+    display:none!important;
+  }
+
+  .bottom-nav button{
+    min-height:44px!important;
+    font-size:9px!important;
+    line-height:1.05!important;
+    padding:2px!important;
+  }
+}
+
+@media(max-width:400px){
+  .buyer-home .grid{
+    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  }
+
+  .buyer-home .photo{
+    height:78px!important;
+  }
 }
