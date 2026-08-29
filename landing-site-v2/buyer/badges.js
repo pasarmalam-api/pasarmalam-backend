@@ -160,7 +160,17 @@
       add('button[onclick*="support.html"],a[href="support.html"]',count(n=>n.type==="support"||String(n.target_url||"").includes("support")));
     }catch(e){}
   }
-  function init(){ensureLanguageButton();addSellerSwitch();addPolicyLink();applyLanguage();setTimeout(()=>{load();applyLanguage()},300)}
+  function setupLiveNotifications(){
+    const start=()=>window.PMNotify&&window.PMNotify.start({role:"buyer",api:API,token:token});
+    if(window.PMNotify){start();return}
+    if(document.querySelector('script[data-pm-notify]'))return;
+    const script=document.createElement("script");
+    script.src="../pm-notify.js?v=20260829p";
+    script.dataset.pmNotify="1";
+    script.onload=start;
+    document.head.appendChild(script);
+  }
+  function init(){ensureLanguageButton();addSellerSwitch();addPolicyLink();applyLanguage();setupLiveNotifications();setTimeout(()=>{load();applyLanguage()},300)}
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
   let languageTimer=0;
   new MutationObserver(()=>{clearTimeout(languageTimer);languageTimer=setTimeout(applyLanguage,120)}).observe(document.documentElement,{childList:true,subtree:true});
