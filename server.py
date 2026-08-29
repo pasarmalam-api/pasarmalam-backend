@@ -19,11 +19,18 @@ PORT = int(os.environ.get("PORT", "8080"))
 AUTH_SECRET = os.environ.get("AUTH_SECRET", "pasarmalam-dev-secret-change-me")
 ADMIN_RESET_CODE = os.environ.get("ADMIN_RESET_CODE", "")
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "https://pasarmalam-backend.onrender.com")
-ADMIN_APP_URL = os.environ.get("ADMIN_APP_URL", "https://www.pasarmalamapp.com/admin")
+def production_app_url(env_key, fallback):
+    value = os.environ.get(env_key, fallback).strip()
+    if "tiiny.site" in value:
+        return fallback
+    return value
+
+
+ADMIN_APP_URL = production_app_url("ADMIN_APP_URL", "https://www.pasarmalamapp.com/admin")
 ADMIN_RESET_EMAIL = os.environ.get("ADMIN_RESET_EMAIL", "pasahmalla@gmail.com")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "PasarMalam <otp@mail.pasarmalamapp.com>")
-BUYER_APP_URL = os.environ.get("BUYER_APP_URL", "https://www.pasarmalamapp.com/buyer")
+BUYER_APP_URL = production_app_url("BUYER_APP_URL", "https://www.pasarmalamapp.com/buyer")
 TOYYIBPAY_SECRET_KEY = os.environ.get("TOYYIBPAY_SECRET_KEY", "")
 TOYYIBPAY_CATEGORY_CODE = os.environ.get("TOYYIBPAY_CATEGORY_CODE", "")
 TOYYIBPAY_MODE = os.environ.get("TOYYIBPAY_MODE", "sandbox").lower()
