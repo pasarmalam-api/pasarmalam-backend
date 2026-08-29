@@ -18,3 +18,24 @@ nav a{justify-content:space-between;gap:8px}.badge-count{display:none;min-width:
 }
 
 
+
+
+/* Render hotfix 2026-08-29: seller phone layout cleanup */
+@media(max-width:760px){
+  html,body{max-width:100%;overflow-x:hidden!important;}
+  aside{position:sticky!important;top:0!important;z-index:50!important;width:100%!important;max-height:54vh!important;overflow:auto!important;background:#17233d!important;padding:10px!important;}
+  aside .nav, aside nav{max-height:38vh!important;overflow-y:auto!important;}
+  aside a, aside button, .side-nav a, .side-nav button{font-size:12px!important;line-height:1.2!important;min-height:38px!important;padding:8px!important;border-radius:8px!important;}
+  header,.app-header,.sticky-header{position:sticky!important;top:0!important;z-index:45!important;background:#fff!important;}
+  main,.app-main,.page,.content,.main-container{padding:10px 10px 90px!important;max-width:100%!important;overflow-x:hidden!important;}
+  .card,.panel,.section,.table-wrap,.stat,.metric,.row,.toolbar,.actions{min-width:0!important;max-width:100%!important;overflow-wrap:anywhere!important;}
+  .grid,.cards,.stats,.metrics,.two,.three,.product-grid,.products-grid{grid-template-columns:1fr!important;gap:10px!important;}
+  table{width:100%!important;min-width:0!important;font-size:12px!important;}
+  th,td{padding:8px 6px!important;white-space:normal!important;}
+  .actions{display:flex!important;flex-wrap:wrap!important;gap:6px!important;}
+  .actions button,.btn,.primary,.soft{min-height:38px!important;font-size:12px!important;padding:8px 10px!important;white-space:normal!important;}
+  h1{font-size:22px!important;line-height:1.15!important;}
+  h2{font-size:18px!important;line-height:1.18!important;}
+  h3{font-size:15px!important;line-height:1.2!important;}
+  p,li,label,input,select,textarea{font-size:13px!important;line-height:1.35!important;}
+}
