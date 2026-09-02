@@ -7,13 +7,13 @@ services:
     routes:
       - type: rewrite
         source: /buyer
-        destination: /buyer/index.html
+        destination: /buyer.html
       - type: rewrite
         source: /seller
-        destination: /seller/index.html
+        destination: /seller.html
       - type: rewrite
         source: /policies
-        destination: /policies/index.html
+        destination: /policies.html
       - type: rewrite
         source: /contact
-        destination: /contact/index.html
+        destination: /contact.html
