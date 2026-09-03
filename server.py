@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import sqlite3
 import time
@@ -1880,10 +1881,13 @@ class Handler(BaseHTTPRequestHandler):
             product = con.execute("SELECT id, stock FROM products WHERE id = ?", (product_id,)).fetchone()
             if not product:
                 raise ValueError("Product not found")
+            stock = int(product["stock"] or 0)
+            if stock < 1:
+                raise ValueError("Out of stock")
             quantity = int(data.get("quantity", 1))
             if quantity < 1:
                 raise ValueError("Quantity must be at least 1")
-            if quantity > int(product["stock"] or 0):
+            if quantity > stock:
                 raise ValueError(f"Only {product['stock']} item(s) available")
             variant = str(data.get("variant", "") or "")
             existing = con.execute(
@@ -1898,7 +1902,7 @@ class Handler(BaseHTTPRequestHandler):
                 send_json(self, 200, {"ok": True, "id": item_id, "quantity": quantity})
                 return
             if existing:
-                quantity = min(int(existing["quantity"] or 0) + quantity, int(product["stock"] or 0))
+                quantity = min(int(existing["quantity"] or 0) + quantity, stock)
                 con.execute("UPDATE cart_items SET quantity = ? WHERE id = ? AND buyer_id = ?", (quantity, existing["id"], buyer_id))
                 send_json(self, 200, {"ok": True, "id": existing["id"], "quantity": quantity})
                 return
@@ -2012,6 +2016,7 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as con:
             if user and user["role"] == "buyer":
                 rows = [row_to_dict(row) for row in con.execute("SELECT * FROM orders WHERE buyer_id = ? ORDER BY created_at DESC, id DESC", (user["id"],))]
+                rows = [row for row in rows if not self.is_sample_buyer_record(row)]
             elif user and user["role"] == "seller":
                 rows = [
                     row_to_dict(row)
@@ -2029,11 +2034,30 @@ class Handler(BaseHTTPRequestHandler):
                 rows = [row_to_dict(row) for row in con.execute("SELECT * FROM orders ORDER BY created_at DESC, id DESC")]
         send_json(self, 200, {"orders": rows})
 
+    def is_sample_buyer_record(self, row):
+        text = " ".join(str(row.get(key, "") or "") for key in (
+            "id",
+            "order_id",
+            "buyer_name",
+            "address",
+            "payment_review_note",
+            "tracking_no",
+            "reason",
+            "request_type",
+        ))
+        record_id = int(row.get("order_id") or row.get("id") or 0)
+        return record_id <= 45 or bool(re.search(
+            r"test|demo|cloudinary|postgres|auth seller|automated|buyer bad|seller test|bad product|should-fail|notification",
+            text,
+            re.I,
+        ))
+
     def get_returns(self):
         user = self.current_user()
         with connect() as con:
             if user and user["role"] == "buyer":
                 rows = [row_to_dict(row) for row in con.execute("SELECT * FROM returns WHERE buyer_id = ? ORDER BY created_at DESC, id DESC", (user["id"],))]
+                rows = [row for row in rows if not self.is_sample_buyer_record(row)]
             elif user and user["role"] == "seller":
                 rows = [
                     row_to_dict(row)

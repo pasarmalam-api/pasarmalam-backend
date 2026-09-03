@@ -719,3 +719,65 @@ main,
     margin-top:auto!important;
   }
 }
+
+/* 2026-09-03 Android mobile safety pass: keep content clear of browser/nav bars. */
+@media (max-width: 760px) {
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: hidden !important;
+  }
+
+  header,
+  .topbar,
+  .mobile-header,
+  .buyer-topbar {
+    z-index: 50 !important;
+    background: #fff !important;
+  }
+
+  main,
+  .app-main,
+  .page,
+  .content,
+  .main-container,
+  .buyer-shell,
+  .product-feed {
+    padding-bottom: 150px !important;
+  }
+
+  .bottom-nav,
+  .mobile-bottom-nav,
+  .tabbar {
+    z-index: 40 !important;
+    background: #fff !important;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+
+  .product-card,
+  .card,
+  .product-tile {
+    position: relative;
+    z-index: 1;
+    height: auto !important;
+    min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden;
+  }
+
+  .product-card .name,
+  .card .name,
+  .product-title {
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .product-card .actions,
+  .card .actions,
+  .product-actions {
+    margin-top: auto !important;
+  }
+}
