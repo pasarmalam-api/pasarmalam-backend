@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>PasarMalam Seller Centre</title>
+  <title>Pusat Penjual PasarMalam</title>
   <link rel="stylesheet" href="seller.css">
   <style>
     .hero{min-height:214px;border-radius:8px;padding:22px;color:#fff;display:flex;align-items:flex-end;background:linear-gradient(90deg,#101828e6,#10182891,#10182822),url("pasar-malam-real.jpg") center/cover;margin-bottom:14px}
@@ -24,111 +24,111 @@
   <aside>
     <a class="brand" href="index.html">
       <div class="logo">PM</div>
-      <div><h1>PasarMalam</h1><div class="label">Seller Centre</div></div>
+      <div><h1>PasarMalam</h1><div class="label">Pusat Penjual</div></div>
     </a>
     <nav>
-      <a class="active" href="index.html">Dashboard</a>
-      <a href="login.html">Sign In</a>
-      <a href="register.html">Register Seller</a>
-      <a href="business-verification.html">Business Verification</a>
-      <a href="products.html">Products</a>
-      <a href="add-product.html">Add Product</a>
-      <a href="ai-assistant.html">AI Listing Helper</a>
-      <a href="orders.html">Orders</a>
-      <a href="returns.html">Returns</a>
-      <a href="messages.html">Messages</a>
-      <a href="logistics.html">Logistics</a>
-      <a href="wallet.html">Wallet</a>
-      <a href="campaigns.html">Campaigns</a>
-      <a href="reviews.html">Reviews</a>
-      <a href="performance.html">Performance</a>
-      <a href="notifications.html">Notifications</a><a href="support.html">Support</a><a href="settings.html">Settings</a>
-      <a href="policies.html">Policies</a>
+      <a class="active" href="index.html">Papan Pemuka</a>
+      <a href="login.html">Log Masuk</a>
+      <a href="register.html">Daftar Penjual</a>
+      <a href="business-verification.html">Pengesahan Perniagaan</a>
+      <a href="products.html">Produk</a>
+      <a href="add-product.html">Tambah Produk</a>
+      <a href="ai-assistant.html">Pembantu AI Listing</a>
+      <a href="orders.html">Pesanan</a>
+      <a href="returns.html">Pulangan</a>
+      <a href="messages.html">Mesej</a>
+      <a href="logistics.html">Logistik</a>
+      <a href="wallet.html">Dompet</a>
+      <a href="campaigns.html">Promosi</a>
+      <a href="reviews.html">Ulasan</a>
+      <a href="performance.html">Prestasi</a>
+      <a href="notifications.html">Notifikasi</a><a href="support.html">Sokongan</a><a href="settings.html">Tetapan</a>
+      <a href="policies.html">Polisi</a>
     </nav>
   </aside>
   <div>
     <header>
       <div class="top">
         <div>
-          <h2>Merchant Dashboard</h2>
-          <span>Manage listings, orders, returns, chat, logistics and payouts.</span>
+          <h2>Papan Pemuka Penjual</h2>
+          <span>Urus listing, pesanan, pulangan, chat, logistik dan bayaran penjual.</span>
         </div>
         <div class="toolbar">
-          <input class="search" id="search" placeholder="Search product, category or shop">
-          <button class="soft" onclick="location.href='login.html'">Sign In</button>
-          <button class="soft" onclick="location.href='register.html'">Register</button>
+          <input class="search" id="search" placeholder="Cari produk, kategori atau kedai">
+          <button class="soft" onclick="location.href='login.html'">Log Masuk</button>
+          <button class="soft" onclick="location.href='register.html'">Daftar</button>
           <button class="soft" onclick="location.href='business-verification.html'">SSM</button>
-          <button class="soft" onclick="location.href='ai-assistant.html'">AI Helper</button>
-          <button class="primary" onclick="location.href='add-product.html'">Add Product</button>
+          <button class="soft" onclick="location.href='ai-assistant.html'">Pembantu AI</button>
+          <button class="primary" onclick="location.href='add-product.html'">Tambah Produk</button>
         </div>
       </div>
     </header>
     <main>
       <section class="seller-download-strip" aria-label="PasarMalam app download links">
-        <div><b>PasarMalam mobile app</b><span>Install PasarMalam from Google Play.</span></div>
+        <div><b>Aplikasi mudah alih PasarMalam</b><span>Pasang PasarMalam daripada Google Play.</span></div>
         <button class="google-play-badge image-badge" aria-label="Download PasarMalam on Google Play" onclick="location.href='https://play.google.com/store/apps/details?id=com.pasarmalam.app'"><img src="google-play-badge.png" alt="Download on Google Play"></button>
       </section>
       <section class="hero">
         <div>
-          <h2>Professional seller workspace for PasarMalam merchants</h2>
-          <p>Track sales, publish products with photos, manage shipping, reply to buyers and handle refunds from one dashboard.</p>
+          <h2>Ruang kerja penjual profesional untuk peniaga PasarMalam</h2>
+          <p>Jejaki jualan, terbitkan produk dengan foto, urus penghantaran, balas pembeli dan kendalikan bayaran balik dalam satu papan pemuka.</p>
         </div>
       </section>
 
       <section class="grid">
-        <div class="stat"><span>Live Products</span><b id="productCount">0</b></div>
-        <div class="stat"><span>Orders</span><b id="orderCount">0</b></div>
-        <div class="stat"><span>Gross Sales</span><b id="salesCount">RM0</b></div>
-        <div class="stat"><span>Store Rating</span><b id="ratingScore">0</b></div>
+        <div class="stat"><span>Produk Aktif</span><b id="productCount">0</b></div>
+        <div class="stat"><span>Pesanan</span><b id="orderCount">0</b></div>
+        <div class="stat"><span>Jualan Kasar</span><b id="salesCount">RM0</b></div>
+        <div class="stat"><span>Rating Kedai</span><b id="ratingScore">0</b></div>
       </section>
 
       <section class="panel section mobile-dashboard-extra">
         <div class="panel-head">
-          <h3>Launch Commission Structure</h3>
-          <span class="tag">No RM0.50 order fee during launch</span>
+          <h3>Struktur Komisen Pelancaran</h3>
+          <span class="tag">Tiada yuran pesanan RM0.50 semasa pelancaran</span>
         </div>
         <table>
-          <thead><tr><th>Seller Type</th><th>Commission</th></tr></thead>
+          <thead><tr><th>Jenis Penjual</th><th>Komisen</th></tr></thead>
           <tbody>
-            <tr><td>New seller first 30 days</td><td><b>3%</b></td></tr>
-            <tr><td>Basic seller after 30 days</td><td><b>5%</b></td></tr>
-            <tr><td>Verified SSM seller</td><td><b>4%</b></td></tr>
-            <tr><td>High-volume seller</td><td><b>3% negotiated</b></td></tr>
-            <tr><td>Fixed platform/order fee</td><td><b>RM0.00 for launch</b></td></tr>
+            <tr><td>Penjual baharu 30 hari pertama</td><td><b>3%</b></td></tr>
+            <tr><td>Penjual asas selepas 30 hari</td><td><b>5%</b></td></tr>
+            <tr><td>Penjual SSM disahkan</td><td><b>4%</b></td></tr>
+            <tr><td>Penjual volume tinggi</td><td><b>3% boleh dirunding</b></td></tr>
+            <tr><td>Yuran tetap platform/pesanan</td><td><b>RM0.00 semasa pelancaran</b></td></tr>
           </tbody>
         </table>
       </section>
 
       <section class="three section mobile-dashboard-extra">
-        <div class="stat"><span>Response Rate</span><b id="responseRate">0%</b></div>
-        <div class="stat"><span>Late Shipment</span><b id="lateShipment">0%</b></div>
-        <div class="stat"><span>Cancellation</span><b id="cancelRate">0%</b></div>
+        <div class="stat"><span>Kadar Respons</span><b id="responseRate">0%</b></div>
+        <div class="stat"><span>Penghantaran Lewat</span><b id="lateShipment">0%</b></div>
+        <div class="stat"><span>Pembatalan</span><b id="cancelRate">0%</b></div>
       </section>
 
       <section class="quick section">
-        <a href="products.html">Product Management</a>
-        <a href="orders.html">Order Processing</a>
-        <a href="logistics.html">Logistics / AWB</a>
-        <a href="campaigns.html">Campaign Tools</a>
+        <a href="products.html">Pengurusan Produk</a>
+        <a href="orders.html">Proses Pesanan</a>
+        <a href="logistics.html">Logistik / AWB</a>
+        <a href="campaigns.html">Alat Promosi</a>
       </section>
 
       <section class="mini-grid section">
         <div class="panel">
           <div class="panel-head">
-            <h3>Product Listings</h3>
-            <button class="soft" onclick="location.href='products.html'">Open Products</button>
+            <h3>Listing Produk</h3>
+            <button class="soft" onclick="location.href='products.html'">Buka Produk</button>
           </div>
           <div style="overflow:auto">
             <table class="product-preview-table">
-              <thead><tr><th>Product</th><th>Price</th><th>Stock</th><th>Status</th><th>Action</th></tr></thead>
+              <thead><tr><th>Produk</th><th>Harga</th><th>Stok</th><th>Status</th><th>Tindakan</th></tr></thead>
               <tbody id="productRows"></tbody>
             </table>
           </div>
         </div>
         <div class="panel">
           <div class="panel-head">
-            <h3>Wallet / Settlement</h3>
-            <button class="soft" onclick="loadWallet()">Refresh</button>
+            <h3>Dompet / Penyelesaian</h3>
+            <button class="soft" onclick="loadWallet()">Segar Semula</button>
           </div>
           <div id="walletBox"></div>
         </div>
@@ -137,15 +137,15 @@
       <section class="two section mobile-dashboard-extra">
         <div class="panel">
           <div class="panel-head">
-            <h3>Orders To Handle</h3>
-            <button class="soft" onclick="location.href='orders.html'">Open Orders</button>
+            <h3>Pesanan Untuk Diurus</h3>
+            <button class="soft" onclick="location.href='orders.html'">Buka Pesanan</button>
           </div>
           <div id="ordersBox"></div>
         </div>
         <div class="panel">
           <div class="panel-head">
-            <h3>Returns / Disputes</h3>
-            <button class="soft" onclick="location.href='returns.html'">Open Returns</button>
+            <h3>Pulangan / Pertikaian</h3>
+            <button class="soft" onclick="location.href='returns.html'">Buka Pulangan</button>
           </div>
           <div id="returnsBox"></div>
         </div>
@@ -153,15 +153,15 @@
 
       <section class="three section mobile-dashboard-extra">
         <div class="panel">
-          <div class="panel-head"><h3>Buyer Messages</h3><a class="soft" href="messages.html">Reply</a></div>
+          <div class="panel-head"><h3>Mesej Pembeli</h3><a class="soft" href="messages.html">Balas</a></div>
           <div id="messagesBox"></div>
         </div>
         <div class="panel">
-          <div class="panel-head"><h3>Logistics Rate</h3><a class="soft" href="logistics.html">AWB</a></div>
+          <div class="panel-head"><h3>Kadar Logistik</h3><a class="soft" href="logistics.html">AWB</a></div>
           <div id="ratesBox"></div>
         </div>
         <div class="panel">
-          <div class="panel-head"><h3>Reviews</h3><a class="soft" href="reviews.html">View</a></div>
+          <div class="panel-head"><h3>Ulasan</h3><a class="soft" href="reviews.html">Lihat</a></div>
           <div id="reviewsBox"></div>
         </div>
       </section>
@@ -182,8 +182,8 @@ function showSignedOutDashboard(){orderCount.textContent="0";salesCount.textCont
 async function loadMetrics(){if(!hasSellerSession()){showSignedOutDashboard();return}try{const m=await api("/api/metrics");orderCount.textContent=m.orders||0;salesCount.textContent=money(m.sales);ratingScore.textContent=m.rating||"0";responseRate.textContent=(m.response_rate||0)+"%";lateShipment.textContent=(m.late_shipment_rate||0)+"%";cancelRate.textContent=(m.cancellation_rate||0)+"%"}catch(e){}}
 async function loadProducts(){if(!hasSellerSession())return;const d=await api("/api/products");const rows=(d.products||[]).map(cleanProduct);productCount.textContent=rows.length;drawProducts(rows);search.oninput=()=>drawProducts(rows)}
 function drawProducts(rows){const q=(search.value||"").toLowerCase();const limit=window.matchMedia("(max-width:700px)").matches?4:8;productRows.innerHTML=rows.filter(p=>`${p.name} ${p.category} ${p.shop}`.toLowerCase().includes(q)).slice(0,limit).map(p=>`<tr><td><div class="product-title">${img(p)}<div><b>${p.name}</b><div class="muted">${p.shop} | ${p.category}</div></div></div></td><td>${money(p.price)}</td><td><span class="tag ${p.stock<=5?"warn":""}">${p.stock}</span></td><td><span class="tag ${p.condition==="Used"?"warn":""}">${p.condition}</span></td><td><button class="soft" onclick="location.href='edit-product.html?id=${p.id}'">Edit</button></td></tr>`).join("")}
-async function loadOrders(){if(!hasSellerSession())return;const d=await api("/api/orders");const rows=(d.orders||[]).slice(0,5);ordersBox.innerHTML=rows.map(o=>`<div class="order"><b>PM-${o.id}</b> <span class="tag">${o.order_status}</span><p class="muted">${o.logistics_method||"Shipping"} | ${money(o.total)}</p></div>`).join("")||"<p class='muted'>No orders yet.</p>"}
-async function loadReturns(){if(!hasSellerSession())return;const d=await api("/api/returns");const rows=(d.returns||[]).slice(0,5);returnsBox.innerHTML=rows.map(r=>`<div class="order"><b>${r.request_type}</b><p>${r.reason}</p><span class="tag warn">${r.status}</span></div>`).join("")||"<p class='muted'>No return requests.</p>"}
+async function loadOrders(){if(!hasSellerSession())return;const d=await api("/api/orders");const rows=(d.orders||[]).slice(0,5);ordersBox.innerHTML=rows.map(o=>`<div class="order"><b>PM-${o.id}</b> <span class="tag">${o.order_status}</span><p class="muted">${o.logistics_method||"Penghantaran"} | ${money(o.total)}</p></div>`).join("")||"<p class='muted'>Belum ada pesanan.</p>"}
+async function loadReturns(){if(!hasSellerSession())return;const d=await api("/api/returns");const rows=(d.returns||[]).slice(0,5);returnsBox.innerHTML=rows.map(r=>`<div class="order"><b>${r.request_type}</b><p>${r.reason}</p><span class="tag warn">${r.status}</span></div>`).join("")||"<p class='muted'>Belum ada permintaan pulangan.</p>"}
 async function loadWallet(){if(!hasSellerSession())return;const d=await api("/api/wallet");walletBox.innerHTML=(d.wallet||[]).slice(0,5).map(w=>`<div class="wallet-line"><span>${w.type}<br><small class="muted">${w.note}</small></span><b>${money(w.amount)}</b></div>`).join("")}
 async function loadMessages(){if(!hasSellerSession())return;const d=await api("/api/messages");messagesBox.innerHTML=(d.messages||[]).slice(0,4).map(m=>`<div class="msg"><b>${m.sender_role}</b><div class="muted">${m.body}</div></div>`).join("")||"<p class='muted'>No messages.</p>"}
 async function loadRates(){if(!hasSellerSession())return;const d=await api("/api/logistics/rates");ratesBox.innerHTML=(d.rates||[]).slice(0,4).map(r=>`<div class="rate"><span>${r.method}<br><small class="muted">${r.eta}</small></span><strong>${money(r.fee||r.rate)}</strong></div>`).join("")}
