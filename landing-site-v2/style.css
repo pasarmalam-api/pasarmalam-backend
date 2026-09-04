@@ -81,6 +81,31 @@ footer{max-width:1180px;margin:16px auto;padding:14px;color:var(--muted);border-
   .links::-webkit-scrollbar{display:none}
 }
 @media(max-width:420px){
+  .nav{
+    display:flex!important;
+    flex-wrap:wrap!important;
+    align-items:center!important;
+    gap:8px!important;
+    padding:8px 10px!important;
+  }
+  .brand{
+    flex:1 1 calc(100% - 154px)!important;
+    max-width:calc(100% - 154px)!important;
+  }
+  .brand b{font-size:16px!important}
+  .brand .muted{font-size:12px!important}
+  .lang-toggle{
+    flex:0 0 146px!important;
+    max-width:146px!important;
+    min-width:0!important;
+    overflow:visible!important;
+    text-overflow:clip!important;
+    padding:7px 10px!important;
+    font-size:12px!important;
+  }
+  .links{
+    flex:1 1 100%!important;
+  }
   .hero:before,.small-hero:before,.hero-copy:before{content:none;display:none}
   .hero-media{aspect-ratio:1.82/1;max-height:190px}
   .hero h1{font-size:22px}
@@ -90,7 +115,7 @@ footer{max-width:1180px;margin:16px auto;padding:14px;color:var(--muted);border-
 
 /* Final phone override: banner first, no text over image, compact actions. */
 @media(max-width:900px){
-  header{z-index:50;background:#fff}
+  header{z-index:50;background:#fff;overflow:hidden}
   main{padding:10px;overflow-x:hidden}
   .hero{
     display:block!important;

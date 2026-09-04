@@ -124,7 +124,7 @@
     if(window.PMNotify){start();return}
     if(document.querySelector('script[data-pm-notify]'))return;
     const script=document.createElement("script");
-    script.src="../pm-notify.js?v=20260904s";
+    script.src="../pm-notify.js?v=20260904t";
     script.dataset.pmNotify="1";
     script.onload=start;
     document.head.appendChild(script);
