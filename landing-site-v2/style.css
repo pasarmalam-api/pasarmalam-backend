@@ -47,7 +47,7 @@ table{display:block;overflow-x:auto}
 .list div{background:#f9fafb;border:1px solid var(--line);border-radius:8px;padding:12px;color:#344054}
 footer{max-width:1180px;margin:16px auto;padding:14px;color:var(--muted);border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-size:13px}
 @media(max-width:800px){
-  body{font-size:14px}
+  body{font-size:15px}
   .nav{grid-template-columns:1fr auto;gap:8px;padding:9px 12px}
   .brand b{font-size:17px}
   .logo{width:44px;height:44px;font-size:18px}
@@ -62,12 +62,12 @@ footer{max-width:1180px;margin:16px auto;padding:14px;color:var(--muted);border-
   .hero p{font-size:13px;line-height:1.35;max-width:none;margin-bottom:12px;color:#344054;text-shadow:none}
   .grid,.two,.steps{grid-template-columns:1fr}
   .product-feed,.product-grid,.products-grid,[data-product-feed]{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-  .card,.panel,.step{padding:13px}
+  .card,.panel,.step{padding:14px}
   .card b{font-size:16px}
   .section h2,.panel h2{font-size:19px}
   .actions{gap:8px}
-  .cta,.soft{min-height:38px;padding:9px 12px;font-size:14px}
-  .store-badge img{width:148px;border-radius:7px}
+  .cta,.soft{min-height:40px;padding:10px 12px;font-size:14px}
+  .store-badge img{width:156px;border-radius:7px}
 }
 @media(max-width:400px){
   html,body{width:100%;overflow-x:hidden}
@@ -82,9 +82,9 @@ footer{max-width:1180px;margin:16px auto;padding:14px;color:var(--muted);border-
 }
 @media(max-width:420px){
   .hero:before,.small-hero:before,.hero-copy:before{content:none;display:none}
-  .hero-media{aspect-ratio:1.9/1;max-height:180px}
+  .hero-media{aspect-ratio:1.82/1;max-height:190px}
   .hero h1{font-size:22px}
-  .hero p{font-size:12.5px}
+  .hero p{font-size:14px}
   .links{font-size:12px}
 }
 
@@ -112,15 +112,15 @@ footer{max-width:1180px;margin:16px auto;padding:14px;color:var(--muted);border-
   .hero-media{
     display:block!important;
     width:100%!important;
-    aspect-ratio:1.9/1!important;
-    max-height:190px!important;
+    aspect-ratio:1.82/1!important;
+    max-height:200px!important;
     object-fit:cover!important;
     object-position:center!important;
     background:#f3f6fa!important;
   }
   .hero-copy{
     display:block!important;
-    padding:10px!important;
+    padding:12px!important;
     background:#fff!important;
     border:0!important;
   }
@@ -130,14 +130,14 @@ footer{max-width:1180px;margin:16px auto;padding:14px;color:var(--muted);border-
   }
   .actions{
     display:grid!important;
-    grid-template-columns:minmax(0,150px) minmax(0,1fr)!important;
+    grid-template-columns:minmax(0,156px) minmax(0,1fr)!important;
     gap:8px!important;
     align-items:center!important;
     padding:0!important;
   }
   .store-badge{
     width:auto!important;
-    max-width:160px!important;
+    max-width:156px!important;
     min-height:0!important;
     padding:0!important;
     background:transparent!important;
@@ -150,22 +150,25 @@ footer{max-width:1180px;margin:16px auto;padding:14px;color:var(--muted);border-
     display:none!important;
   }
   .store-badge img{
-    width:150px!important;
+    width:156px!important;
     height:auto!important;
     display:block!important;
     border-radius:8px!important;
   }
   .cta,.soft{
-    min-height:38px!important;
-    padding:8px 10px!important;
-    font-size:13px!important;
-    line-height:1.12!important;
+    min-height:40px!important;
+    padding:10px 12px!important;
+    font-size:14px!important;
+    line-height:1.15!important;
     border-radius:8px!important;
   }
   .soft{
     grid-column:1 / -1!important;
-    width:max-content!important;
+    width:100%!important;
     max-width:100%!important;
+    background:#fff!important;
+    border:1px solid var(--line)!important;
   }
+  .card p,.panel p,.step p{font-size:14px!important;line-height:1.42!important}
 }
 
