@@ -2870,7 +2870,16 @@ class Handler(BaseHTTPRequestHandler):
 
     def admin_update_user_status(self, data):
         self.require_user("admin")
+        status = data.get("status", "active")
+        seller_status = data.get("seller_status", "pending")
+        if status not in ("active", "suspended") or seller_status not in ("pending", "approved", "rejected", "not_applicable"):
+            raise ValueError("Invalid account or seller status")
         with connect() as con:
+            account = con.execute("SELECT role FROM users WHERE id = ?", (int(data["user_id"]),)).fetchone()
+            if not account:
+                raise ValueError("Account not found")
+            if seller_status == "approved" and account["role"] != "seller":
+                raise ValueError("Only seller accounts can be approved")
             con.execute(
                 "UPDATE users SET status = ?, seller_status = ? WHERE id = ?",
                 (data.get("status", "active"), data.get("seller_status", "pending"), int(data["user_id"])),

@@ -1,0 +1,22 @@
+const fs = require('node:fs');
+const vm = require('node:vm');
+const assert = require('node:assert/strict');
+const calls = [];
+const context = vm.createContext({URL, Set, console, setTimeout() {}, localStorage: {getItem() {return 'token';}}, location: {href: 'https://admin.example/notifications.html', origin: 'https://admin.example', pathname: '/sellers.html'}, alert(message) {calls.push(message);}});
+vm.runInContext(fs.readFileSync('admin-app/admin.js', 'utf8'), context);
+vm.runInContext('api=async(p,o)=>record(p,o);loadNotificationBadges=async()=>record("badges");loadSellers=async()=>record("sellers");loadNotifications=async()=>record("list");', Object.assign(context, {record: (...args) => calls.push(args)}));
+(async () => {
+  await context.attendNotification(42, 'tickets.html');
+  assert.equal(calls[0][0], '/api/notifications/read');
+  assert.equal(JSON.parse(calls[0][1].body).notification_id, 42);
+  assert.equal(calls[1][0], 'badges');
+  assert.equal(context.location.href, 'https://admin.example/tickets.html');
+  calls.length = 0;
+  await Promise.all([context.setUser(7, 'active', 'approved'), context.setUser(7, 'active', 'approved')]);
+  assert.deepEqual(calls.map(c => c[0]), ['/api/admin/user-status', 'sellers', 'badges']);
+  vm.runInContext('api=async()=>{throw new Error("Session expired")}', context);
+  calls.length = 0;
+  await context.setUser(7, 'active', 'approved');
+  assert.equal(calls[0], 'Could not update account: Session expired');
+  console.log('PASS: individual read, badge refresh, seller approval refresh, duplicate guard, visible errors');
+})().catch(error => {console.error(error);process.exitCode=1;});
