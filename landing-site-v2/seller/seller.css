@@ -566,12 +566,20 @@ td .primary{
 }
 
 [hidden]{display:none!important}
+:root{--seller-text-size:14px}
 body{font-size:13px;line-height:1.5;letter-spacing:0}
 .app h1{font-size:20px}.app h2{font-size:22px}.app h3{font-size:16px}
 .app .hero h2{font-size:24px}.app .stat b{font-size:24px}
 .app nav a,.app button,.app .quick a{font-size:13px;font-weight:600}
 .app button{min-height:38px}.app input,.app select,.app textarea{font-size:16px}
 .seller-table-scroll{max-width:100%;overflow:auto}
+body,.app p,.app label,.app .label,.app .muted,.app th,.app td,.app .tag,.app nav a,.app button,.app input,.app select,.app textarea,.app .quick a,.app .stat span{font-family:Arial,sans-serif!important;font-size:var(--seller-text-size)!important;line-height:1.5;letter-spacing:0}
+@media(max-width:980px){:root{--seller-text-size:16px}}
 #previewGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,160px));gap:10px;margin:12px 0}
 #previewGrid .preview{aspect-ratio:1;background-size:cover;background-position:center;border:1px solid var(--line);border-radius:6px}
+#previewGrid .preview{position:relative;overflow:hidden}
+#previewGrid .preview img{display:block;width:100%;height:100%;object-fit:cover}
+#previewGrid .photo-remove{position:absolute;top:4px;right:4px;display:grid;place-items:center;width:36px;height:36px;min-height:36px;padding:0;border:1px solid #d1d5db;border-radius:6px;background:#fff;color:#b42318;font-size:24px!important;line-height:1}
+#previewGrid .photo-remove:hover{background:#fee4e2}
+#previewGrid .photo-remove:focus-visible{outline:3px solid #0f9f8f;outline-offset:-3px}
 @media(max-width:980px){.app h2{font-size:20px!important}.app .hero h2{font-size:22px!important}.app .stat b{font-size:22px!important}.app aside{z-index:70!important}.app aside nav{z-index:71!important}}

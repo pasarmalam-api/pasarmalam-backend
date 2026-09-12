@@ -13,11 +13,20 @@ const data={products:[product],orders:[order],returns:[{id:301,order_id:201,stat
  const context=await browser.newContext({viewport:{width:1440,height:1000}});
  await context.addInitScript(u=>{localStorage.setItem('pm_token','test');localStorage.setItem('pm_user',JSON.stringify(u));localStorage.setItem('pasarmalam-lang','en')},user);
  const writes=[];let fail=false;
- await context.route('**/*',route=>{const request=route.request(),url=request.url();if(url.startsWith(origin))return route.continue();if(url.includes('api.cloudinary.com'))return route.fulfill({json:{secure_url:'https://example.test/image.jpg'}});if(!url.startsWith('https://pasarmalam-backend.onrender.com'))return route.abort();const endpoint=new URL(url).pathname;if(request.method()!=='GET'){writes.push({endpoint,body:request.postDataJSON()});return route.fulfill({status:fail?400:200,json:fail?{error:'Simulated validation failure'}:{ok:true,id:601,user,token:'test',answer:'Listing advice',print_text:'PM-AWB-201'}})}return route.fulfill({json:data})});
+ await context.route('**/*',route=>{const request=route.request(),url=request.url();if(url.startsWith(origin))return route.continue();if(url.startsWith('https://example.test/'))return route.fulfill({contentType:'image/png',body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64')});if(url.includes('api.cloudinary.com'))return route.fulfill({json:{secure_url:'https://example.test/image.jpg'}});if(!url.startsWith('https://pasarmalam-backend.onrender.com'))return route.abort();const endpoint=new URL(url).pathname;if(request.method()!=='GET'){writes.push({endpoint,body:request.postDataJSON()});return route.fulfill({status:fail?400:200,json:fail?{error:'Simulated validation failure'}:{ok:true,id:601,user,token:'test',answer:'Listing advice',print_text:'PM-AWB-201'}})}return route.fulfill({json:data})});
  const page=await context.newPage();page.setDefaultTimeout(5000);const errors=[];page.on('pageerror',e=>errors.push(e.message));
  async function visit(file){await page.goto(origin+'/'+file);await page.waitForTimeout(180)}
  async function fill(values){for(const [id,value]of Object.entries(values))await page.locator('#'+id).fill(value)}
- for(const file of fs.readdirSync(root).filter(f=>f.endsWith('.html'))){await visit(file+(file==='edit-product.html'?'?id=101':file==='order-detail.html'?'?id=201':''));assert.equal(await page.locator('.auth-lock').count(),0,file+' unexpectedly locked')}
+ for(const file of fs.readdirSync(root).filter(f=>f.endsWith('.html'))){
+   await visit(file+(file==='edit-product.html'?'?id=101':file==='order-detail.html'?'?id=201':''));
+   assert.equal(await page.locator('.auth-lock').count(),0,file+' unexpectedly locked');
+   for(const width of [1440,402]){
+     await page.setViewportSize({width,height:900});
+     const mismatch=await page.evaluate(()=>Array.from(document.querySelectorAll('nav a,input,select,textarea')).filter(e=>getComputedStyle(e).fontSize!==getComputedStyle(document.body).fontSize).map(e=>e.tagName));
+     assert.deepEqual(mismatch,[],file+' font consistency at '+width);
+   }
+ }
+ await page.setViewportSize({width:1440,height:1000});
  async function action(file,values,handler,endpoint){await visit(file);await fill(values);const before=writes.length;await page.locator('button[onclick="'+handler+'"]').click();await page.waitForTimeout(250);assert.equal(writes.length,before+1,file+' submit');assert.equal(writes.at(-1).endpoint,endpoint);console.log('PASS '+file+' '+handler)}
  await visit('add-product.html');
  await page.locator('#category').selectOption({label:'Phone Accessories'});assert.equal(await page.locator('#category').inputValue(),'Chargers');
@@ -30,6 +39,16 @@ const data={products:[product],orders:[order],returns:[{id:301,order_id:201,stat
  fail=true;await action('add-product.html',{name:'Keep my draft',price:'50',stock:'3'},'save()','/api/products');
  assert.ok(page.url().endsWith('/add-product.html'));assert.equal(await page.locator('#name').inputValue(),'Keep my draft');assert.match(await page.locator('#out').textContent(),/Simulated validation failure/);fail=false;
  await visit('product-published.html');await page.getByRole('link',{name:'View Products',exact:true}).click();await page.waitForURL('**/products.html');
+ product.images=['https://example.test/one.png','https://example.test/two.png'];
+ await visit('edit-product.html?id=101');assert.equal(await page.locator('#previewGrid .preview').count(),2);
+ await page.getByRole('button',{name:'Remove photo 1',exact:true}).click();
+ assert.equal(await page.locator('#previewGrid .preview').count(),1);
+ await page.locator('button[onclick="save()"]').click();await page.waitForTimeout(200);
+ assert.deepEqual(writes.at(-1).body.images,['https://example.test/two.png']);
+ await page.getByRole('button',{name:'Remove photo 1',exact:true}).click();
+ await page.locator('button[onclick="save()"]').click();await page.waitForTimeout(200);
+ assert.deepEqual(writes.at(-1).body.images,[]);
+ product.images=[];
  await action('edit-product.html?id=101',{name:'Camera edited',price:'60',stock:'4'},'save()','/api/products/101');assert.equal(writes.at(-1).body.name,'Camera edited');
  await visit('edit-product.html');assert.equal(await page.locator('button[onclick="save()"]').isDisabled(),true);
  await visit('edit-product.html?id=101');page.once('dialog',d=>d.dismiss());let n=writes.length;await page.locator('button[onclick="removeProduct()"]').click();assert.equal(writes.length,n);
@@ -45,6 +64,9 @@ const data={products:[product],orders:[order],returns:[{id:301,order_id:201,stat
  await visit('settings.html');await page.locator('#identityType').selectOption({index:1});await fill({sellerName:'Seller',identityNumber:'ABC123',bankName:'Bank',bankAccountName:'Seller',bankAccountNumber:'123456'});await page.locator('button[onclick="savePayoutProfile()"]').click();await page.waitForTimeout(200);assert.equal(writes.at(-1).body.bank_account_number,'123456');
  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
  await visit('add-product.html');await page.locator('#productImage').setInputFiles({name:'test.png',mimeType:'image/png',buffer:png});await page.locator('#previewGrid .preview').waitFor();
+ await page.getByRole('button',{name:'Remove photo 1',exact:true}).click();assert.equal(await page.locator('#previewGrid .preview').count(),0);
+ await page.locator('#productImage').setInputFiles([]);
+ await page.locator('#productImage').setInputFiles({name:'test.png',mimeType:'image/png',buffer:png});await page.locator('#previewGrid .preview').waitFor();
  await fill({name:'Photo product',price:'5',stock:'2'});await page.locator('button[onclick="save()"]').click();await page.waitForTimeout(200);assert.deepEqual(writes.at(-1).body.images,['https://example.test/image.jpg']);
  await visit('business-verification.html');await page.locator('#businessType').selectOption({index:1});await fill({ssmNumber:'SSM123'});await page.locator('#docInput').setInputFiles({name:'test.png',mimeType:'image/png',buffer:png});await page.waitForFunction(()=>document.getElementById('uploadStatus').textContent.includes('uploaded'));await page.locator('button[onclick="submitVerification()"]').click();await page.waitForTimeout(200);assert.equal(writes.at(-1).body.ssm_document_url,'https://example.test/image.jpg');
  await action('login.html',{currentPassword:'old-password',newPassword:'new-password'},'changePassword()','/api/auth/change-password');
@@ -57,6 +79,16 @@ const data={products:[product],orders:[order],returns:[{id:301,order_id:201,stat
  await visit('ai-assistant.html');await fill({prompt:'Camera listing'});await page.locator('button[onclick="askAi()"]').click();await page.waitForTimeout(200);assert.equal(writes.at(-1).endpoint,'/api/ai/assistant');
  fail=true;await action('support.html',{subject:'Failure',message:'Failure'},'createTicket()','/api/support/tickets');assert.ok((await page.locator('#status').textContent()).includes('Simulated validation failure'));
  assert.deepEqual(errors,[]);
+ await visit('add-product.html');
+ for(const width of [1440,402]){
+   await page.setViewportSize({width,height:900});
+   const sizes=await page.evaluate(()=>['body','nav a','input','button'].map(s=>getComputedStyle(document.querySelector(s)).fontSize));
+   assert.equal(new Set(sizes).size,1,'Body, navigation and controls must use the same font size');
+   await page.locator('#productImage').setInputFiles({name:'test.png',mimeType:'image/png',buffer:png});await page.locator('#previewGrid .preview').waitFor();
+   fs.mkdirSync('../outputs/seller-photos',{recursive:true});
+   await page.screenshot({path:'../outputs/seller-photos/'+width+'.png',fullPage:true});
+   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Horizontal overflow');
+ }
  console.log('PASS seller populated workflow suite');
  }finally{await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>server.close());
