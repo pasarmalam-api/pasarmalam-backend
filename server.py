@@ -1,6 +1,7 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 import base64
+from lalamove import Client as LalamoveClient, LalamoveError
 import hashlib
 import hmac
 import json
@@ -1393,6 +1394,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/admin/risk": self.admin_risk,
                 "/api/admin/tickets": self.admin_tickets,
                 "/api/admin/logistics": self.admin_logistics,
+                "/api/admin/lalamove/cities": self.admin_lalamove_cities,
                 "/api/admin/settings": self.admin_settings,
                 "/api/admin/audit": self.admin_audit,
             }
@@ -1485,6 +1487,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.create_campaign(data)
             elif parsed.path == "/api/logistics/awb":
                 self.awb(data)
+            elif parsed.path == "/api/admin/lalamove/quotation" and method == "POST":
+                self.admin_lalamove_quotation(data)
             elif parsed.path == "/api/admin/user-status":
                 self.admin_update_user_status(data)
             elif parsed.path == "/api/admin/user-delete":
@@ -1526,6 +1530,24 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as con:
             rows = [row_to_dict(row) for row in con.execute(f"SELECT * FROM {table}{where} ORDER BY created_at DESC, id DESC", params)]
         send_json(self, 200, {key: rows})
+
+    def admin_lalamove_cities(self):
+        self.require_user("admin")
+        try:
+            client = LalamoveClient()
+            send_json(self, 200, {"environment": client.mode, "cities": client.cities(),
+                                  "booking_enabled": False, "pooling_enabled": False})
+        except LalamoveError as exc:
+            send_json(self, 503, {"error": str(exc)})
+
+    def admin_lalamove_quotation(self, data):
+        self.require_user("admin")
+        try:
+            quote = LalamoveClient().quote(data)
+            send_json(self, 200, {"quotation": quote, "checkout_enabled": False,
+                                  "booking_enabled": False})
+        except LalamoveError as exc:
+            send_json(self, 503, {"error": str(exc)})
 
     def get_products(self, query):
         category = query.get("category", [""])[0]
