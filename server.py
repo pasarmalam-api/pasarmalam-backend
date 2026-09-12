@@ -1024,6 +1024,8 @@ def migrate_passwords(con):
 
 
 def seed(con):
+    if USE_POSTGRES:
+        return
     if con.execute("SELECT COUNT(*) AS c FROM users").fetchone()["c"] == 0:
         con.executemany(
             """
