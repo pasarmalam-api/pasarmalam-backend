@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Product Published - PasarMalam</title>
+  <link rel="stylesheet" href="seller.css?v=session2">
+  <script src="seller-session.js?v=2"></script>
+  <script src="seller-auth-guard.js?v=session1"></script>
+</head>
+<body>
+  <main style="max-width:640px;margin:40px auto;padding:20px">
+    <a href="index.html" class="brand">PasarMalam</a>
+    <h1 id="heading">Product published</h1>
+    <p id="message">Your product has been listed successfully.</p>
+    <div class="row">
+      <a id="another" class="primary" href="add-product.html">List Another Product</a>
+      <a id="products" class="soft" href="products.html">View Products</a>
+    </div>
+  </main>
+  <script>
+    const translations={
+      en:['Product published','Your product has been listed successfully.','List Another Product','View Products'],
+      ms:['Produk diterbitkan','Produk anda telah berjaya disenaraikan.','Senaraikan Produk Lain','Lihat Produk'],
+      zh:['\u5546\u54c1\u5df2\u53d1\u5e03','\u60a8\u7684\u5546\u54c1\u5df2\u6210\u529f\u4e0a\u67b6\u3002','\u53d1\u5e03\u53e6\u4e00\u4ef6\u5546\u54c1','\u67e5\u770b\u5546\u54c1']
+    };
+    const lang=localStorage.getItem('pasarmalam-lang')||'ms';
+    document.documentElement.lang=translations[lang]?lang:'en';
+    ['heading','message','another','products'].forEach((id,i)=>document.getElementById(id).textContent=(translations[lang]||translations.en)[i]);
+    document.title=document.getElementById('heading').textContent+' - PasarMalam';
+  </script>
+</body>
+</html>

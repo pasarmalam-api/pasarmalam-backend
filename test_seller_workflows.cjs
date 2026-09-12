@@ -20,6 +20,12 @@ const data={products:[product],orders:[order],returns:[{id:301,order_id:201,stat
  for(const file of fs.readdirSync(root).filter(f=>f.endsWith('.html'))){await visit(file+(file==='edit-product.html'?'?id=101':file==='order-detail.html'?'?id=201':''));assert.equal(await page.locator('.auth-lock').count(),0,file+' unexpectedly locked')}
  async function action(file,values,handler,endpoint){await visit(file);await fill(values);const before=writes.length;await page.locator('button[onclick="'+handler+'"]').click();await page.waitForTimeout(250);assert.equal(writes.length,before+1,file+' submit');assert.equal(writes.at(-1).endpoint,endpoint);console.log('PASS '+file+' '+handler)}
  await action('add-product.html',{name:'Camera',price:'50',stock:'3'},'save()','/api/products');assert.equal(writes.at(-1).body.name,'Camera');
+ await page.waitForURL('**/product-published.html');
+ await page.getByRole('link',{name:'List Another Product',exact:true}).click();
+ await page.waitForURL('**/add-product.html');assert.equal(await page.locator('#name').inputValue(),'');
+ fail=true;await action('add-product.html',{name:'Keep my draft',price:'50',stock:'3'},'save()','/api/products');
+ assert.ok(page.url().endsWith('/add-product.html'));assert.equal(await page.locator('#name').inputValue(),'Keep my draft');assert.match(await page.locator('#out').textContent(),/Simulated validation failure/);fail=false;
+ await visit('product-published.html');await page.getByRole('link',{name:'View Products',exact:true}).click();await page.waitForURL('**/products.html');
  await action('edit-product.html?id=101',{name:'Camera edited',price:'60',stock:'4'},'save()','/api/products/101');assert.equal(writes.at(-1).body.name,'Camera edited');
  await visit('edit-product.html');assert.equal(await page.locator('button[onclick="save()"]').isDisabled(),true);
  await visit('edit-product.html?id=101');page.once('dialog',d=>d.dismiss());let n=writes.length;await page.locator('button[onclick="removeProduct()"]').click();assert.equal(writes.length,n);
