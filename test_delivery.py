@@ -24,7 +24,7 @@ class DeliveryTest(unittest.TestCase):
             con.execute('UPDATE products SET seller_id=2,stock=5,weight_kg=0.5 WHERE id=1')
             delivery.save_pickup(con, 2, self.point)
             self.product = dict(con.execute('SELECT * FROM products WHERE id=1').fetchone())
-        self.data = {'product_id': 1, 'quantity': 1, 'logistics_method': 'Lalamove Segera',
+        self.data = {'product_id': 1, 'quantity': 1, 'fee_version': 1, 'logistics_method': 'Lalamove Segera',
                      'address': 'Test delivery', 'coordinates': {'lat': 3.14, 'lng': 101.69},
                      'location_confirmed': True, 'package_confirmed': True, 'city': 'MY KUL',
                      'service_type': 'MOTORCYCLE', 'buyer_phone': '01123456789', 'payment_method': 'Billplz'}
@@ -44,7 +44,7 @@ class DeliveryTest(unittest.TestCase):
         data = {**self.quoted(), 'logistics_fee': -999}
         with server.connect() as con:
             fee, details = delivery.consume(con, self.user, self.product, 1, data)
-        self.assertEqual(fee, 9)
+        self.assertEqual(fee, 9.4)
         self.assertEqual(details['dispatch_status'], 'manual_booking_required')
         with server.connect() as con, self.assertRaises(ValueError):
             delivery.consume(con, self.user, self.product, 1, data)
@@ -122,7 +122,7 @@ class DeliveryTest(unittest.TestCase):
                 delivery.consume(con, self.user, self.product, 1, data)
                 raise RuntimeError('rolled back')
         with server.connect() as con:
-            self.assertEqual(delivery.consume(con, self.user, self.product, 1, data)[0], 9)
+            self.assertEqual(delivery.consume(con, self.user, self.product, 1, data)[0], 9.4)
 
     def test_both_gateway_paths_use_saved_fee_and_preserve_route(self):
         for method in ('create_billplz_payment', 'create_toyyibpay_payment'):
@@ -133,7 +133,8 @@ class DeliveryTest(unittest.TestCase):
                 getattr(self.handler, method)(data)
             with server.connect() as con:
                 order = con.execute('SELECT * FROM orders ORDER BY id DESC LIMIT 1').fetchone()
-            self.assertEqual(order['logistics_fee'], 9)
+            self.assertEqual(order['logistics_fee'], 9.4)
+            self.assertEqual(order['logistics_admin_fee'], 0.4)
             self.assertEqual(order['payment_status'], 'unpaid')
             self.assertEqual(order['tracking_no'], '')
             self.assertEqual(json.loads(order['delivery_data'])['context']['dropoff']['address'], 'Test delivery')
@@ -148,6 +149,49 @@ class DeliveryTest(unittest.TestCase):
         for qty in (1.5, True, 'nan', 'inf'):
             with server.connect() as con, self.assertRaises(ValueError):
                 self.handler.validate_checkout_payload(con, {**self.data, 'quantity':qty}, self.user)
+
+    def test_fee_is_per_order_not_quantity_and_cannot_be_overridden(self):
+        data = {**self.data, 'quantity': 3, 'admin_fee': 999, 'logistics_admin_fee': -5}
+        with server.connect() as con:
+            q = delivery.create_quote(con, self.user, self.product, 3, data, self.client)
+            fee, details = delivery.consume(con, self.user, self.product, 3, {**data, 'quote_id': q['quote_id']})
+        self.assertEqual(q['courier_fee'], 9)
+        self.assertEqual(q['admin_fee'], .4)
+        self.assertEqual(q['fee'], 9.4)
+        self.assertEqual(fee, 9.4)
+        self.assertEqual(details['quotation']['priceBreakdown']['total'], '9.0')
+
+    def test_existing_quotes_keep_original_price(self):
+        data = self.quoted()
+        with server.connect() as con:
+            row = con.execute('SELECT quotation FROM delivery_quotes WHERE id=?', (data['quote_id'],)).fetchone()
+            quote = json.loads(row['quotation'])
+            quote.pop('_pasarmalam_charges')
+            con.execute('UPDATE delivery_quotes SET quotation=? WHERE id=?', (json.dumps(quote),data['quote_id']))
+        data.pop('fee_version')
+        with server.connect() as con:
+            fee, details = delivery.consume(con, self.user, self.product, 1, data)
+        self.assertEqual(fee, 9)
+        self.assertEqual(details['charges']['admin_fee'], 0)
+
+    def test_old_checkout_must_refresh_before_new_fee_quote(self):
+        data = dict(self.data)
+        data.pop('fee_version')
+        with server.connect() as con, self.assertRaisesRegex(ValueError, 'refresh'):
+            delivery.create_quote(con, self.user, self.product, 1, data, self.client)
+
+    def test_platform_delivery_money_is_not_paid_to_seller(self):
+        data = self.quoted()
+        with patch.multiple(server, BILLPLZ_API_KEY='test', BILLPLZ_COLLECTION_ID='test'), \
+             patch.object(server, 'post_billplz', return_value={'id':'test','url':'https://example.test/pay'}), \
+             patch.object(server, 'send_json') as send:
+            self.handler.create_billplz_payment(data)
+        order_id = send.call_args.args[2]['order_id']
+        with server.connect() as con:
+            con.execute("UPDATE orders SET payment_status='paid',order_status='completed',escrow_status='released' WHERE id=?", (order_id,))
+            server.sync_wallet_settlements(con)
+            row = con.execute("SELECT gross_amount FROM wallet WHERE order_id=? AND type='settlement'", (order_id,)).fetchone()
+        self.assertAlmostEqual(row['gross_amount'], float(self.product['price']))
 
 
 if __name__ == '__main__': unittest.main()

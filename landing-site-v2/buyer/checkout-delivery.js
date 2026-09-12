@@ -35,8 +35,10 @@
   const status = text => { get('deliveryStatus').textContent = text; };
   const valid = () => isPickup() || (quote && quote.expires_at * 1000 > Date.now());
   window.pmDeliveryFee = () => isPickup() ? 0 : valid() ? Number(quote.fee) : NaN;
+  window.pmDeliveryAdminFee = () => isPickup() ? 0 : valid() ? Number(quote.admin_fee || 0) : NaN;
+  window.pmDeliveryCourierFee = () => isPickup() ? 0 : valid() ? Number(quote.courier_fee ?? quote.fee) : NaN;
   function fields() {
-    return {coordinates: {lat: get('deliveryLat').value, lng: get('deliveryLng').value},
+    return {fee_version: 1, coordinates: {lat: get('deliveryLat').value, lng: get('deliveryLng').value},
       city: get('deliveryCity').value, service_type: get('deliveryVehicle').value,
       location_confirmed: get('deliveryConfirmed').checked, package_confirmed: get('deliveryPackage').checked,
       schedule_at: shipping.value === 'Lalamove Biasa' && get('deliverySchedule').value
@@ -109,6 +111,7 @@
       requireCheckoutReady();
       const data = JSON.parse(options.body);
       delete data.logistics_fee;
+      delete data.logistics_admin_fee;
       if (!isPickup()) Object.assign(data, fields(), {quote_id: quote.quote_id});
       options = {...options, body: JSON.stringify(data)};
     }

@@ -18,11 +18,15 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    if(endpoint==='/api/delivery/services')return route.fulfill({json:{cities:[{name:'Kuala Lumpur',locode:'MY KUL',services:[{key:'MOTORCYCLE',load:{value:'10',unit:'kg'},dimensions:{length:{value:'0.4',unit:'m'}}}]}]}});
    if(endpoint==='/api/delivery/quotation'){
     if(delayQuote)await new Promise(r=>{pendingQuote=r;});
-    return route.fulfill({status:quoteFailure?400:200,json:quoteFailure?{error:'Seller pickup missing'}:{quote_id:'server-quote',fee:9,currency:'MYR',expires_at:Math.floor(Date.now()/1000)+300}});
+    return route.fulfill({status:quoteFailure?400:200,json:quoteFailure?{error:'Seller pickup missing'}:{quote_id:'server-quote',fee:9.4,courier_fee:9,admin_fee:0.4,fee_version:1,currency:'MYR',expires_at:Math.floor(Date.now()/1000)+300}});
    }
    if(endpoint==='/api/payments/billplz/create')return route.fulfill({json:{message:'Payment mocked; no charge.'}});
    if(endpoint==='/api/checkout')return route.fulfill({json:{id:123,total:20,payment_status:'unpaid'}});
    if(endpoint==='/api/delivery/pickup')return route.fulfill({json:{pickup:null}});
+   if(endpoint==='/api/orders'){
+    assert.equal(req.headers().authorization,'Bearer test');
+    return route.fulfill({json:{orders:[{id:123,total:29.4,logistics_fee:9.4,logistics_admin_fee:.4,product_id:1,quantity:1,payment_status:'paid'}]}});
+   }
    return route.fulfill({json:{products:[{id:1,name:'USB cable',shop:'Test Shop',price:20,stock:5,weight_kg:0.5}],cart:[{product_id:1,quantity:1}],notifications:[],unread:0,campaigns:[]}});
   });
   const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(5000);
@@ -33,13 +37,13 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    await page.locator('#pay').click();assert.equal(writes.filter(x=>x.endpoint.includes('/payments/')).length,0);
    await page.locator('#deliveryLat').fill('3.14');await page.locator('#deliveryLng').fill('101.69');
    await page.locator('#deliveryConfirmed').check();await page.locator('#deliveryPackage').check();
-   await page.locator('#deliveryQuote').click();await page.waitForFunction(()=>document.getElementById('deliveryStatus').textContent.includes('RM9.00'));
-   assert.match(await page.locator('#summary').textContent(),/RM29.00/);
+   await page.locator('#deliveryQuote').click();await page.waitForFunction(()=>document.getElementById('deliveryStatus').textContent.includes('RM9.40'));
+   assert.match(await page.locator('#summary').textContent(),/RM29.40/);assert.match(await page.locator('#summary').textContent(),/RM0.40/);assert.match(await page.locator('#summary').textContent(),/RM9.00/);
    await page.screenshot({path:path.resolve('../outputs/delivery-checkout-'+width+'.png'),fullPage:true});
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    await page.locator('#pay').click();await page.waitForFunction(()=>document.getElementById('result').textContent.includes('mocked'));
    const sent=writes.findLast(x=>x.endpoint.includes('/payments/')).body;
-   assert.equal(sent.quote_id,'server-quote');assert.equal(sent.logistics_fee,undefined);
+   assert.equal(sent.quote_id,'server-quote');assert.equal(sent.fee_version,1);assert.equal(sent.logistics_fee,undefined);
    await page.locator('#address').fill('Changed address');assert.equal(await page.locator('#deliveryConfirmed').isChecked(),false);
    const n=writes.length;await page.locator('#pay').click();assert.equal(writes.length,n);
    await page.locator('#shipping').selectOption('Lalamove Biasa');assert.equal(await page.locator('#deliverySchedule').isVisible(),true);
@@ -54,6 +58,12 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
   quoteFailure=true;await page.locator('#deliveryQuote').click();await page.waitForTimeout(250);console.log('Failure status:',await page.locator('#deliveryStatus').textContent());await page.waitForFunction(()=>document.getElementById('deliveryStatus').textContent.includes('pickup missing'));
   quoteFailure=false;delayQuote=true;await page.locator('#deliveryQuote').click();await page.waitForTimeout(100);await page.locator('#address').fill('Changed during quote');pendingQuote();
   await page.waitForTimeout(200);assert.doesNotMatch(await page.locator('#deliveryStatus').textContent(),/RM9/);
+  for(const file of ['receipt.html','order-confirmation.html']){
+   await page.goto(origin+'/buyer/'+file+'?id=123');
+   await page.waitForFunction(()=>document.body.textContent.includes('RM0.40'));
+   assert.match(await page.locator('main').textContent(),/RM9.00/);
+   assert.match(await page.locator('main').textContent(),/RM29.40/);
+  }
   await ctx.addInitScript(()=>localStorage.setItem('pm_user',JSON.stringify({id:2,role:'seller',name:'Seller',shop_name:'Shop',address:'Test pickup'})));
   await page.goto(origin+'/seller/pickup-location.html');await page.locator('#savePickup').waitFor();await page.waitForTimeout(200);
   await page.locator('#lat').fill('3.15');await page.locator('#lng').fill('101.71');await page.locator('#confirmed').check();await page.locator('#savePickup').click();

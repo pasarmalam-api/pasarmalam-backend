@@ -1,5 +1,6 @@
 """Persisted pickup locations and single-use, server-priced delivery quotations."""
 from datetime import datetime
+from decimal import Decimal
 import json
 import math
 import secrets
@@ -13,6 +14,7 @@ METHODS = {
     'Lalamove Biasa': 'standard', 'Lalamove Regular': 'standard', 'Standard Rider': 'standard',
     'Lalamove Segera': 'express', 'Lalamove Instant': 'express', 'Express Rider': 'express',
 }
+ADMIN_FEE = Decimal('0.40')
 
 
 def migrate(con):
@@ -62,6 +64,8 @@ def context(con, user, product, qty, data):
 
 
 def create_quote(con, user, product, qty, data, client=None):
+    if data.get('fee_version') != 1:
+        raise ValueError('Please refresh checkout to view the delivery fee breakdown.')
     ctx = context(con, user, product, qty, data)
     client = client or Client()
     cities = client.cities()
@@ -78,12 +82,18 @@ def create_quote(con, user, product, qty, data, client=None):
     if load.get('unit') != 'kg' or not math.isfinite(limit) or not math.isfinite(weight) or weight <= 0 or weight > limit:
         raise ValueError('The package weight exceeds this vehicle capacity or cannot be verified.')
     quote = client.quote(ctx)
+    courier = Decimal(str(quote['priceBreakdown']['total'])).quantize(Decimal('0.01'))
+    charges = {'courier_fee': float(courier), 'admin_fee': float(ADMIN_FEE),
+               'total': float(courier + ADMIN_FEE), 'version': 1}
+    # Store platform pricing separately from the unmodified provider quotation.
+    stored_quote = {**quote, '_pasarmalam_charges': charges}
     ident = secrets.token_urlsafe(32)
     expires = int(datetime.fromisoformat(quote['expiresAt'].replace('Z', '+00:00')).timestamp())
     con.execute('DELETE FROM delivery_quotes WHERE used=0 AND expires_at<?', (int(time.time()) - 86400,))
     con.execute('INSERT INTO delivery_quotes(id,buyer_id,context,quotation,expires_at,used) VALUES(?,?,?,?,?,0)',
-                (ident, user['id'], json.dumps(ctx, sort_keys=True), json.dumps(quote), expires))
-    return {'quote_id': ident, 'fee': float(quote['priceBreakdown']['total']), 'currency': 'MYR',
+                (ident, user['id'], json.dumps(ctx, sort_keys=True), json.dumps(stored_quote), expires))
+    return {'quote_id': ident, 'fee': charges['total'], 'courier_fee': charges['courier_fee'],
+            'admin_fee': charges['admin_fee'], 'fee_version': 1, 'currency': 'MYR',
             'expires_at': expires, 'mode': ctx['mode']}
 
 
@@ -98,12 +108,19 @@ def consume(con, user, product, qty, data):
         raise ValueError('Your delivery quote has expired or was used. Request a new quote.')
     if json.loads(row['context']) != ctx:
         raise ValueError('Delivery details changed. Request a new quote.')
+    quote = json.loads(row['quotation'])
+    charges = quote.pop('_pasarmalam_charges', None)
+    # Quotes issued before this release retain their original price and no admin fee.
+    if charges is None:
+        charges = {'courier_fee': float(quote['priceBreakdown']['total']), 'admin_fee': 0,
+                   'total': float(quote['priceBreakdown']['total']), 'version': 0}
+    if charges['version'] == 1 and data.get('fee_version') != 1:
+        raise ValueError('Please refresh checkout to view the delivery fee breakdown.')
     claimed = con.execute('UPDATE delivery_quotes SET used=1 WHERE id=? AND used=0 RETURNING id', (row['id'],)).fetchone()
     if not claimed:
         raise ValueError('This delivery quote was already used.')
-    quote = json.loads(row['quotation'])
     seller = con.execute('SELECT name,phone FROM users WHERE id=?', (product['seller_id'],)).fetchone()
-    return float(quote['priceBreakdown']['total']), {'context': ctx, 'quotation': quote,
+    return charges['total'], {'context': ctx, 'quotation': quote, 'charges': charges,
                                                   'pickup_contact': dict(seller),
                                                   'recipient': {'name': user['name'], 'phone': str(data.get('buyer_phone') or user.get('phone') or '')},
                                                   'dispatch_status': 'manual_booking_required'}

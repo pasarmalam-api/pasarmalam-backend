@@ -812,6 +812,7 @@ def migrate_orders(con):
         "tracking_no": "TEXT DEFAULT ''",
         "awb_label": "TEXT DEFAULT ''",
         "delivery_data": "TEXT DEFAULT ''",
+        "logistics_admin_fee": "REAL DEFAULT 0",
     }
     for name, sql in additions.items():
         if name not in columns:
@@ -1571,8 +1572,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def attach_delivery(self, con, order_id, details):
         if details:
-            con.execute("UPDATE orders SET delivery_data=?, tracking_no='', awb_label='' WHERE id=?",
-                        (json.dumps(details), order_id))
+            con.execute("UPDATE orders SET delivery_data=?, logistics_admin_fee=?, tracking_no='', awb_label='' WHERE id=?",
+                        (json.dumps(details), details.get('charges', {}).get('admin_fee', 0), order_id))
             notify_admins(con, f"Courier booking required for PM-{order_id}",
                           "Check payment before manually booking Lalamove. A quotation is not a courier booking.",
                           "logistics", "orders.html")
@@ -3454,6 +3455,9 @@ def sync_wallet_settlements(con):
         seller = row_to_dict(seller) if seller else {"created_at": now(), "business_verification_status": "not_submitted"}
         rate = commission_rate_for_seller(seller)
         gross = round(as_float(order["total"]), 2)
+        details = json.loads(order.get("delivery_data") or '{}')
+        if details.get('charges', {}).get('version') == 1:
+            gross = round(max(gross - as_float(order["logistics_fee"]), 0), 2)
         commission = round(gross * rate / 100, 2)
         earning = round(gross - commission, 2)
         con.execute(

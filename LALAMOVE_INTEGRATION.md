@@ -24,6 +24,18 @@ belong in source control, Tiiny archives, browser storage or this document.
 
 ## Buyer checkout release
 
+New delivery quotes include a RM0.40 PasarMalam logistics admin fee per order,
+not per item. `fee` is the combined courier plus admin amount; `courier_fee` and
+`admin_fee` provide the separate display lines. Self-pickup has neither charge.
+Checkout sends `fee_version: 1`; old checkout clients must refresh before requesting
+a new quote. Already-issued legacy quotes retain their original price without an
+added fee. The provider's quotation price is never overwritten.
+
+Orders persist `logistics_admin_fee` separately, while `logistics_fee` remains the
+combined delivery charge included in the order total. Receipts and admin details
+show the split. New version-1 orders exclude the full logistics amount from seller
+settlements; historical orders and existing settlements are not rewritten.
+
 The new checkout requests live prices and stores single-use quotes server-side. Each
 quote is tied to its buyer, seller, product, quantity, variant, product price/weight,
 route, vehicle and schedule. All payment paths ignore client prices. Self-pickup is

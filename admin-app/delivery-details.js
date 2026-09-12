@@ -10,6 +10,7 @@ function deliveryDetails(order) {
       <p>Recipient: ${esc(d.recipient?.name || '')} ${esc(d.recipient?.phone || '')}</p>
       <p>${esc(c.mode)} | ${esc(c.service_type)} | ${esc(c.schedule_at || 'Immediate pickup')}</p>
       <p>Buyer delivery charge: ${money(order.logistics_fee)}</p>
+      <p>Courier: ${money(Number(order.logistics_fee || 0) - Number(order.logistics_admin_fee || 0))} | PasarMalam logistics admin fee: ${money(order.logistics_admin_fee || 0)}</p>
       <p>Quotation is not a booking. Requote when booking; do not charge the buyer extra without their agreement.</p></details>`;
   } catch (_) { return '<p>Delivery details unavailable. Review before dispatch.</p>'; }
 }
