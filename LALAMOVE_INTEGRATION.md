@@ -22,25 +22,33 @@ Set `LALAMOVE_API_KEY`, `LALAMOVE_API_SECRET` and `LALAMOVE_ENV` (`production` o
 settings using Save only; they become active on the next deployment. No credentials
 belong in source control, Tiiny archives, browser storage or this document.
 
-## Not yet enabled
+## Buyer checkout release
 
-This is a diagnostic foundation, not a completed checkout integration. The existing
-buyer checkout still uses legacy fixed prices; those are NOT live Lalamove quotations.
-Do not advertise live Lalamove pricing or automatic dispatch yet.
+The new checkout requests live prices and stores single-use quotes server-side. Each
+quote is tied to its buyer, seller, product, quantity, variant, product price/weight,
+route, vehicle and schedule. All payment paths ignore client prices. Self-pickup is
+free and cash orders cannot mark themselves paid. Legacy non-quoted delivery methods
+are rejected. Roll out the matching frontend and backend together.
+
+Seller Store Profile links to Pickup Location. Sellers must save a confirmed pickup
+address and coordinates. Buyers can use browser geolocation or manually supply the
+coordinates of their delivery address, then confirm the match. Package weight is
+validated against the API vehicle limit; dimensions require buyer confirmation.
+
+Couriers are NOT booked automatically. The admin order view shows pickup, delivery,
+contacts and the accepted delivery charge. An admin must verify payment, arrange the
+delivery manually, and record its tracking number. Refresh the provider quote when
+booking; any changed fare must not be silently charged to the buyer. No shipment is
+marked booked merely because checkout has a quotation.
 
 Before buyer rollout:
 
-1. Verify authenticated city information and diagnostic quotes after deployment.
-2. Capture seller pickup coordinates and buyer delivery coordinates with consent;
-   confirm they match the entered addresses. Nearest-seller sorting is still pending.
-3. Validate package weight/dimensions against vehicle capacity.
-4. Persist quotations server-side and bind them to buyer, seller, product, quantity,
-   address, coordinates, service and schedule. Checkout must reject expired/mismatched
-   quotes and ignore client-supplied delivery prices in ALL payment paths.
-5. Add buyer selection, schedule controls and quotation refresh; test browser flows.
-6. Implement idempotent dispatch after verified payment, tracking/webhooks and recovery
+1. Configure real seller pickup locations and verify route accuracy with each seller.
+2. Nearest-seller sorting and automated address geocoding remain pending.
+3. Add seller package dimensions for automatic dimensional capacity checks.
+4. Implement idempotent dispatch after verified payment, tracking/webhooks and recovery
    for expired quotations or price changes. Never silently charge a changed fare.
-7. Confirm Pooling API support with Lalamove before enabling it only for explicitly
+5. Confirm Pooling API support with Lalamove before enabling it only for explicitly
    non-perishable shipments. Do not infer API availability from the consumer app.
 
 No real booking, top-up, product edit or buyer transaction is needed for these tests.
@@ -49,7 +57,10 @@ Official reference: https://developers.lalamove.com/
 
 ## Tests
 
-`python -m unittest test_lalamove test_seller_operations test_admin_backend test_seller_registration`
+`python -m unittest test_delivery test_lalamove test_seller_operations test_admin_backend test_seller_registration`
+
+`node test_delivery_ui.cjs` covers mobile/desktop checkout, quote failures and changed
+routes, zero-cost pickup and saving seller locations, with mocked APIs.
 
 Lalamove responses are mocked in automated tests; passing them does not establish
 production authentication, coverage, live rates or delivery performance.

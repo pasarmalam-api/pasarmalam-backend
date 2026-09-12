@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ms"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PasarMalam Pickup Location</title><link rel="stylesheet" href="seller.css?v=photos1">
+<script src="seller-session.js?v=2"></script><script src="seller-auth-guard.js?v=session1"></script></head>
+<body><div class="app"><aside><a class="brand" href="index.html"><div class="logo">PM</div><h1>PasarMalam</h1></a>
+<nav><a href="index.html">Dashboard</a><a href="store-profile.html">Store Profile</a><a href="products.html">Products</a><a href="orders.html">Orders</a></nav></aside>
+<div><header><div class="top"><h2>Lokasi Pengambilan</h2><a href="store-profile.html">Kembali</a></div></header>
+<main><form id="pickupForm" style="max-width:640px">
+<label for="pickupAddress">Alamat pengambilan</label><textarea id="pickupAddress" required maxlength="1000"></textarea>
+<button type="button" id="locate" class="soft">Gunakan lokasi semasa</button>
+<label for="lat">Latitud</label><input id="lat" type="number" step="any" min="-90" max="90" required>
+<label for="lng">Longitud</label><input id="lng" type="number" step="any" min="-180" max="180" required>
+<label style="display:block;margin:16px 0"><input id="confirmed" type="checkbox" required style="width:auto"> Saya sahkan koordinat sepadan dengan alamat pengambilan.</label>
+<button id="savePickup" class="primary" type="submit">Simpan lokasi</button><p id="status" role="status"></p>
+</form></main></div></div>
+<script>
+(() => {
+  const $=id=>document.getElementById(id), token=localStorage.getItem('pm_token')||'';
+  async function api(options){const r=await fetch('https://pasarmalam-backend.onrender.com/api/delivery/pickup',{...options,headers:{'Content-Type':'application/json',Authorization:'Bearer '+token}});const d=await r.json();if(!r.ok)throw new Error(d.error||'Request failed');return d;}
+  for(const id of ['pickupAddress','lat','lng'])$(id).oninput=()=>{$('confirmed').checked=false;};
+  $('locate').onclick=()=>{
+    if(!navigator.geolocation){$('status').textContent='Lokasi tidak tersedia.';return;}
+    $('status').textContent='Mencari lokasi...';
+    navigator.geolocation.getCurrentPosition(p=>{$('lat').value=p.coords.latitude.toFixed(6);$('lng').value=p.coords.longitude.toFixed(6);$('confirmed').checked=false;$('status').textContent='';},()=>{$('status').textContent='Lokasi tidak dibenarkan. Masukkan koordinat alamat.';},{enableHighAccuracy:true,timeout:15000,maximumAge:0});
+  };
+  $('pickupForm').onsubmit=async e=>{e.preventDefault();$('savePickup').disabled=true;try{await api({method:'POST',body:JSON.stringify({address:$('pickupAddress').value.trim(),coordinates:{lat:$('lat').value,lng:$('lng').value},confirmed:$('confirmed').checked})});$('status').textContent='Lokasi pengambilan disimpan.';}catch(e){$('status').textContent=e.message;}finally{$('savePickup').disabled=false;}};
+  $('savePickup').disabled=true;
+  api().then(d=>{if(d.pickup){$('pickupAddress').value=d.pickup.address;$('lat').value=d.pickup.coordinates.lat;$('lng').value=d.pickup.coordinates.lng;}else{try{$('pickupAddress').value=JSON.parse(localStorage.getItem('pm_user')||'{}').address||'';}catch(e){}}$('savePickup').disabled=false;}).catch(e=>{$('status').textContent=e.message;});
+})();
+</script><script src="seller-actions.js?v=1"></script><script src="badges.js?v=audit2"></script></body></html>

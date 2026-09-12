@@ -2,6 +2,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 import base64
 from lalamove import Client as LalamoveClient, LalamoveError
+import delivery
 import hashlib
 import hmac
 import json
@@ -790,6 +791,7 @@ def migrate_products(con):
 
 
 def migrate_orders(con):
+    delivery.migrate(con)
     columns = table_columns(con, "orders")
     additions = {
         "buyer_id": "INTEGER DEFAULT 1",
@@ -809,6 +811,7 @@ def migrate_orders(con):
         "escrow_release_at": "INTEGER DEFAULT 0",
         "tracking_no": "TEXT DEFAULT ''",
         "awb_label": "TEXT DEFAULT ''",
+        "delivery_data": "TEXT DEFAULT ''",
     }
     for name, sql in additions.items():
         if name not in columns:
@@ -1378,6 +1381,8 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/wallet": self.get_wallet,
                 "/api/metrics": self.get_metrics,
                 "/api/logistics/rates": self.get_logistics_rates,
+                "/api/delivery/pickup": self.delivery_pickup,
+                "/api/delivery/services": self.delivery_services,
                 "/api/public/settings": self.public_settings,
                 "/api/payments/toyyibpay/status": lambda: self.toyyibpay_status(query),
                 "/api/payments/toyyibpay/return": lambda: self.toyyibpay_return(query),
@@ -1439,6 +1444,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.reset_admin_password(data)
             elif parsed.path == "/api/profile":
                 self.update_profile(data)
+            elif parsed.path == "/api/delivery/pickup" and method == "POST":
+                self.delivery_pickup(data)
+            elif parsed.path == "/api/delivery/quotation" and method == "POST":
+                self.delivery_quotation(data)
             elif parsed.path == "/api/products" and method == "POST":
                 self.create_product(data)
             elif parsed.path.startswith("/api/products/"):
@@ -1539,6 +1548,34 @@ class Handler(BaseHTTPRequestHandler):
                                   "booking_enabled": False, "pooling_enabled": False})
         except LalamoveError as exc:
             send_json(self, 503, {"error": str(exc)})
+
+    def delivery_pickup(self, data=None):
+        user = self.require_user("seller")
+        with connect() as con:
+            point = delivery.pickup(con, user["id"]) if data is None else delivery.save_pickup(con, user["id"], data)
+        send_json(self, 200, {"pickup": point})
+
+    def delivery_services(self):
+        self.require_user("buyer")
+        try:
+            send_json(self, 200, {"cities": LalamoveClient().cities(), "pooling_enabled": False})
+        except LalamoveError as exc:
+            send_json(self, 503, {"error": str(exc)})
+
+    def delivery_quotation(self, data):
+        user = self.require_user("buyer")
+        with connect() as con:
+            product, qty, _, _, _ = self.validate_checkout_payload(con, {**data, "payment_method": "quotation"}, user)
+            quote = delivery.create_quote(con, user, product, qty, data)
+        send_json(self, 200, quote)
+
+    def attach_delivery(self, con, order_id, details):
+        if details:
+            con.execute("UPDATE orders SET delivery_data=?, tracking_no='', awb_label='' WHERE id=?",
+                        (json.dumps(details), order_id))
+            notify_admins(con, f"Courier booking required for PM-{order_id}",
+                          "Check payment before manually booking Lalamove. A quotation is not a courier booking.",
+                          "logistics", "orders.html")
 
     def admin_lalamove_quotation(self, data):
         self.require_user("admin")
@@ -2341,11 +2378,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def checkout(self, data):
         user = self.require_user("buyer")
+        if data.get("payment_method") != "Cash Pickup" or delivery.METHODS.get(data.get("logistics_method")) != "pickup":
+            raise ValueError("Use the payment gateway for delivery orders. Cash payment is for pickup only.")
         buyer_id = user["id"]
         buyer_name = user["name"]
         with connect() as con:
             product, qty, address, payment_method, buyer_phone = self.validate_checkout_payload(con, data, user)
-            fee = float(data.get("logistics_fee", shipping_fee(data.get("logistics_method", product["shipping_type"]), product["weight_kg"])))
+            fee, delivery_details = delivery.consume(con, user, product, qty, data)
             subtotal = float(product["price"]) * qty
             discount, voucher_code = campaign_discount(con, product["seller_id"], data.get("voucher_code", ""), subtotal)
             if voucher_code and str(data.get("voucher_code", "")).strip() and str(voucher_code).lower() != str(data.get("voucher_code", "")).strip().lower():
@@ -2353,9 +2392,9 @@ class Handler(BaseHTTPRequestHandler):
             total = max(subtotal + fee - discount, 0)
             tracking = f"PM{now()}{product['id']}"
             awb = f"AWB-{tracking}-{data.get('logistics_method', product['shipping_type']).replace(' ', '-')}"
-            payment_status = data.get("payment_status", "paid")
-            order_status = data.get("order_status", "placed")
-            escrow_status = data.get("escrow_status", "holding")
+            payment_status = "unpaid"
+            order_status = "pending_payment"
+            escrow_status = "pending"
             payment_proof_url = data.get("payment_proof_url", "")
             payment_reference = data.get("payment_reference", "")
             if voucher_code:
@@ -2383,7 +2422,14 @@ class Handler(BaseHTTPRequestHandler):
         product = con.execute("SELECT * FROM products WHERE id = ?", (int(data["product_id"]),)).fetchone()
         if not product:
             raise ValueError("Product not found")
-        qty = int(data.get("quantity", 1))
+        raw_qty = data.get("quantity", 1)
+        try:
+            number = float(raw_qty)
+            if isinstance(raw_qty, bool) or not math.isfinite(number) or not number.is_integer():
+                raise ValueError()
+            qty = int(number)
+        except (TypeError, ValueError, OverflowError):
+            raise ValueError("Quantity must be a whole number") from None
         if qty < 1:
             raise ValueError("Quantity must be at least 1")
         if qty > int(product["stock"] or 0):
@@ -2408,7 +2454,7 @@ class Handler(BaseHTTPRequestHandler):
         buyer_email = data.get("buyer_email") or user.get("email", "")
         with connect() as con:
             product, qty, address, payment_method, buyer_phone = self.validate_checkout_payload(con, data, user)
-            fee = float(data.get("logistics_fee", shipping_fee(data.get("logistics_method", product["shipping_type"]), product["weight_kg"])))
+            fee, delivery_details = delivery.consume(con, user, product, qty, data)
             subtotal = float(product["price"]) * qty
             discount, voucher_code = campaign_discount(con, product["seller_id"], data.get("voucher_code", ""), subtotal)
             total = max(subtotal + fee - discount, 0)
@@ -2423,6 +2469,7 @@ class Handler(BaseHTTPRequestHandler):
                 (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), address, total, data.get("logistics_method", product["shipping_type"]), fee, tracking, awb, now()),
             )
             order_id = cur.lastrowid
+            self.attach_delivery(con, order_id, delivery_details)
 
         bill_name = clean_toyyib_text(f"PasarMalam Order {order_id}", 30)
         bill_description = clean_toyyib_text(f"Payment for order {order_id}", 100)
@@ -2467,7 +2514,7 @@ class Handler(BaseHTTPRequestHandler):
         buyer_email = data.get("buyer_email") or user.get("email", "")
         with connect() as con:
             product, qty, address, payment_method, buyer_phone = self.validate_checkout_payload(con, data, user)
-            fee = float(data.get("logistics_fee", shipping_fee(data.get("logistics_method", product["shipping_type"]), product["weight_kg"])))
+            fee, delivery_details = delivery.consume(con, user, product, qty, data)
             subtotal = float(product["price"]) * qty
             discount, voucher_code = campaign_discount(con, product["seller_id"], data.get("voucher_code", ""), subtotal)
             total = max(subtotal + fee - discount, 0)
@@ -2482,6 +2529,7 @@ class Handler(BaseHTTPRequestHandler):
                 (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), address, total, data.get("logistics_method", product["shipping_type"]), fee, tracking, awb, now()),
             )
             order_id = cur.lastrowid
+            self.attach_delivery(con, order_id, delivery_details)
 
         payload = {
             "collection_id": BILLPLZ_COLLECTION_ID,
