@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Registration received | PasarMalam</title>
+  <meta name="robots" content="noindex">
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f8faf9;color:#202b28;font:17px/1.6 system-ui,sans-serif}
+    header,main{max-width:680px;margin:auto;padding:28px 24px}header{border-bottom:1px solid #dbe5df}
+    a{color:#087d65}header a{font-weight:700;text-decoration:none;font-size:22px}
+    main{padding-top:48px}h1{font-size:30px;line-height:1.25;overflow-wrap:anywhere}
+    .status{display:inline-block;color:#655010;background:#fff1bd;padding:4px 10px;border-radius:4px}
+    .home{display:inline-block;min-height:44px;padding:10px 0;margin-top:12px}
+  </style>
+</head>
+<body>
+  <header><a href="index.html">PasarMalam</a></header>
+  <main>
+    <span class="status" id="pending">Pending review</span>
+    <h1 id="thanks">Thank you for your registration</h1>
+    <p id="message">Your seller application has been received. You will be contacted shortly.</p>
+    <p id="emailNote">Your acknowledgement email will be sent to your registered email address. Please check your spam folder too.</p>
+    <a class="home" id="home" href="index.html">Return to home</a>
+  </main>
+  <script>
+    const messages={
+      ms:["Menunggu semakan","Terima kasih atas pendaftaran anda","Permohonan penjual anda telah diterima. Kami akan menghubungi anda tidak lama lagi.","Emel pengesahan penerimaan akan dihantar ke alamat emel berdaftar anda. Sila semak folder spam juga.","Kembali ke laman utama"],
+      zh:["等待审核","感谢您的注册","我们已收到您的卖家申请，将尽快与您联系。","确认邮件将发送至您的注册邮箱，请同时检查垃圾邮件文件夹。","返回首页"]
+    };
+    let lang="ms";try{lang=localStorage.getItem("pasarmalam-lang")||"ms"}catch(e){}
+    document.documentElement.lang=lang;
+    if(messages[lang])["pending","thanks","message","emailNote","home"].forEach((id,i)=>document.getElementById(id).textContent=messages[lang][i]);
+  </script>
+</body>
+</html>

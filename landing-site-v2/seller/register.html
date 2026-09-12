@@ -12,11 +12,13 @@ async function post(path,body){const r=await fetch(API+path,{method:"POST",heade
 async function sendSellerOtp(){try{if(!$("sellerEmail").value.trim()){setText("otpStatus","Email is required.");return}setText("otpStatus","Sending OTP...");const d=await post("/api/otp/email/send",{email:$("sellerEmail").value.trim(),purpose:"seller_signup"});setText("otpStatus",d.message||"OTP sent to email.")}catch(e){setText("otpStatus",e.message)}}
 async function verifySellerOtp(){try{if(!$("otp").value.trim()){setText("otpStatus","OTP code is required.");return}setText("otpStatus","Verifying OTP...");const d=await post("/api/otp/email/verify",{email:$("sellerEmail").value.trim(),code:$("otp").value.trim(),purpose:"seller_signup"});sellerOtpToken=d.email_otp_token;setText("otpStatus","Email verified. Continue seller application.")}catch(e){setText("otpStatus",e.message)}}
 function required(id,message){if(!$(id).value.trim()){setText("applyStatus",message);return false}return true}
-async function applySeller(){try{
+let submittingSeller=false;
+async function applySeller(){if(submittingSeller)return;try{
   if(!required("sellerName","Owner name is required."))return;if(!required("sellerPhone","Phone number is required."))return;if(!required("sellerEmail","Email is required."))return;if(!sellerOtpToken){setText("applyStatus","Please verify seller email OTP first.");return}if($("sellerPassword").value.length<8){setText("applyStatus","Password must be at least 8 characters.");return}
   for(const item of [["shopName","Shop name is required."],["identityType","Identity type is required."],["identityNumber","Identity number is required."],["sellerAddress","Seller address is required."],["bankName","Bank name is required."],["bankAccountName","Bank account holder name is required."],["bankAccountNumber","Bank account number is required."]]){if(!required(item[0],item[1]))return}
+  submittingSeller=true;
   setText("applyStatus","Submitting seller application...");
   await post("/api/auth/signup",{role:"seller",name:$("sellerName").value.trim(),email:$("sellerEmail").value.trim(),password:$("sellerPassword").value,phone:$("sellerPhone").value.trim(),address:$("sellerAddress").value.trim(),shop_name:$("shopName").value.trim(),identity_type:$("identityType").value,identity_number:$("identityNumber").value.trim(),business_type:$("businessType").value,ssm_number:$("ssmNumber").value.trim(),bank_name:$("bankName").value.trim(),bank_account_name:$("bankAccountName").value.trim(),bank_account_number:$("bankAccountNumber").value.trim(),email_otp_token:sellerOtpToken});
-  setText("applyStatus","Application submitted. Admin must approve before seller login works.");
-}catch(e){setText("applyStatus",e.message)}}
+  location.replace("thank-you.html");
+}catch(e){submittingSeller=false;setText("applyStatus",e.message)}}
 </script><script src="badges.js"></script></body></html>

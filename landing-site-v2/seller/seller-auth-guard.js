@@ -1,5 +1,5 @@
 (function(){
-  const publicPages=new Set(["index.html","login.html","register.html","policies.html"]);
+  const publicPages=new Set(["index.html","login.html","register.html","thank-you.html","policies.html"]);
   const page=(location.pathname.split("/").pop()||"index.html").toLowerCase();
   if(publicPages.has(page))return;
 

@@ -9,6 +9,8 @@ import re
 import secrets
 import sqlite3
 import time
+import threading
+from html import escape
 import urllib.parse
 import urllib.request
 from decimal import Decimal
@@ -439,6 +441,70 @@ def init_db():
         migrate_email_otps(con)
         migrate_notifications(con)
         migrate_support_tickets(con)
+        migrate_seller_email_queue(con)
+
+
+def migrate_seller_email_queue(con):
+    pk = "SERIAL PRIMARY KEY" if USE_POSTGRES else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    con.execute(f"""CREATE TABLE IF NOT EXISTS seller_email_queue (
+        id {pk}, user_id INTEGER NOT NULL, kind TEXT NOT NULL,
+        recipient TEXT NOT NULL, subject TEXT NOT NULL, html TEXT NOT NULL,
+        created_at BIGINT NOT NULL, sent_at BIGINT DEFAULT 0,
+        attempts INTEGER DEFAULT 0, next_attempt_at BIGINT DEFAULT 0,
+        UNIQUE(user_id, kind))""")
+
+
+def queue_seller_emails(con, user_id, data):
+    name = escape(data["name"])
+    shop = escape(data["shop_name"])
+    acknowledgement = (
+        f"<p>Hello {name},</p><h2>Thank you for your registration</h2>"
+        f"<p>We have received your seller application for {shop}. Your status is <strong>Pending review</strong>.</p>"
+        "<p>You will be contacted shortly. Seller access will be available after approval.</p>"
+        "<p>Terima kasih atas pendaftaran anda. Permohonan penjual anda sedang menunggu semakan. "
+        "Kami akan menghubungi anda tidak lama lagi.</p><p>PasarMalam</p>"
+    )
+    admin_message = (
+        f"<h2>New seller application #{user_id}</h2><p>Status: Pending review</p>"
+        f"<p>Name: {name}<br>Shop: {shop}<br>Email: {escape(data['email'])}"
+        f"<br>Phone: {escape(data.get('phone', ''))}</p>"
+        '<p><a href="https://bronze-kally-50.tiiny.site/sellers.html">Review seller application</a></p>'
+    )
+    for kind, recipient, subject, html in (
+        ("acknowledgement", data["email"].strip(), "PasarMalam seller registration received - Pending review", acknowledgement),
+        ("admin", "pasahmallam@gmail.com", "PasarMalam - New seller application", admin_message),
+    ):
+        con.execute("INSERT INTO seller_email_queue (user_id, kind, recipient, subject, html, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                    (user_id, kind, recipient, subject, html, now()))
+    notify_admins(con, f"New seller application #{user_id}", f"{data['shop_name']} is awaiting review.", "seller", "sellers.html")
+
+
+def deliver_seller_emails():
+    if not RESEND_API_KEY:
+        return
+    with connect() as con:
+        rows = [row_to_dict(row) for row in con.execute(
+            "SELECT * FROM seller_email_queue WHERE sent_at = 0 AND attempts < 8 AND next_attempt_at <= ? ORDER BY id LIMIT 20", (now(),))]
+    for row in rows:
+        try:
+            send_email(row["recipient"], row["subject"], row["html"], idempotency_key=f"seller-registration-{row['user_id']}-{row['kind']}")
+        except Exception:
+            with connect() as con:
+                con.execute("UPDATE seller_email_queue SET attempts = attempts + 1, next_attempt_at = ? WHERE id = ?",
+                            (now() + min(3600, 60 * 2 ** row["attempts"]), row["id"]))
+            print(f"Seller registration email {row['id']} failed; attempt {row['attempts'] + 1}/8", flush=True)
+        else:
+            with connect() as con:
+                con.execute("UPDATE seller_email_queue SET sent_at = ?, attempts = attempts + 1 WHERE id = ?", (now(), row["id"]))
+
+
+def seller_email_worker():
+    while True:
+        try:
+            deliver_seller_emails()
+        except Exception:
+            print("Seller registration email queue could not be processed", flush=True)
+        time.sleep(30)
 
 
 def postgres_schema_statements():
@@ -1701,6 +1767,8 @@ class Handler(BaseHTTPRequestHandler):
                     now(),
                 ),
             )
+            if role == "seller":
+                queue_seller_emails(con, cur.lastrowid, data)
         user = {"id": cur.lastrowid, "role": role, "name": data["name"], "phone": data.get("phone", ""), "email": data["email"], "address": data.get("address", ""), "shop_name": data.get("shop_name", ""), "status": "active", "seller_status": seller_status}
         send_json(self, 201, {"token": make_token(user), "user": user})
 
@@ -3376,7 +3444,7 @@ def verify_email_otp_token(email, token, purpose="buyer_signup"):
     return payload.get("email") == email and payload.get("purpose") == purpose and payload.get("exp", 0) >= now()
 
 
-def send_email(to_email, subject, html):
+def send_email(to_email, subject, html, idempotency_key=None):
     payload = {
         "from": RESEND_FROM_EMAIL,
         "to": [to_email],
@@ -3393,6 +3461,8 @@ def send_email(to_email, subject, html):
         },
         method="POST",
     )
+    if idempotency_key:
+        request.add_header("Idempotency-Key", idempotency_key)
     try:
         with urllib.request.urlopen(request, timeout=20) as response:
             raw = response.read().decode("utf-8")
@@ -3404,6 +3474,7 @@ def send_email(to_email, subject, html):
 
 if __name__ == "__main__":
     init_db()
+    threading.Thread(target=seller_email_worker, daemon=True).start()
     server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
     print(f"PasarMalam API running on http://localhost:{PORT}")
     server.serve_forever()
