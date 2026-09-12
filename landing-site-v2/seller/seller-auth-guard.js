@@ -35,7 +35,7 @@
   let user={};
   try{user=JSON.parse(getStored("pm_user")||"{}")}catch(e){user={}}
   const token=getStored("pm_token")||"";
-  const isSeller=Boolean(token)&&(!user.role||user.role==="seller"||user.role==="admin");
+  const isSeller=Boolean(token)&&user.role==="seller";
   if(isSeller)return;
 
   window.PM_SELLER_AUTH_REQUIRED=true;

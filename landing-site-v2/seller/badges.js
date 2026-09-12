@@ -95,6 +95,8 @@
     document.addEventListener("keydown",e=>{if(e.key==="Escape")close()});
     window.addEventListener("resize",()=>{if(window.innerWidth>980)close()});
   }
+  Object.assign(dictionary.ms,{"Sign Out":"Log Keluar","Change Password":"Tukar Kata Laluan"});
+  Object.assign(dictionary.zh,{"Sign Out":"退出登录","Change Password":"更改密码"});
   function init(){setupLanguage();setupMobileMenu();setTimeout(applyLanguage,300)}
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
   const API="https://pasarmalam-backend.onrender.com";

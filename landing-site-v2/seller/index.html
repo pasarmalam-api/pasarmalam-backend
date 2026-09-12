@@ -1,10 +1,10 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ms">
-<head>
+<head><script src="seller-session.js?v=1"></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Pusat Penjual PasarMalam</title>
-  <link rel="stylesheet" href="seller.css">
+  <link rel="stylesheet" href="seller.css?v=session1">
   <style>
     .hero{min-height:214px;border-radius:8px;padding:22px;color:#fff;display:flex;align-items:flex-end;background:linear-gradient(90deg,#101828e6,#10182891,#10182822),url("pasar-malam-real.jpg") center/cover;margin-bottom:14px}
     .hero h2{font-size:34px;max-width:760px;margin-bottom:6px}
@@ -172,14 +172,14 @@
 <script>
 const API="https://pasarmalam-backend.onrender.com";
 const money=v=>`RM${Number(v||0).toFixed(2)}`;
-async function api(path){const r=await fetch(API+path);return r.json()}
+async function api(path){const r=await fetch(API+path);const data=await r.json();if(!r.ok)throw new Error(data.error||'Request failed');return data}
 const seedWords=/\b(Cloudinary|Postgres|Auth Seller|Voucher Test|Test Item|System test|Automated return|Buyer Bad|Seller Test|Bad Product|demo|test)\b/gi;
 function cleanText(v){return String(v??"").replace(seedWords,"").replace(/\b\d{5,}\b/g,"").replace(/\s{2,}/g," ").trim()}
 function cleanProduct(p){const fallback={Phones:"Smartphone",Chargers:"USB-C charger",Electronics:"Bluetooth speaker",Hardware:"Home tool set",Toys:"Toy set",Clothes:"Clothing item",Food:"Fresh food","Street Food":"Street food special",Drinks:"Fresh drink",Meals:"Meal set",Stationery:"Stationery bundle",Shoes:"Shoes"};let n=cleanText(p.name);if(!n||/bad|test|^charger\s*$/i.test(n)||/\d{5,}/.test(String(p.name||"")))n=fallback[p.category]||"Marketplace item";return {...p,name:n,shop:cleanText(p.shop)||"PasarMalam Seller",category:cleanText(p.category)||"Marketplace",condition:cleanText(p.condition)||"New"}}
 function img(p){const src=(p.images&&p.images[0])||p.image_url;return src?`<img class="thumb" src="${src}" alt="">`:""}
-function hasSellerSession(){return Boolean(localStorage.getItem("pm_token"))}
+function hasSellerSession(){return window.PMSellerSession.signedIn()}
 function showSignedOutDashboard(){orderCount.textContent="0";salesCount.textContent="RM0.00";ratingScore.textContent="0";responseRate.textContent="0%";lateShipment.textContent="0%";cancelRate.textContent="0%";productCount.textContent="0";productRows.innerHTML="<tr><td colspan='5' class='muted'>Log masuk untuk melihat produk kedai.</td></tr>";ordersBox.innerHTML="<p class='muted'>Log masuk untuk melihat pesanan.</p>";returnsBox.innerHTML="<p class='muted'>Log masuk untuk melihat pulangan.</p>";walletBox.innerHTML="<p class='muted'>Log masuk untuk melihat dompet.</p>";messagesBox.innerHTML="<p class='muted'>Log masuk untuk melihat mesej.</p>";ratesBox.innerHTML="<p class='muted'>Lalamove Segera dan Lalamove Biasa tersedia semasa checkout.</p>";reviewsBox.innerHTML="<p class='muted'>Belum ada ulasan.</p>"}
-async function loadMetrics(){if(!hasSellerSession()){showSignedOutDashboard();return}try{const m=await api("/api/metrics");orderCount.textContent=m.orders||0;salesCount.textContent=money(m.sales);ratingScore.textContent=m.rating||"0";responseRate.textContent=(m.response_rate||0)+"%";lateShipment.textContent=(m.late_shipment_rate||0)+"%";cancelRate.textContent=(m.cancellation_rate||0)+"%"}catch(e){}}
+async function loadMetrics(){if(!hasSellerSession()){showSignedOutDashboard();return}try{const m=await api("/api/metrics");orderCount.textContent=m.orders||0;salesCount.textContent=money(m.sales);ratingScore.textContent=m.rating||"0";responseRate.textContent=m.response_rate==null?"--":m.response_rate+"%";lateShipment.textContent=m.late_shipment_rate==null?"--":m.late_shipment_rate+"%";cancelRate.textContent=m.cancellation_rate==null?"--":m.cancellation_rate+"%"}catch(e){}}
 async function loadProducts(){if(!hasSellerSession())return;const d=await api("/api/products");const rows=(d.products||[]).map(cleanProduct);productCount.textContent=rows.length;drawProducts(rows);search.oninput=()=>drawProducts(rows)}
 function drawProducts(rows){const q=(search.value||"").toLowerCase();const limit=window.matchMedia("(max-width:700px)").matches?4:8;productRows.innerHTML=rows.filter(p=>`${p.name} ${p.category} ${p.shop}`.toLowerCase().includes(q)).slice(0,limit).map(p=>`<tr><td><div class="product-title">${img(p)}<div><b>${p.name}</b><div class="muted">${p.shop} | ${p.category}</div></div></div></td><td>${money(p.price)}</td><td><span class="tag ${p.stock<=5?"warn":""}">${p.stock}</span></td><td><span class="tag ${p.condition==="Used"?"warn":""}">${p.condition}</span></td><td><button class="soft" onclick="location.href='edit-product.html?id=${p.id}'">Edit</button></td></tr>`).join("")}
 async function loadOrders(){if(!hasSellerSession())return;const d=await api("/api/orders");const rows=(d.orders||[]).slice(0,5);ordersBox.innerHTML=rows.map(o=>`<div class="order"><b>PM-${o.id}</b> <span class="tag">${o.order_status}</span><p class="muted">${o.logistics_method||"Penghantaran"} | ${money(o.total)}</p></div>`).join("")||"<p class='muted'>Belum ada pesanan.</p>"}

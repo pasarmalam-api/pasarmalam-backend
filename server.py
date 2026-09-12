@@ -2624,10 +2624,11 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 200, {"settings": {row["key"]: row["value"] for row in rows}})
 
     def get_metrics(self):
+        seller = self.require_user("seller")
         with connect() as con:
-            orders = con.execute("SELECT COUNT(*) AS c, COALESCE(SUM(total),0) AS total FROM orders").fetchone()
-            reviews = con.execute("SELECT COALESCE(AVG(rating),0) AS rating FROM reviews").fetchone()
-            products = con.execute("SELECT COUNT(*) AS c FROM products").fetchone()
+            orders = con.execute("SELECT COUNT(*) AS c, COALESCE(SUM(o.total),0) AS total FROM orders o JOIN products p ON p.id=o.product_id WHERE p.seller_id=?", (seller["id"],)).fetchone()
+            reviews = con.execute("SELECT COALESCE(AVG(rating),0) AS rating FROM reviews WHERE seller_id=?", (seller["id"],)).fetchone()
+            products = con.execute("SELECT COUNT(*) AS c FROM products WHERE seller_id=?", (seller["id"],)).fetchone()
         send_json(
             self,
             200,
@@ -2635,9 +2636,9 @@ class Handler(BaseHTTPRequestHandler):
                 "live_products": products["c"],
                 "orders": orders["c"],
                 "sales": round(as_float(orders["total"]), 2),
-                "response_rate": 98,
-                "late_shipment_rate": 1.2,
-                "cancellation_rate": 0.8,
+                "response_rate": None,
+                "late_shipment_rate": None,
+                "cancellation_rate": None,
                 "rating": round(as_float(reviews["rating"]), 1),
             },
         )
