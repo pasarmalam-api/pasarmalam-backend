@@ -2937,23 +2937,48 @@ class Handler(BaseHTTPRequestHandler):
             )
 
     def admin_update_user_status(self, data):
-        self.require_user("admin")
+        admin = self.require_user("admin")
         status = data.get("status", "active")
         seller_status = data.get("seller_status", "pending")
         if status not in ("active", "suspended") or seller_status not in ("pending", "approved", "rejected", "not_applicable"):
             raise ValueError("Invalid account or seller status")
         with connect() as con:
-            account = con.execute("SELECT role FROM users WHERE id = ?", (int(data["user_id"]),)).fetchone()
+            lock = " FOR UPDATE" if USE_POSTGRES else ""
+            account = con.execute("SELECT * FROM users WHERE id = ?" + lock, (int(data["user_id"]),)).fetchone()
             if not account:
                 raise ValueError("Account not found")
             if seller_status == "approved" and account["role"] != "seller":
                 raise ValueError("Only seller accounts can be approved")
+            changed = account["seller_status"] != seller_status
+            reason = str(data.get("reason", "")).strip()[:2000]
+            if account["role"] == "seller" and changed and seller_status == "rejected" and not reason:
+                raise ValueError("Please give a reason for rejecting this seller")
+            if account["role"] == "seller" and changed and seller_status == "approved" and status != "active":
+                raise ValueError("An approved seller must have an active account")
             con.execute(
                 "UPDATE users SET status = ?, seller_status = ? WHERE id = ?",
                 (data.get("status", "active"), data.get("seller_status", "pending"), int(data["user_id"])),
             )
-        self.audit("user_status_update", "user", data["user_id"], f"{data.get('status')} / {data.get('seller_status')}")
-        send_json(self, 200, {"ok": True})
+            if account["role"] == "seller" and changed and seller_status in ("approved", "rejected"):
+                approved = seller_status == "approved"
+                message = ("Your seller application has been approved. You can now sign in and manage your shop."
+                           if approved else "Your seller application has been rejected.")
+                html = f"<p>Hello {escape(account['name'])},</p><p>{message}</p>"
+                if reason:
+                    html += f"<p>Admin note: {escape(reason)}</p>"
+                html += ('<p><a href="https://www.pasarmalamapp.com/seller/login.html">Seller sign in</a></p>' if approved
+                         else '<p>For questions, contact pasahmallam@gmail.com.</p>')
+                html += "<p>PasarMalam</p>"
+                con.execute("INSERT INTO seller_email_queue (user_id, kind, recipient, subject, html, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                            (int(data["user_id"]), "decision-" + secrets.token_hex(12), account["email"],
+                             f"PasarMalam seller application {seller_status}", html, now()))
+                create_notification(con, "seller", int(data["user_id"]), f"Seller application {seller_status}", message, "seller", "index.html")
+                con.execute("UPDATE notifications SET read_at = ? WHERE role = 'admin' AND title = ? AND target_url = 'sellers.html' AND read_at = 0",
+                            (now(), f"New seller application #{data['user_id']}"))
+            if changed or account["status"] != status:
+                con.execute("INSERT INTO audit_logs (actor_id, action, target_type, target_id, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                            (admin["id"], "user_status_update", "user", int(data["user_id"]), f"{status} / {seller_status}: {reason}", now()))
+        send_json(self, 200, {"ok": True, "status": status, "seller_status": seller_status, "decision_email_queued": account["role"] == "seller" and changed and seller_status in ("approved", "rejected")})
 
     def admin_update_business_verification(self, data):
         self.require_user("admin")

@@ -9,11 +9,13 @@ class AdminActionsTest(unittest.TestCase):
         self.db = sqlite3.connect(':memory:')
         self.db.row_factory = sqlite3.Row
         self.db.executescript("""
-            CREATE TABLE users (id INTEGER PRIMARY KEY, role TEXT, status TEXT, seller_status TEXT);
-            INSERT INTO users VALUES (2, 'seller', 'active', 'pending'), (3, 'buyer', 'active', 'not_applicable');
-            CREATE TABLE notifications (id INTEGER PRIMARY KEY, role TEXT, user_id INTEGER, read_at INTEGER);
-            INSERT INTO notifications VALUES (10, 'admin', 0, 0), (11, 'admin', 0, 0);
+            CREATE TABLE users (id INTEGER PRIMARY KEY, role TEXT, status TEXT, seller_status TEXT, name TEXT, email TEXT);
+            INSERT INTO users VALUES (2, 'seller', 'active', 'pending', 'Test Seller', 'seller@example.test'), (3, 'buyer', 'active', 'not_applicable', 'Buyer', 'buyer@example.test');
+            CREATE TABLE notifications (id INTEGER PRIMARY KEY, role TEXT, user_id INTEGER, read_at INTEGER, title TEXT, body TEXT, type TEXT, target_url TEXT, created_at INTEGER);
+            INSERT INTO notifications (id, role, user_id, read_at) VALUES (10, 'admin', 0, 0), (11, 'admin', 0, 0);
+            CREATE TABLE audit_logs (id INTEGER PRIMARY KEY, actor_id INTEGER, action TEXT, target_type TEXT, target_id INTEGER, note TEXT, created_at INTEGER);
         """)
+        server.migrate_seller_email_queue(self.db)
         self.handler = object.__new__(server.Handler)
         self.handler.current_user = lambda: {'id': 1, 'role': 'admin'}
         self.handler.audit = lambda *args: None
@@ -29,6 +31,28 @@ class AdminActionsTest(unittest.TestCase):
         for _ in range(2):
             self.handler.admin_update_user_status({'user_id': 2, 'status': 'active', 'seller_status': 'approved'})
         self.assertEqual(self.db.execute('SELECT seller_status FROM users WHERE id=2').fetchone()[0], 'approved')
+        self.assertEqual(self.db.execute('SELECT count(*) FROM seller_email_queue').fetchone()[0], 1)
+
+    def test_reject_requires_reason_and_emails_seller(self):
+        with self.assertRaisesRegex(ValueError, 'reason'):
+            self.handler.admin_update_user_status({'user_id': 2, 'status': 'suspended', 'seller_status': 'rejected'})
+        self.handler.admin_update_user_status({'user_id': 2, 'status': 'suspended', 'seller_status': 'rejected', 'reason': '<Missing document>'})
+        message = self.db.execute('SELECT recipient, html FROM seller_email_queue').fetchone()
+        self.assertEqual(message['recipient'], 'seller@example.test')
+        self.assertIn('&lt;Missing document&gt;', message['html'])
+
+    def test_approval_clears_only_matching_application_notification(self):
+        self.db.execute("UPDATE notifications SET title='New seller application #2', target_url='sellers.html' WHERE id=10")
+        self.handler.admin_update_user_status({'user_id': 2, 'status': 'active', 'seller_status': 'approved'})
+        self.assertGreater(self.db.execute('SELECT read_at FROM notifications WHERE id=10').fetchone()[0], 0)
+        self.assertEqual(self.db.execute('SELECT read_at FROM notifications WHERE id=11').fetchone()[0], 0)
+
+    def test_email_queue_failure_rolls_back_decision(self):
+        self.db.commit()
+        self.db.execute('DROP TABLE seller_email_queue')
+        with self.assertRaises(sqlite3.OperationalError):
+            self.handler.admin_update_user_status({'user_id': 2, 'status': 'active', 'seller_status': 'approved'})
+        self.assertEqual(self.db.execute('SELECT seller_status FROM users WHERE id=2').fetchone()[0], 'pending')
 
     def test_missing_account_rejected(self):
         with self.assertRaisesRegex(ValueError, 'Account not found'):
