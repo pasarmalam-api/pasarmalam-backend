@@ -1472,6 +1472,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.awb(data)
             elif parsed.path == "/api/admin/user-status":
                 self.admin_update_user_status(data)
+            elif parsed.path == "/api/admin/user-delete":
+                self.admin_delete_user(data)
             elif parsed.path == "/api/admin/business-verification":
                 self.admin_update_business_verification(data)
             elif parsed.path == "/api/admin/product-status":
@@ -2938,6 +2940,31 @@ class Handler(BaseHTTPRequestHandler):
                 (int(user.get("id", 0)), action, target_type, int(target_id or 0), note, now()),
             )
 
+    def admin_delete_user(self, data):
+        admin = self.require_user("admin")
+        user_id = int(data["user_id"])
+        with connect() as con:
+            # Serialize related writes while checking dependencies and deleting.
+            if USE_POSTGRES:
+                con.execute("LOCK TABLE users, products, orders, returns, wallet, campaigns, reviews, cart_items, wishlist, notifications, support_tickets, seller_email_queue, email_otps IN SHARE ROW EXCLUSIVE MODE")
+            account = con.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+            if not account:
+                raise ValueError("Account not found")
+            if account["role"] == "admin" or user_id == admin["id"]:
+                raise ValueError("Administrator accounts cannot be deleted")
+            if data.get("confirm_email") != account["email"]:
+                raise ValueError("Type the account email exactly to confirm deletion")
+            for table, column in (("products", "seller_id"), ("orders", "buyer_id"), ("returns", "buyer_id"), ("wallet", "seller_id"), ("campaigns", "seller_id"), ("reviews", "seller_id")):
+                if con.execute(f"SELECT id FROM {table} WHERE {column} = ? LIMIT 1", (user_id,)).fetchone():
+                    raise ValueError("This account has linked listings or transaction records. Suspend it instead; deletion requires a separate data review.")
+            for table, column in (("cart_items", "buyer_id"), ("wishlist", "buyer_id"), ("notifications", "user_id"), ("support_tickets", "user_id"), ("seller_email_queue", "user_id")):
+                con.execute(f"DELETE FROM {table} WHERE {column} = ?", (user_id,))
+            con.execute("DELETE FROM email_otps WHERE email = ?", (account["email"],))
+            con.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            con.execute("INSERT INTO audit_logs (actor_id, action, target_type, target_id, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+                        (admin["id"], "user_deleted", "user", user_id, "Account deleted after explicit admin confirmation", now()))
+        send_json(self, 200, {"ok": True, "deleted_user_id": user_id})
+
     def admin_update_user_status(self, data):
         admin = self.require_user("admin")
         status = data.get("status", "active")
@@ -2949,6 +2976,8 @@ class Handler(BaseHTTPRequestHandler):
             account = con.execute("SELECT * FROM users WHERE id = ?" + lock, (int(data["user_id"]),)).fetchone()
             if not account:
                 raise ValueError("Account not found")
+            if account["role"] == "admin":
+                raise ValueError("Administrator account status cannot be changed here")
             if seller_status == "approved" and account["role"] != "seller":
                 raise ValueError("Only seller accounts can be approved")
             changed = account["seller_status"] != seller_status

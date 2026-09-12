@@ -50,7 +50,23 @@ window.login=async function(){const message=document.getElementById('status');tr
 window.adminMoveOrder=async function(order_id,order_status){const tracking=prompt('Tracking / admin note, leave blank to keep current','');if(tracking===null)return;const body={order_id,order_status};if(tracking)body.tracking_no=tracking;await api('/api/orders/status',{method:'POST',body:JSON.stringify(body)});await loadOrders();feedback('Order updated.')};
 window.cancelPendingPayment=async function(order_id){const note=prompt('Cancel/expire note','Admin cancelled stale unpaid order');if(note===null)return;await api('/api/admin/payment-cancel',{method:'POST',body:JSON.stringify({order_id,note})});if(adminPage==='orders.html')await loadOrders();else await loadPayments();feedback('Unpaid order cancelled.')};
 window.saveSettings=async function(){const settings={};document.querySelectorAll('#settingsBox input').forEach(i=>settings[i.id.replace('set_','')]=i.value);await api('/api/admin/settings',{method:'POST',body:JSON.stringify({settings})});document.getElementById('status').textContent='Settings saved.';feedback('Settings saved.')};
-window.loadUsers=async function(){const rows=(await api('/api/admin/users')).users||[];document.getElementById('tbody').innerHTML=rows.map(u=>`<tr><td>#${u.id}</td><td><b>${esc(u.name)}</b><div class="muted">${esc(u.email)}</div></td><td>${esc(u.role)}</td><td>${esc(u.status)}</td><td>${esc(u.seller_status)}</td><td>${u.role==='seller'?'<a class="soft" href="sellers.html">Review seller</a>':`<button class="soft" onclick="setUser(${Number(u.id)},'active','not_applicable')">Enable account</button> <button class="danger" onclick="setUser(${Number(u.id)},'suspended','not_applicable')">Suspend account</button>`}</td></tr>`).join('')||'<tr><td colspan="6">No users found.</td></tr>'};
+let usersData=[];
+window.loadUsers=async function(){
+  usersData=(await api('/api/admin/users')).users||[];
+  document.getElementById('tbody').innerHTML=usersData.map(u=>`<tr><td>#${Number(u.id)}</td><td><b>${esc(u.name)}</b><div class="muted">${esc(u.email)}</div></td><td>${esc(u.role)}</td><td>${esc(u.status)}</td><td>${esc(u.seller_status)}</td><td><div class="actions">${u.role==='admin'?'<span class="tag">Protected administrator</span>':`${u.role==='seller'?'<a class="soft" href="sellers.html">Review seller</a>':`<button class="soft" onclick="setUser(${Number(u.id)},'${u.status==='active'?'suspended':'active'}','not_applicable')">${u.status==='active'?'Suspend account':'Enable account'}</button>`}<button class="danger" onclick="deleteUser(${Number(u.id)})">Delete account</button>`}</div></td></tr>`).join('')||'<tr><td colspan="6">No users found.</td></tr>';
+};
+window.deleteUser=function(id){
+  const user=usersData.find(u=>Number(u.id)===id);if(!user||user.role==='admin')return;
+  let modal=document.getElementById('deleteUserDialog');if(!modal){modal=document.createElement('dialog');modal.id='deleteUserDialog';document.body.append(modal)}
+  modal.innerHTML=`<form><h3>Delete account</h3><p>${esc(user.name)}<br>${esc(user.email)}</p><p>This permanently deletes the account and its account-only data. Accounts with listings or transaction records cannot be deleted here.</p><label>Type the email to confirm<input name="confirmation" autocomplete="off" required></label><p role="alert" id="deleteError"></p><div class="actions"><button type="button" class="soft">Back</button><button type="submit" class="danger">Delete permanently</button></div></form>`;
+  modal.querySelector('[type=button]').onclick=()=>modal.close();
+  modal.querySelector('form').onsubmit=async event=>{
+    event.preventDefault();const email=modal.querySelector('input').value;
+    if(email!==user.email){modal.querySelector('#deleteError').textContent='Type the account email exactly.';return}
+    const button=modal.querySelector('[type=submit]');button.disabled=true;
+    try{await api('/api/admin/user-delete',{method:'POST',body:JSON.stringify({user_id:id,confirm_email:email})});modal.close();feedback('Account deleted.');await loadUsers();await loadNotificationBadges()}catch(e){modal.querySelector('#deleteError').textContent=e.message}finally{button.disabled=false}
+  };modal.showModal();
+};
 window.setPayout=async function(wallet_id,status,proof=false){
   if(!proof){if(!confirm(`Change settlement #${wallet_id} to ${status}?`))return;await api('/api/admin/payout-status',{method:'POST',body:JSON.stringify({wallet_id,status,note:`Admin marked payout ${status}`})});await loadWallet();feedback('Settlement updated.');return}
   const payout_reference=prompt('Enter payout bank reference number');if(payout_reference===null)return;if(!payout_reference.trim())throw new Error('A payout bank reference is required.');

@@ -4,6 +4,7 @@ const root=path.resolve('admin-app');
 const sellers=[{id:2,name:'Test Seller',shop_name:'Test Shop',email:'seller@example.test',status:'active',seller_status:'pending'}];
 const base={users:[],products:[],orders:[],payments:[],returns:[],tickets:[],messages:[],open_disputes:[],wallet:[],campaigns:[],settings:[],audit:[],rates:[],notifications:[],summary:{},order_status:[],product_categories:[],seller_rank:[],return_rate:0,payment_mismatches:[],payout_blocks:[],account_flags:[],product_flags:[],high_value_orders:[],old_pending_payments:[]};
 const writes=[];
+let users=[{id:1,name:'Admin',email:'admin@example.test',role:'admin',status:'active',seller_status:'not_applicable'},{id:3,name:'Buyer',email:'buyer@example.test',role:'buyer',status:'suspended',seller_status:'not_applicable'}];
 const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req.url,'http://localhost').pathname);if(!file.startsWith(root)||!fs.existsSync(file)){res.writeHead(404);return res.end('Not found')}res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file))});
 (async()=>{
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -18,11 +19,13 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
       const request=route.request(),endpoint=new URL(url).pathname;
       if(request.method()==='POST'){
         const data=request.postDataJSON();writes.push({endpoint,data});
-        if(endpoint==='/api/admin/user-status')Object.assign(sellers.find(s=>s.id===data.user_id),{status:data.status,seller_status:data.seller_status});
+        if(endpoint==='/api/admin/user-status')Object.assign(sellers.find(s=>s.id===data.user_id)||users.find(u=>u.id===data.user_id),{status:data.status,seller_status:data.seller_status});
+        if(endpoint==='/api/admin/user-delete')users=users.filter(u=>u.id!==data.user_id);
         return route.fulfill({json:{ok:true,decision_email_queued:true}});
       }
       let response={...base};
       if(endpoint==='/api/admin/sellers')response={sellers};
+      if(endpoint==='/api/admin/users')response={users};
       if(endpoint==='/api/admin/metrics')response={users:0,products:0,orders:0,sales:0,buyers:0,sellers:1,returns:0,campaigns:0};
       return route.fulfill({json:response});
     });
@@ -52,6 +55,24 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
     await page.setViewportSize({width:390,height:844});await page.screenshot({path:'../outputs/admin-audit/mobile.png',fullPage:true});
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'mobile overflow');
     await page.getByRole('button',{name:'Menu',exact:true}).click();assert.equal(await page.locator('aside nav').isVisible(),true);
+    await page.getByRole('link',{name:'Users',exact:true}).click();
+    await page.getByRole('button',{name:'Enable account',exact:true}).click();
+    await page.getByRole('button',{name:'Suspend account',exact:true}).waitFor();
+    assert.equal(await page.getByRole('button',{name:'Enable account',exact:true}).count(),0);
+    assert.equal(await page.getByRole('button',{name:'Delete account',exact:true}).count(),1);
+    const beforeDelete=writes.length;
+    await page.getByRole('button',{name:'Delete account',exact:true}).click();
+    await page.locator('#deleteUserDialog').getByRole('button',{name:'Back',exact:true}).click();
+    assert.equal(writes.length,beforeDelete);
+    await page.getByRole('button',{name:'Delete account',exact:true}).click();
+    await page.locator('#deleteUserDialog input').fill('wrong@example.test');
+    await page.getByRole('button',{name:'Delete permanently',exact:true}).click();
+    assert.equal(writes.length,beforeDelete);
+    await page.locator('#deleteUserDialog input').fill('buyer@example.test');
+    await page.getByRole('button',{name:'Delete permanently',exact:true}).click();
+    await page.getByText('Account deleted.',{exact:true}).waitFor();
+    assert.equal(writes.at(-1).endpoint,'/api/admin/user-delete');
+    assert.equal(await page.getByRole('button',{name:'Delete account',exact:true}).count(),0);
     assert.deepEqual(errors,[]);
     console.log('PASS: '+pages.length+' pages, all navigation targets, approval/rejection, cancel/back, desktop/mobile layout');
   }finally{await browser.close()}

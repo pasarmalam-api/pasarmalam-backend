@@ -77,6 +77,43 @@ class AdminActionsTest(unittest.TestCase):
         self.handler.mark_notifications_read({})
         self.assertEqual(self.db.execute('SELECT count(*) FROM notifications WHERE read_at=0').fetchone()[0], 0)
 
+    def prepare_deletion(self):
+        for table, column in (("products", "seller_id"), ("orders", "buyer_id"), ("returns", "buyer_id"), ("wallet", "seller_id"), ("campaigns", "seller_id"), ("reviews", "seller_id"), ("cart_items", "buyer_id"), ("wishlist", "buyer_id"), ("support_tickets", "user_id")):
+            self.db.execute(f"CREATE TABLE {table} (id INTEGER PRIMARY KEY, {column} INTEGER)")
+        self.db.execute("CREATE TABLE email_otps (id INTEGER PRIMARY KEY, email TEXT)")
+        self.db.commit()
+
+    def test_delete_account_and_only_its_data(self):
+        self.prepare_deletion()
+        self.db.execute('INSERT INTO cart_items VALUES (1,3),(2,2)')
+        self.handler.admin_delete_user({'user_id': 3, 'confirm_email': 'buyer@example.test'})
+        self.assertIsNone(self.db.execute('SELECT id FROM users WHERE id=3').fetchone())
+        self.assertIsNotNone(self.db.execute('SELECT id FROM users WHERE id=2').fetchone())
+        self.assertEqual(self.db.execute('SELECT buyer_id FROM cart_items').fetchone()[0], 2)
+        self.assertEqual(self.db.execute("SELECT count(*) FROM audit_logs WHERE action='user_deleted'").fetchone()[0], 1)
+
+    def test_delete_blocks_transaction_history(self):
+        self.prepare_deletion()
+        self.db.execute('INSERT INTO orders VALUES (1,3)')
+        self.db.commit()
+        with self.assertRaisesRegex(ValueError, 'linked'):
+            self.handler.admin_delete_user({'user_id': 3, 'confirm_email': 'buyer@example.test'})
+        self.assertIsNotNone(self.db.execute('SELECT id FROM users WHERE id=3').fetchone())
+
+    def test_delete_requires_confirmation(self):
+        with self.assertRaisesRegex(ValueError, 'email'):
+            self.handler.admin_delete_user({'user_id': 3, 'confirm_email': 'wrong'})
+
+    def test_delete_protects_admin(self):
+        self.db.execute("UPDATE users SET role='admin' WHERE id=3")
+        with self.assertRaisesRegex(ValueError, 'Administrator'):
+            self.handler.admin_delete_user({'user_id': 3, 'confirm_email': 'buyer@example.test'})
+
+    def test_delete_requires_admin(self):
+        self.handler.current_user = lambda: {'id': 3, 'role': 'buyer'}
+        with self.assertRaises(PermissionError):
+            self.handler.admin_delete_user({'user_id': 2})
+
 
 if __name__ == '__main__':
     unittest.main()
