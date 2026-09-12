@@ -10,6 +10,7 @@ import secrets
 import sqlite3
 import time
 import threading
+import math
 from html import escape
 import urllib.parse
 import urllib.request
@@ -1325,7 +1326,21 @@ class Handler(BaseHTTPRequestHandler):
         token = self.headers.get("X-PM-Token", "")
         if auth.lower().startswith("bearer "):
             token = auth.split(" ", 1)[1].strip()
-        return parse_token(token)
+        try:
+            payload = parse_token(token)
+        except (ValueError, TypeError, KeyError):
+            return None
+        if not payload:
+            return None
+        with connect() as con:
+            row = con.execute("SELECT * FROM users WHERE id=?", (payload["id"],)).fetchone()
+        if not row or row["status"] != "active":
+            return None
+        user = row_to_dict(row)
+        if user["role"] == "seller" and user["seller_status"] != "approved":
+            return None
+        user.pop("password", None)
+        return user
 
     def require_user(self, role=None):
         user = self.current_user()
@@ -1498,17 +1513,34 @@ class Handler(BaseHTTPRequestHandler):
             send_json(self, 400, {"error": str(exc)})
 
     def list_table(self, table, key):
+        user = self.current_user()
+        where, params = "", []
+        if table == "messages":
+            user = self.require_user()
+            if user["role"] == "seller":
+                where, params = " WHERE product_id IN (SELECT id FROM products WHERE seller_id=?)", [user["id"]]
+            elif user["role"] == "buyer":
+                where, params = " WHERE buyer_name=?", [user["name"]]
+        elif table in ("reviews", "campaigns") and user and user["role"] == "seller":
+            where, params = " WHERE seller_id=?", [user["id"]]
         with connect() as con:
-            rows = [row_to_dict(row) for row in con.execute(f"SELECT * FROM {table} ORDER BY created_at DESC, id DESC")]
+            rows = [row_to_dict(row) for row in con.execute(f"SELECT * FROM {table}{where} ORDER BY created_at DESC, id DESC", params)]
         send_json(self, 200, {key: rows})
 
     def get_products(self, query):
         category = query.get("category", [""])[0]
         sql = "SELECT * FROM products"
         params = []
+        filters = []
+        user = self.current_user()
+        if user and user["role"] == "seller":
+            filters.append("seller_id = ?")
+            params.append(user["id"])
         if category:
-            sql += " WHERE category = ?"
+            filters.append("category = ?")
             params.append(category)
+        if filters:
+            sql += " WHERE " + " AND ".join(filters)
         sql += " ORDER BY created_at DESC, id DESC"
         with connect() as con:
             rows = [row_to_dict(row) for row in con.execute(sql, params)]
@@ -1525,6 +1557,7 @@ class Handler(BaseHTTPRequestHandler):
         for key in required:
             if key not in data:
                 raise ValueError(f"Missing {key}")
+        self.validate_product(data)
         images = data.get("images") or ([data.get("image_url")] if data.get("image_url") else [])
         variants = data.get("variants") or []
         seller_id = user["id"] if user and user["role"] == "seller" else int(data.get("seller_id", 1))
@@ -1557,6 +1590,20 @@ class Handler(BaseHTTPRequestHandler):
             )
         send_json(self, 201, {"id": cur.lastrowid})
 
+    def validate_product(self, data):
+        for key in ("name", "category"):
+            if key in data and not str(data[key]).strip():
+                raise ValueError(f"{key} is required")
+        for key in ("price", "stock", "weight_kg"):
+            if key in data:
+                number = float(data[key])
+                if not math.isfinite(number) or number < 0 or (key == "weight_kg" and number == 0) or (key == "stock" and not number.is_integer()):
+                    raise ValueError(f"Invalid {key}")
+        if "condition" in data and data["condition"] not in ("New", "Used"):
+            raise ValueError("Invalid condition")
+        if "price_mode" in data and data["price_mode"] not in ("Fixed", "Negotiable"):
+            raise ValueError("Invalid price mode")
+
     def product_by_id(self, method, path, data):
         product_id = int(path.rsplit("/", 1)[-1])
         user = self.current_user()
@@ -1569,10 +1616,15 @@ class Handler(BaseHTTPRequestHandler):
             if user and user["role"] == "seller" and int(product["seller_id"]) != int(user["id"]):
                 raise PermissionError("Seller cannot manage another seller product")
             if method == "DELETE":
+                if con.execute("SELECT id FROM orders WHERE product_id=? LIMIT 1", (product_id,)).fetchone():
+                    raise ValueError("Products with order history cannot be deleted. Set stock to zero instead.")
+                for table in ("cart_items", "wishlist", "reviews", "messages"):
+                    con.execute(f"DELETE FROM {table} WHERE product_id=?", (product_id,))
                 con.execute("DELETE FROM products WHERE id = ?", (product_id,))
                 send_json(self, 200, {"ok": True})
                 return
             allowed = ["name", "shop", "category", "price", "stock", "condition", "price_mode", "description", "warranty", "shipping_type", "weight_kg"]
+            self.validate_product(data)
             updates = {key: data[key] for key in allowed if key in data}
             if "variants" in data:
                 updates["variants"] = json.dumps(data["variants"])
@@ -1597,7 +1649,12 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 201, {"id": cur.lastrowid})
 
     def create_message(self, data):
-        user = self.current_user()
+        user = self.require_user()
+        if user["role"] not in ("buyer", "seller"):
+            raise PermissionError("Buyer or seller account required")
+        data = dict(data, sender_role=user["role"])
+        if user["role"] == "buyer":
+            data["buyer_name"] = user["name"]
         sender_role = data.get("sender_role") or (user["role"] if user and user["role"] in ("buyer", "seller") else "buyer")
         if sender_role not in ("buyer", "seller"):
             raise ValueError("sender_role must be buyer or seller")
@@ -1610,6 +1667,14 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as con:
             product = con.execute("SELECT seller_id, shop, name FROM products WHERE id = ?", (product_id,)).fetchone() if product_id else None
             seller_id = int(product["seller_id"]) if product else 0
+            if not product:
+                raise ValueError("Select a product conversation first")
+            if user["role"] == "seller":
+                if seller_id != user["id"]:
+                    raise PermissionError("Cannot reply to another shop conversation")
+                if not con.execute("SELECT id FROM messages WHERE product_id=? AND buyer_name=? LIMIT 1", (product_id, buyer_name)).fetchone():
+                    raise ValueError("Buyer conversation not found")
+                seller_name = user.get("shop_name") or user["name"]
             if product and not seller_name:
                 seller_name = product["shop"]
             cur = con.execute(
@@ -1623,9 +1688,8 @@ class Handler(BaseHTTPRequestHandler):
                     create_notification(con, "seller", seller_id, f"New buyer message{product_label}", body, "message", "messages.html")
                 notify_admins(con, "Buyer-seller chat message", body, "message", "tickets.html")
             else:
-                buyer = con.execute("SELECT id FROM users WHERE role = 'buyer' AND name = ? ORDER BY id LIMIT 1", (buyer_name,)).fetchone()
-                if not buyer:
-                    buyer = con.execute("SELECT id FROM users WHERE role = 'buyer' ORDER BY id LIMIT 1").fetchone()
+                matches = con.execute("SELECT id FROM users WHERE role = 'buyer' AND name = ? LIMIT 2", (buyer_name,)).fetchall()
+                buyer = matches[0] if len(matches) == 1 else None
                 if buyer:
                     create_notification(con, "buyer", buyer["id"], f"Seller replied{product_label}", body, "message", "chat.html")
                 notify_admins(con, "Seller chat reply", body, "message", "tickets.html")
@@ -1681,9 +1745,8 @@ class Handler(BaseHTTPRequestHandler):
             if int(review["seller_id"] or 0) != int(user["id"]):
                 raise PermissionError("Seller cannot reply to another seller review")
             con.execute("UPDATE reviews SET seller_reply = ? WHERE id = ?", (reply, review_id))
-            buyer = con.execute("SELECT id FROM users WHERE role = 'buyer' AND name = ? ORDER BY id LIMIT 1", (review["buyer_name"],)).fetchone()
-            if not buyer:
-                buyer = con.execute("SELECT id FROM users WHERE role = 'buyer' ORDER BY id LIMIT 1").fetchone()
+            matches = con.execute("SELECT id FROM users WHERE role = 'buyer' AND name = ? LIMIT 2", (review["buyer_name"],)).fetchall()
+            buyer = matches[0] if len(matches) == 1 else None
             if buyer:
                 create_notification(con, "buyer", buyer["id"], f"Seller replied to your review", reply, "review", "reviews.html")
             notify_admins(con, "Seller replied to review", f"{review['product_name']}: {reply}", "review", "products.html")
@@ -1992,7 +2055,7 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 200, {"wishlist": rows})
 
     def get_notifications(self):
-        user = self.current_user()
+        user = self.require_user()
         role = user["role"] if user else (parse_qs(urlparse(self.path).query).get("role") or ["buyer"])[0]
         user_id = int(user["id"]) if user else int((parse_qs(urlparse(self.path).query).get("user_id") or ["1"])[0] or 1)
         if role not in ("buyer", "seller", "admin"):
@@ -2018,12 +2081,12 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 200, {"notifications": rows, "unread": unread})
 
     def mark_notifications_read(self, data):
-        user = self.current_user()
+        user = self.require_user()
         role = user["role"] if user else data.get("role", "buyer")
         user_id = int(user["id"]) if user else int(data.get("user_id", 1) or 1)
         with connect() as con:
             if data.get("notification_id"):
-                con.execute("UPDATE notifications SET read_at = ? WHERE id = ?", (now(), int(data["notification_id"])))
+                con.execute("UPDATE notifications SET read_at = ? WHERE id = ? AND role = ? AND (user_id = 0 OR user_id = ?)", (now(), int(data["notification_id"]), role, user_id))
             elif role == "admin":
                 con.execute("UPDATE notifications SET read_at = ? WHERE role = 'admin' OR user_id = ?", (now(), user_id))
             else:
@@ -2084,7 +2147,7 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 201, {"ok": True, "id": ticket_id})
 
     def get_orders(self):
-        user = self.current_user()
+        user = self.require_user()
         with connect() as con:
             if user and user["role"] == "buyer":
                 rows = [row_to_dict(row) for row in con.execute("SELECT * FROM orders WHERE buyer_id = ? ORDER BY created_at DESC, id DESC", (user["id"],))]
@@ -2125,7 +2188,7 @@ class Handler(BaseHTTPRequestHandler):
         ))
 
     def get_returns(self):
-        user = self.current_user()
+        user = self.require_user()
         with connect() as con:
             if user and user["role"] == "buyer":
                 rows = [row_to_dict(row) for row in con.execute("SELECT * FROM returns WHERE buyer_id = ? ORDER BY created_at DESC, id DESC", (user["id"],))]
@@ -2150,7 +2213,9 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 200, {"returns": rows})
 
     def get_wallet(self):
-        user = self.current_user()
+        user = self.require_user()
+        if user["role"] not in ("seller", "admin"):
+            raise PermissionError("Seller or admin access required")
         with connect() as con:
             sync_wallet_settlements(con)
             if user and user["role"] == "seller":
@@ -2230,7 +2295,7 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as con:
             row = con.execute(
                 """
-                SELECT returns.id
+                SELECT returns.id, returns.status, returns.dispute_status
                 FROM returns
                 JOIN orders ON orders.id = returns.order_id
                 JOIN products ON products.id = orders.product_id
@@ -2240,6 +2305,8 @@ class Handler(BaseHTTPRequestHandler):
             ).fetchone()
             if not row:
                 raise PermissionError("Seller cannot respond to another seller return")
+            if row["status"] == "refunded" or row["dispute_status"] == "closed":
+                raise ValueError("This return is closed; seller responses are locked")
             con.execute(
                 "UPDATE returns SET seller_response = ?, dispute_status = 'seller_responded' WHERE id = ?",
                 (response, return_id),
@@ -2606,6 +2673,13 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 200, {"ok": True, "order": row_to_dict(updated)})
 
     def awb(self, data):
+        user = self.require_user("seller")
+        with connect() as con:
+            order = con.execute("SELECT o.payment_status, o.order_status, p.seller_id FROM orders o JOIN products p ON p.id=o.product_id WHERE o.id=?", (int(data.get("order_id", 0)),)).fetchone()
+            if not order or (user["role"] != "admin" and order["seller_id"] != user["id"]):
+                raise PermissionError("Order does not belong to this shop")
+            if order["payment_status"] != "paid" or order["order_status"] == "cancelled":
+                raise ValueError("Only paid, non-cancelled orders can have a shipping label")
         awb = f"PM-AWB-{int(data.get('order_id', 0)):06d}"
         send_json(self, 200, {"awb_label": awb, "print_text": f"PasarMalam Shipping Label {awb}"})
 

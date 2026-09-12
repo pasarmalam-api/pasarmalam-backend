@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="en">
-<head><script src="seller-session.js?v=1"></script>
+<head><script src="seller-session.js?v=2"></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>PasarMalam Seller AI</title>
-  <link rel="stylesheet" href="seller.css?v=session1"><script src="seller-auth-guard.js?v=session1"></script>
+  <link rel="stylesheet" href="seller.css?v=session2"><script src="seller-auth-guard.js?v=session1"></script>
   <style>
     textarea{width:100%;min-height:132px;border:1px solid var(--line);border-radius:8px;padding:12px;font:inherit;resize:vertical}
     .answer{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:14px;line-height:1.55}
@@ -34,9 +34,9 @@
   </div>
   <script>
     const API="https://pasarmalam-backend.onrender.com";
-    function askPreset(text){prompt.value=text;askAi()}
+    function askPreset(text){document.getElementById("prompt").value=text;askAi()}
     async function askAi(){
-      const text=prompt.value.trim();
+      const text=document.getElementById("prompt").value.trim();
       if(!text){answer.textContent="Enter product details first.";return}
       answer.textContent="Thinking...";
       try{
@@ -47,6 +47,6 @@
       }catch(e){answer.textContent="AI is not reachable right now. Check Render first, then try again. "+e.message}
     }
   </script>
-  <script src="badges.js"></script>
+  <script src="seller-actions.js?v=1"></script><script src="badges.js?v=audit2"></script>
 </body>
 </html>

@@ -572,4 +572,6 @@ body{font-size:13px;line-height:1.5;letter-spacing:0}
 .app nav a,.app button,.app .quick a{font-size:13px;font-weight:600}
 .app button{min-height:38px}.app input,.app select,.app textarea{font-size:16px}
 .seller-table-scroll{max-width:100%;overflow:auto}
+#previewGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,160px));gap:10px;margin:12px 0}
+#previewGrid .preview{aspect-ratio:1;background-size:cover;background-position:center;border:1px solid var(--line);border-radius:6px}
 @media(max-width:980px){.app h2{font-size:20px!important}.app .hero h2{font-size:22px!important}.app .stat b{font-size:22px!important}.app aside{z-index:70!important}.app aside nav{z-index:71!important}}

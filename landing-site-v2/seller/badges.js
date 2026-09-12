@@ -121,6 +121,7 @@
       add("support.html",count(n=>n.type==="support"||String(n.target_url||"").includes("support")));
     }catch(e){}
   }
+  window.addEventListener('seller-data-changed',load);
   function setupLiveNotifications(){
     const start=()=>window.PMNotify&&window.PMNotify.start({role:"seller",api:API,token:token});
     if(window.PMNotify){start();return}

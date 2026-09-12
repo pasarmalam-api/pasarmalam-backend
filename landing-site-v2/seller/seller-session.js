@@ -4,7 +4,8 @@
   const publicPages=new Set(['index.html','login.html','register.html','thank-you.html','policies.html']);
   function user(){try{return JSON.parse(localStorage.getItem('pm_user')||'{}')}catch(e){return {}}}
   function signedIn(){return Boolean(localStorage.getItem('pm_token'))&&user().role==='seller'}
-  window.PMSellerSession={signedIn};
+  function escape(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+  window.PMSellerSession={signedIn,escape};
   const originalFetch=window.fetch;
   let expired=false;
   window.fetch=async function(input,options){
@@ -16,7 +17,9 @@
       settings={...options,headers};
     }
     const response=await originalFetch.call(this,input,settings);
-    if(url.origin===base&&response.status===401&&signedIn()&&!expired){
+    if(url.origin===base&&response.ok&&settings?.method&&settings.method!=='GET')window.dispatchEvent(new Event('seller-data-changed'));
+    const loginRequired=url.origin===base&&(response.status===401||(response.status===403&&(await response.clone().json().catch(()=>({}))).error==='Login required'));
+    if(loginRequired&&signedIn()&&!expired){
       expired=true;localStorage.removeItem('pm_token');localStorage.removeItem('pm_user');
       location.replace('login.html?next='+encodeURIComponent(page));
     }
