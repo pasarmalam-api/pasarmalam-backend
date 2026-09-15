@@ -54,11 +54,15 @@ async function signup(){
   if(password.value.length<8){setStatus("Password must be at least 8 characters.","error");return}
   if(!agree.checked){setStatus("Please accept the terms first.","error");return}
   setStatus("Creating account...");
+  if(signup.busy)return;signup.busy=true;
+  try{
   const r=await fetch(API+"/api/auth/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name.value.trim(),email:email.value.trim(),password:password.value,phone:phone.value.trim(),address:address.value.trim(),role:"buyer",email_otp_token:emailOtpToken})});
   const d=await r.json().catch(()=>({}));
   if(d.token){localStorage.setItem("pm_token",d.token);localStorage.setItem("pm_user",JSON.stringify(d.user));setStatus("Account created. Redirecting...","success");setTimeout(()=>location.href="index.html",800)}
   else setStatus(d.error||"Signup failed.","error");
+  }catch(e){setStatus('Connection failed. Please try again.','error')}finally{signup.busy=false}
 }
+document.getElementById('email').addEventListener('input',()=>{emailOtpToken=''});
 </script>
-<script src="badges.js?v=buyer-ui-1"></script><script src="buyer-ui.js?v=1"></script></body>
+<script src="badges.js?v=buyer-actions-2"></script><script src="buyer-ui.js?v=2"></script></body>
 </html>

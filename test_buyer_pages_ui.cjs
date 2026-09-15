@@ -42,7 +42,7 @@ const products=[{id:1,seller_id:2,name:'USB C Cable',shop:'Accessory Shop',categ
      badLinks:[...document.querySelectorAll('a[href]')].map(a=>a.getAttribute('href')).filter(h=>h.endsWith('.html'))
     }));
     if(audit.body!=='14px'||audit.heading!=='22px'||audit.overflow||audit.badButtons.length||audit.visual||errors.length)failures.push({file,width,...audit,errors});
-    for(const href of audit.badLinks)if(!href.includes('://')&&!fs.existsSync(path.join(root,href)))failures.push({file,missing:href});
+    for(const href of audit.badLinks)if(!href.includes('://')&&!fs.existsSync(path.join(root,href.split(/[?#]/)[0])))failures.push({file,missing:href});
     if(['signup.html','login.html','orders.html','seller-store.html'].includes(file))await page.screenshot({path:path.resolve('../outputs/buyer-'+file.replace('.html','')+'-'+width+'.png'),fullPage:true});
     page.off('pageerror',listener);
    }

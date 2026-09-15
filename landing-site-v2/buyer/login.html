@@ -35,12 +35,16 @@ async function login(){
   const email=$("email"),password=$("password");
   setStatus("Signing in...");
   if(!email.value.trim()||!password.value){setStatus("Email and password are required.","error");return}
-  const r=await fetch(API+"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value.trim(),password:password.value})});
+  if(login.busy)return;login.busy=true;
+  try{
+  const r=await fetch(API+"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value.trim().toLowerCase(),password:password.value})});
   const d=await r.json().catch(()=>({}));
-  if(d.token){localStorage.setItem("pm_token",d.token);localStorage.setItem("pm_user",JSON.stringify(d.user));setStatus("Signed in. Redirecting...","success");setTimeout(()=>location.href="index.html",650)}
+  if(r.ok&&d.token&&d.user?.role==='buyer'){localStorage.setItem("pm_token",d.token);localStorage.setItem("pm_user",JSON.stringify(d.user));setStatus("Signed in. Redirecting...","success");const next=new URLSearchParams(location.search).get('next')||'index.html';setTimeout(()=>location.href=/^[a-z-]+\.html(?:\?[^#]*)?$/.test(next)?next:'index.html',650)}
+  else if(d.user&&d.user.role!=='buyer'){setStatus('Please use a buyer account. Seller sign-in is available through Switch to Seller.','error')}
   else{setStatus(d.error||"Sign in failed.","error")}
+  }catch(e){setStatus('Connection failed. Please try again.','error')}finally{login.busy=false}
 }
 document.addEventListener("DOMContentLoaded",()=>$("password").addEventListener("keydown",e=>{if(e.key==="Enter")login()}));
 </script>
-<script src="badges.js?v=buyer-ui-1"></script><script src="buyer-ui.js?v=1"></script></body>
+<script src="badges.js?v=buyer-actions-2"></script><script src="buyer-ui.js?v=2"></script></body>
 </html>

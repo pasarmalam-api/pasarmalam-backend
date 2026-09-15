@@ -66,8 +66,6 @@
   function sourceMap(){const map={Pengecas:"Chargers","\u5145\u7535\u5668":"Chargers"};[dictionary.ms,dictionary.en,dictionary.zh].forEach(group=>Object.entries(group).forEach(([key,value])=>{map[value]=key}));return map}
   function cleanVisibleText(value){
     return String(value||"")
-      .replace(/\b(Cloudinary|Postgres|Auth Seller|Voucher Test|Test Item|System test|Automated return|Buyer Bad|Seller Test|Bad Product|demo|test|should-fail|notification test|button live test)\b/gi,"")
-      .replace(/\b\d{5,}\b/g,"")
       .replace(/\s{2,}/g," ")
       .trim();
   }
@@ -101,7 +99,7 @@
   function applyLanguage(){
     const lang=currentLang(),lookup=sourceMap();
     document.documentElement.lang=lang;
-    document.querySelectorAll("#langToggle,.buyer-lang-toggle").forEach(button=>{button.textContent=labels[lang]});
+    document.querySelectorAll("#langToggle,.buyer-lang-toggle").forEach(button=>{if(button.textContent!==labels[lang])button.textContent=labels[lang]});
     const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,{acceptNode(node){if(!node.nodeValue.trim())return NodeFilter.FILTER_REJECT;if(node.parentElement&&["SCRIPT","STYLE","TEXTAREA"].includes(node.parentElement.tagName))return NodeFilter.FILTER_REJECT;return NodeFilter.FILTER_ACCEPT;}});
     const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
     nodes.forEach(node=>{const raw=node.nodeValue.trim(),next=translateText(raw,lang,lookup);if(next!==raw)node.nodeValue=node.nodeValue.replace(raw,next)});

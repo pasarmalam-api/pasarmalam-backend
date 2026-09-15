@@ -61,6 +61,10 @@ class CursorProxy:
         self.cursor = cursor
         self.lastrowid = lastrowid
 
+    @property
+    def rowcount(self):
+        return self.cursor.rowcount
+
     def fetchone(self):
         return self.cursor.fetchone()
 
@@ -181,6 +185,11 @@ def verify_password(password, stored):
 
 def make_token(user):
     payload = {"id": user["id"], "role": user["role"], "name": user["name"], "email": user.get("email", ""), "shop_name": user.get("shop_name", ""), "exp": now() + 60 * 60 * 24 * 30}
+    if user['role'] == 'buyer':
+        with connect() as con:
+            row = con.execute('SELECT password FROM users WHERE id=?', (user['id'],)).fetchone()
+        if row:
+            payload['password_version'] = hmac.new(AUTH_SECRET.encode(), row['password'].encode(), hashlib.sha256).hexdigest()
     body = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode("utf-8")).decode("ascii")
     sig = hmac.new(AUTH_SECRET.encode("utf-8"), body.encode("utf-8"), hashlib.sha256).hexdigest()
     return f"{body}.{sig}"
@@ -1342,6 +1351,11 @@ class Handler(BaseHTTPRequestHandler):
             return None
         with connect() as con:
             row = con.execute("SELECT * FROM users WHERE id=?", (payload["id"],)).fetchone()
+            if row and row['role'] == 'buyer':
+                version = hmac.new(AUTH_SECRET.encode(), row['password'].encode(), hashlib.sha256).hexdigest()
+                reset = con.execute("SELECT id FROM email_otps WHERE email=? AND purpose='buyer_password_reset' AND verified=1 LIMIT 1", (row['email'].lower(),)).fetchone()
+                if (payload.get('password_version') and not hmac.compare_digest(payload['password_version'], version)) or (reset and not payload.get('password_version')):
+                    return None
         if not row or row["status"] != "active":
             return None
         user = row_to_dict(row)
@@ -1372,6 +1386,7 @@ class Handler(BaseHTTPRequestHandler):
             routes = {
                 "/": lambda: send_html(self, 200, backend_homepage()),
                 "/api/health": lambda: send_json(self, 200, {"ok": True, "service": "PasarMalam API", "features": "marketplace", "version": "admin-ops-2026-06-05"}),
+                "/api/profile": self.get_buyer_profile,
                 "/api/products": lambda: self.get_products(query),
                 "/api/seller/availability": self.seller_availability,
                 "/api/seller/category": self.seller_category,
@@ -1441,7 +1456,9 @@ class Handler(BaseHTTPRequestHandler):
             elif parsed.path == "/api/otp/email/verify":
                 self.verify_email_otp(data)
             elif parsed.path == "/api/auth/password-reset":
-                send_json(self, 200, {"ok": True, "message": "Password reset link sent in demo mode"})
+                self.request_buyer_password_reset(data)
+            elif parsed.path == "/api/auth/password-reset/confirm":
+                self.confirm_buyer_password_reset(data)
             elif parsed.path == "/api/auth/change-password":
                 self.change_password(data)
             elif parsed.path == "/api/admin/email-reset-request":
@@ -1465,8 +1482,19 @@ class Handler(BaseHTTPRequestHandler):
             elif parsed.path == "/api/cart":
                 self.cart_route(method, data)
             elif parsed.path == "/api/wishlist":
-                user = self.current_user()
-                self.create_simple("wishlist", data, {"buyer_id": user["id"] if user and user["role"] == "buyer" else 1})
+                user = self.require_user('buyer')
+                product_id = int(data.get('product_id') or 0)
+                with connect() as con:
+                    if method == 'DELETE':
+                        con.execute('DELETE FROM wishlist WHERE buyer_id=? AND product_id=?', (user['id'], product_id))
+                    elif method == 'POST':
+                        if not con.execute('SELECT id FROM products WHERE id=?', (product_id,)).fetchone():
+                            raise ValueError('Product not found')
+                        if not con.execute('SELECT id FROM wishlist WHERE buyer_id=? AND product_id=?', (user['id'], product_id)).fetchone():
+                            con.execute('INSERT INTO wishlist (buyer_id, product_id, created_at) VALUES (?, ?, ?)', (user['id'], product_id, now()))
+                    else:
+                        raise ValueError('Unsupported wishlist action')
+                send_json(self, 200, {'ok': True})
             elif parsed.path == "/api/messages":
                 self.create_message(data)
             elif parsed.path == "/api/reviews":
@@ -1821,7 +1849,7 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 201, {"id": message_id, "ok": True})
 
     def create_review(self, data):
-        user = self.current_user()
+        user = self.require_user('buyer')
         product_id = int(data.get("product_id") or 0)
         rating = int(data.get("rating") or 0)
         title = str(data.get("title", "")).strip()
@@ -1832,7 +1860,7 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("Rating must be between 1 and 5")
         if not title or not body:
             raise ValueError("Review title and body are required")
-        buyer_name = data.get("buyer_name") or (user["name"] if user and user["role"] == "buyer" else "Buyer")
+        buyer_name = user['name']
         with connect() as con:
             product = con.execute("SELECT id, seller_id, name FROM products WHERE id = ?", (product_id,)).fetchone()
             if not product:
@@ -1900,6 +1928,12 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 201, {"id": cur.lastrowid, "ok": True})
 
     def signup(self, data):
+        data = dict(data)
+        data['email'] = str(data.get('email', '')).strip().lower()
+        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", data['email']):
+            raise ValueError('Valid email is required')
+        if len(str(data.get('password', ''))) < 8:
+            raise ValueError('Password must be at least 8 characters')
         required = ["role", "name", "email", "password"]
         for key in required:
             if key not in data:
@@ -1968,9 +2002,56 @@ class Handler(BaseHTTPRequestHandler):
         user['shop_category'] = data['shop_category'] if role == 'seller' else ''
         send_json(self, 201, {"token": make_token(user), "user": user})
 
+    def request_buyer_password_reset(self, data):
+        email = str(data.get("email", "")).strip().lower()
+        if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email):
+            raise ValueError("Valid email is required")
+        if not RESEND_API_KEY:
+            return send_json(self, 503, {"error": "Password reset email is temporarily unavailable. Please try again later."})
+        message = "If an active buyer account matches this email, a reset link will arrive shortly."
+        with connect() as con:
+            user = con.execute("SELECT id FROM users WHERE LOWER(email)=? AND role='buyer' AND status='active'", (email,)).fetchone()
+            recent = con.execute("SELECT id FROM email_otps WHERE email=? AND purpose='buyer_password_reset' AND created_at>?", (email, now()-60)).fetchone()
+            if not user or recent:
+                return send_json(self, 200, {"ok": True, "message": message})
+            token = secrets.token_urlsafe(32)
+            cur = con.execute("INSERT INTO email_otps (email, code_hash, purpose, verified, attempts, expires_at, created_at) VALUES (?, ?, 'buyer_password_reset', 0, 0, ?, ?)", (email, hash_otp_code(email, token), now()+1800, now()))
+            reset_id = cur.lastrowid
+        link = BUYER_APP_URL.rstrip('/') + '/password-reset.html#' + urllib.parse.urlencode({"email": email, "token": token})
+        try:
+            send_email(email, "Reset your PasarMalam buyer password", f'<p>A password reset was requested for your buyer account.</p><p><a href="{escape(link, quote=True)}">Reset password</a></p><p>This link expires in 30 minutes and can only be used once. If you did not request this, ignore this email.</p>')
+        except Exception:
+            with connect() as con:
+                con.execute("DELETE FROM email_otps WHERE id=?", (reset_id,))
+            return send_json(self, 503, {"error": "Password reset email could not be sent. Please try again later."})
+        send_json(self, 200, {"ok": True, "message": message})
+
+    def confirm_buyer_password_reset(self, data):
+        email = str(data.get("email", "")).strip().lower()
+        token = str(data.get("token", ""))
+        password = str(data.get("new_password", ""))
+        if len(password) < 8:
+            raise ValueError("New password must be at least 8 characters")
+        if not token or len(token) > 200:
+            raise PermissionError("Invalid or expired reset link. Request a new link.")
+        with connect() as con:
+            row = con.execute("SELECT id FROM email_otps WHERE email=? AND code_hash=? AND purpose='buyer_password_reset' AND verified=0 AND expires_at>?", (email, hash_otp_code(email, token), now())).fetchone()
+            user = con.execute("SELECT id FROM users WHERE LOWER(email)=? AND role='buyer' AND status='active'", (email,)).fetchone()
+            if not row or not user:
+                raise PermissionError("Invalid or expired reset link. Request a new link.")
+            # Claim the single-use link inside the same transaction as the password change.
+            claim = con.execute("UPDATE email_otps SET verified=1 WHERE id=? AND verified=0", (row['id'],))
+            if claim.rowcount != 1:
+                raise PermissionError("This reset link has already been used.")
+            con.execute("UPDATE users SET password=? WHERE id=?", (hash_password(password), user['id']))
+            con.execute("UPDATE email_otps SET verified=1 WHERE email=? AND purpose='buyer_password_reset'", (email,))
+        send_json(self, 200, {"ok": True, "message": "Password updated. Sign in with your new password."})
+
     def send_email_otp(self, data):
         email = data.get("email", "").strip().lower()
         purpose = data.get("purpose", "buyer_signup")
+        if purpose not in ("buyer_signup", "seller_signup"):
+            raise ValueError("Invalid verification purpose")
         if not email or "@" not in email:
             raise ValueError("Valid email is required")
         if not RESEND_API_KEY:
@@ -1992,6 +2073,8 @@ class Handler(BaseHTTPRequestHandler):
         email = data.get("email", "").strip().lower()
         code = data.get("code", "").strip()
         purpose = data.get("purpose", "buyer_signup")
+        if purpose not in ("buyer_signup", "seller_signup"):
+            raise ValueError("Invalid verification purpose")
         if not email or not code:
             raise ValueError("Email and OTP code are required")
         expected_hash = hash_otp_code(email, code)
@@ -2016,7 +2099,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def login(self, data):
         with connect() as con:
-            row = con.execute("SELECT * FROM users WHERE email = ?", (data.get("email"),)).fetchone()
+            row = con.execute("SELECT * FROM users WHERE LOWER(email) = ?", (str(data.get("email", "")).strip().lower(),)).fetchone()
         if not row:
             send_json(self, 401, {"error": "Invalid login"})
             return
@@ -2035,6 +2118,10 @@ class Handler(BaseHTTPRequestHandler):
                 con.execute("UPDATE users SET password = ? WHERE id = ?", (hash_password(data.get("password", "")), user["id"]))
         user.pop("password", None)
         send_json(self, 200, {"token": make_token(user), "user": user})
+
+    def get_buyer_profile(self):
+        user = self.require_user('buyer')
+        send_json(self, 200, {'user': {key: user.get(key, '') for key in ('id', 'role', 'name', 'email', 'phone', 'address')}})
 
     def update_profile(self, data):
         user = self.require_user()
@@ -2178,8 +2265,8 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 201, {"ok": True, "id": cur.lastrowid, "quantity": quantity})
 
     def get_wishlist(self):
-        user = self.current_user()
-        buyer_id = user["id"] if user and user["role"] == "buyer" else 1
+        user = self.require_user('buyer')
+        buyer_id = user['id']
         with connect() as con:
             rows = [row_to_dict(row) for row in con.execute("SELECT * FROM wishlist WHERE buyer_id = ? ORDER BY created_at DESC, id DESC", (buyer_id,))]
         send_json(self, 200, {"wishlist": rows})
