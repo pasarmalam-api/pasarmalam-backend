@@ -17,11 +17,11 @@
     .trust{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.trust div{border:1px solid var(--line);border-radius:6px;background:#fafafa;padding:10px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
     .muted{color:var(--muted);font-size:13px}.stars{color:var(--gold);font-weight:900}.error{color:#be123c;font-weight:900}@media(max-width:760px){main{padding-bottom:150px}.grid,.trust{grid-template-columns:1fr}.bar{flex-wrap:wrap}.panel{margin-left:8px!important;margin-right:8px!important}.primary,.soft,.cart{min-height:42px;font-size:13px;white-space:normal}}
   </style>
-<script src="shop-status.js?v=1"></script><link rel="stylesheet" href="catalogue.css?v=2"></head>
-<body>
+<script src="shop-status.js?v=1"></script><link rel="stylesheet" href="catalogue.css?v=2"><link rel="icon" type="image/png" href="pasarmalam-logo.png"><link rel="stylesheet" href="buyer-ui.css?v=1"></head>
+<body class="buyer-page">
   <header>
     <div class="bar">
-      <div class="brand" onclick="location.href='index.html'"><div class="logo">PM</div><div><h2>PasarMalam</h2><div>Butiran Produk</div></div></div>
+      <div class="brand" onclick="location.href='index.html'"><a class="logo" href="index.html" title="Home"><img src="pasarmalam-logo.png" width="56" height="56" alt="PasarMalam"></a><div><h2>PasarMalam</h2><div>Butiran Produk</div></div></div>
       <div><button class="soft" onclick="location.href='index.html'">Laman Utama</button> <button class="cart" onclick="location.href='cart.html'">Troli</button></div>
     </div>
   </header>
@@ -81,7 +81,7 @@
     }
     load().catch(e=>detail.innerHTML=`<p class="error">${e.message}</p>`);
   </script>
-<script src="badges.js?v=phone-accessories-1"></script></body>
+<script src="badges.js?v=buyer-ui-1"></script><script src="buyer-ui.js?v=1"></script></body>
 </html>
 
 

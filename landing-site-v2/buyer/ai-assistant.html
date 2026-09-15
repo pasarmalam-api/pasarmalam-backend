@@ -18,9 +18,9 @@
     .answer{white-space:pre-wrap;background:#f8fafc;border:1px solid var(--line);border-radius:8px;padding:14px;margin-top:14px;line-height:1.55}
     @media(max-width:640px){.bar{align-items:flex-start}.bar h2{font-size:20px}.panel{padding:13px}textarea{min-height:118px}}
   </style>
-</head>
-<body>
-  <header><div class="bar"><div class="brand" onclick="location.href='index.html'"><div class="logo">PM</div><div><h2>PasarMalam AI</h2><div>Buyer assistant</div></div></div><button class="soft" onclick="location.href='index.html'">Home</button></div></header>
+<link rel="icon" type="image/png" href="pasarmalam-logo.png"><link rel="stylesheet" href="buyer-ui.css?v=1"></head>
+<body class="buyer-page">
+  <header><div class="bar"><div class="brand" onclick="location.href='index.html'"><a class="logo" href="index.html" title="Home"><img src="pasarmalam-logo.png" width="56" height="56" alt="PasarMalam"></a><div><h2>PasarMalam AI</h2><div>Buyer assistant</div></div></div><button class="soft" onclick="location.href='index.html'">Home</button></div></header>
   <main>
     <section class="panel">
       <h2>Find what to buy</h2>
@@ -50,6 +50,6 @@
       }catch(e){answer.textContent="AI is not reachable right now. Check Render first, then try again. "+e.message}
     }
   </script>
-  <script src="badges.js?v=phone-accessories-1"></script>
-</body>
+  <script src="badges.js?v=buyer-ui-1"></script>
+<script src="buyer-ui.js?v=1"></script></body>
 </html>
