@@ -30,10 +30,20 @@ assert.deepEqual(mixShops([{id:1,shop:'A'},{id:2,shop:'A'},{id:3,shop:'B'}]).map
    const banner=page.locator('.market-banner');await banner.waitFor();
    assert(await banner.evaluate(i=>i.complete&&i.naturalWidth>0&&i.getBoundingClientRect().height>100));
    assert.equal(await banner.evaluate(i=>getComputedStyle(i).objectFit),'contain');
+   assert(await banner.evaluate(i=>Math.abs(i.clientWidth/i.clientHeight-i.naturalWidth/i.naturalHeight)<0.01),'Banner must fill its width at the original aspect ratio');
    const seller=page.locator('.seller-entry');assert(await seller.isVisible());
    assert(await seller.evaluate(e=>e.getBoundingClientRect().bottom<innerHeight&&e.scrollWidth<=e.clientWidth));
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    await page.screenshot({path:path.resolve('../outputs/buyer-restored-'+width+'.png')});
+   await page.locator('#cats [data-category="Phones"]').click();
+   await page.waitForFunction(()=>document.querySelectorAll('#products .card').length===2);
+   assert.equal(new URL(page.url()).pathname,'/buyer/index.html');
+   assert(await banner.isVisible());
+   await page.locator('#search').fill('Phone');
+   await page.locator('#cats [data-category="All"]').click();
+   await page.waitForFunction(()=>document.querySelectorAll('#products .card').length===23);
+   assert.equal(await page.locator('#search').inputValue(),'');
+   assert.deepEqual(await page.locator('#products .shop-name').evaluateAll(els=>els.slice(0,3).map(e=>e.getAttribute('href'))),[1,2,3].map(id=>'seller-store.html?seller_id='+id));
    await seller.click();await page.waitForURL('https://www.pasarmalamapp.com/seller/');
   }
   await page.goto('http://buyer.test/buyer/category.html?category=All');

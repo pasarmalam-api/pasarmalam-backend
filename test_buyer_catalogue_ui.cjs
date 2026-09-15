@@ -48,7 +48,8 @@ const server=http.createServer((req,res)=>{
    }));
    assert(!metrics.overflow,JSON.stringify(metrics));assert(metrics.buttons.every(b=>b.font<=13&&!b.overflow));
    assert(metrics.photos.every(p=>Math.abs(p.w-p.h)<2&&p.fit==='contain'));
-   assert.equal(metrics.nav,'static');assert(metrics.first<1000);
+   assert.equal(metrics.nav,'static');
+   assert(await page.locator('.market-banner').evaluate(i=>Math.abs(i.clientWidth/i.clientHeight-i.naturalWidth/i.naturalHeight)<0.01));
    await page.screenshot({path:path.resolve('../outputs/buyer-catalogue-'+width+'.png'),fullPage:true});
    if(width===1440)await page.screenshot({path:path.resolve('../outputs/buyer-desktop-preview.png')});
    await page.locator('#products .photo').first().click();await page.waitForURL('**/product.html?id=*',{waitUntil:'domcontentloaded'});
@@ -56,9 +57,10 @@ const server=http.createServer((req,res)=>{
    assert.equal(await page.locator('.photo img').first().evaluate(i=>getComputedStyle(i).objectFit),'contain');
   }
   await page.goto(origin+'/buyer/index.html',{waitUntil:'domcontentloaded'});
-  await page.locator('#cats .cat').nth(1).click();await page.waitForURL('**/category.html?category=Phones',{waitUntil:'domcontentloaded'});
-  await page.locator('#list .card').first().waitFor();
-  assert.equal(await page.locator('#list .photo img').first().evaluate(i=>getComputedStyle(i).objectFit),'contain');
+  await page.locator('#cats [data-category="Phones"]').click();
+  await page.waitForFunction(()=>document.querySelector('#cats [data-category="Phones"]').getAttribute('aria-pressed')==='true');
+  await page.locator('#products .card').first().waitFor();
+  assert.equal(await page.locator('#products .photo img').first().evaluate(i=>getComputedStyle(i).objectFit),'contain');
   const keyword=products[0].name.trim().split(/\s+/)[0];
   const expected=products.filter(p=>[p.name,p.shop,p.category,p.description].join(' ').toLowerCase().includes(keyword.toLowerCase()));
   await page.goto(origin+'/buyer/index.html',{waitUntil:'domcontentloaded'});await page.locator('#search').fill(keyword);await page.locator('#searchButton').click();

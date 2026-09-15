@@ -5,6 +5,8 @@ body button{font-size:13px!important;font-weight:600!important;letter-spacing:0}
 body header{background:#fff!important;color:#202124!important;box-shadow:none!important;border-bottom:1px solid #dce5e7}
 body header .brand h1,body header .brand h2{font-size:22px!important;font-weight:700;line-height:1.2!important}
 body header .logo{width:40px!important;height:40px!important;min-width:40px!important;flex:none;font-size:17px!important;border-radius:8px}
+.buyer-home header #homeLogo{width:56px!important;height:56px!important;min-width:56px!important;background:none!important;box-shadow:none!important;border:0!important;border-radius:0!important;padding:0!important}
+.buyer-home header #homeLogo img{display:block;width:100%;height:100%;object-fit:contain}
 body header .label,body header .version{font-size:11px!important;font-weight:500;color:#59666d!important}
 body header .version{border:0;padding:0;margin-top:2px}
 body .photo{position:relative;overflow:hidden;background:#fff!important;color:#63757d;min-width:0}
@@ -20,7 +22,7 @@ body :is(button,a,input,select):focus-visible{outline:2px solid #0d8174;outline-
 /* Home is a shopping catalogue, with navigation in flow instead of over cards. */
 .buyer-home .utility{display:none!important}
 .buyer-home .hero{display:block!important;margin:16px 0!important;padding:0!important;background:transparent!important}
-.buyer-home .market-banner{display:block;width:100%;height:auto;max-height:300px;object-fit:contain}
+.buyer-home .market-banner{display:block;width:100%!important;height:auto!important;max-height:none!important;aspect-ratio:1672/941;object-fit:contain}
 .buyer-home .bar{max-width:1240px;grid-template-columns:200px minmax(200px,1fr) auto;gap:20px;padding:16px 20px}
 .buyer-home .quick button{color:#53666c}
 .buyer-home .quick{gap:14px}
@@ -31,9 +33,9 @@ body :is(button,a,input,select):focus-visible{outline:2px solid #0d8174;outline-
 .buyer-home .head{padding:0 0 12px!important;border:0;align-items:center!important}
 .buyer-home .head h3{font-size:16px!important;font-weight:600;color:#25383d}
 .buyer-home .head span{display:none!important}
-.buyer-home .cats{grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:8px!important;padding:0!important}
-.buyer-home .cat{min-height:40px!important;padding:8px!important;font-size:12px!important;line-height:1.3!important;border:1px solid #dce5e7!important;border-radius:6px!important;color:#44545a;font-weight:500!important}
-.buyer-home .cat.active{border-color:#168675!important;background:#e7f5ef;color:#126a59}
+.buyer-home .cats{display:flex!important;flex-wrap:wrap;gap:0!important;padding:0!important;border-bottom:1px solid #dce5e7}
+.buyer-home .cat{flex:none;min-height:40px!important;padding:10px 14px!important;font-size:12px!important;line-height:1.3!important;border:0!important;border-bottom:2px solid transparent!important;border-radius:0!important;background:transparent!important;color:#44545a;font-weight:500!important;white-space:nowrap}
+.buyer-home .cat.active{border-bottom-color:#168675!important;color:#126a59;font-weight:700!important}
 .buyer-home .grid{grid-template-columns:repeat(5,minmax(0,1fr))!important;gap:16px!important;padding:0!important}
 .buyer-home .grid>.card{border:1px solid #e0e6e8;border-radius:8px!important;margin:0!important;background:#fff}
 .buyer-home .grid>.card:hover{border-color:#8eaaa8}
@@ -43,6 +45,9 @@ body :is(button,a,input,select):focus-visible{outline:2px solid #0d8174;outline-
 .buyer-home .name{font-size:13px!important;line-height:1.45!important;font-weight:600;min-height:38px!important;color:#22383e}
 .buyer-home .shop,.buyer-home .muted{font-size:11px!important;line-height:1.4!important;color:#65747b}
 .buyer-home .shop{margin:0;overflow-wrap:anywhere}
+.buyer-home .shop-name{font-size:12px;color:#176b61;font-weight:600;text-decoration:none}
+.buyer-home .shop-name:hover{text-decoration:underline}
+.buyer-home .product-category{display:block;font-size:11px;color:#65747b;margin-top:2px}
 .buyer-home .tag{font-size:10px!important;font-weight:500;align-self:flex-start;margin:0!important;padding:2px 5px!important}
 .buyer-home .listing-tags{display:flex;gap:4px;flex-wrap:wrap;min-height:20px}
 .buyer-home .shop-status-slot{min-height:16px}
@@ -71,8 +76,8 @@ body :is(button,a,input,select):focus-visible{outline:2px solid #0d8174;outline-
  .buyer-home .bar>div:last-child{grid-column:auto}
  .buyer-home .search input{font-size:16px!important}
  .buyer-home main{padding:0 12px 24px!important}
- .buyer-home .cats{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important}
- .buyer-home .cat{font-size:11px!important;padding:6px 3px!important;min-height:44px!important}
+ .buyer-home .cats{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin;max-width:100%}
+ .buyer-home .cat{font-size:12px!important;padding:10px 12px!important;min-height:44px!important}
  .buyer-home .grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
  .buyer-home .body{padding:9px!important}
  .buyer-home .name{font-size:12px!important;min-height:35px!important}

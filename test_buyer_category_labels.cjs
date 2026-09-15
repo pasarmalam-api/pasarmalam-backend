@@ -22,7 +22,7 @@ const root=path.resolve('landing-site-v2');
    for(const label of ['Aksesori Telefon','Phone Accessories','\u624b\u673a\u914d\u4ef6','Aksesori Telefon']){
     const button=page.locator('#cats button').filter({hasText:label});
     await button.waitFor();
-    assert((await button.getAttribute('onclick')).includes('category=Chargers'));
+    assert.equal(await button.getAttribute('data-category'),'Chargers');
     assert(await button.evaluate(el=>el.scrollWidth<=el.clientWidth));
     await page.locator('#langToggle').click();
    }
