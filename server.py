@@ -1003,6 +1003,7 @@ def migrate_returns(con):
 def migrate_users(con):
     columns = table_columns(con, "users")
     additions = {
+        "shop_open": "INTEGER DEFAULT 1",
         "status": "TEXT DEFAULT 'active'",
         "seller_status": "TEXT DEFAULT 'pending'",
         "identity_type": "TEXT DEFAULT ''",
@@ -1370,6 +1371,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/": lambda: send_html(self, 200, backend_homepage()),
                 "/api/health": lambda: send_json(self, 200, {"ok": True, "service": "PasarMalam API", "features": "marketplace", "version": "admin-ops-2026-06-05"}),
                 "/api/products": lambda: self.get_products(query),
+                "/api/seller/availability": self.seller_availability,
                 "/api/messages": lambda: self.list_table("messages", "messages"),
                 "/api/reviews": lambda: self.list_table("reviews", "reviews"),
                 "/api/orders": self.get_orders,
@@ -1445,6 +1447,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.reset_admin_password(data)
             elif parsed.path == "/api/profile":
                 self.update_profile(data)
+            elif parsed.path == "/api/seller/availability" and method == "POST":
+                self.seller_availability(data)
             elif parsed.path == "/api/delivery/pickup" and method == "POST":
                 self.delivery_pickup(data)
             elif parsed.path == "/api/delivery/quotation" and method == "POST":
@@ -1587,6 +1591,28 @@ class Handler(BaseHTTPRequestHandler):
         except LalamoveError as exc:
             send_json(self, 503, {"error": str(exc)})
 
+    def seller_availability(self, data=None):
+        user = self.require_user("seller")
+        with connect() as con:
+            row = con.execute("SELECT shop_open FROM users WHERE id=?", (user['id'],)).fetchone()
+            food = con.execute("SELECT id FROM products WHERE seller_id=? AND LOWER(TRIM(category)) IN ('food','street food','meals','drinks','makanan','makanan jalanan','hidangan','minuman') LIMIT 1", (user['id'],)).fetchone()
+            eligible = bool(food) or not bool(row['shop_open'])
+            if data is not None:
+                if type(data.get('is_open')) is not bool:
+                    raise ValueError("is_open must be true or false")
+                if not eligible:
+                    raise ValueError("Open/closed controls are for food and drink shops")
+                con.execute("UPDATE users SET shop_open=? WHERE id=?", (int(data['is_open']), user['id']))
+            opened = data['is_open'] if data is not None else bool(row['shop_open'])
+        send_json(self, 200, {'is_open': opened, 'eligible': eligible})
+
+    def require_shop_open(self, con, product):
+        # Serialize closing against creation of new orders on PostgreSQL.
+        suffix = " FOR UPDATE" if USE_POSTGRES else ""
+        seller = con.execute("SELECT shop_open FROM users WHERE id=?" + suffix, (product['seller_id'],)).fetchone()
+        if seller and not seller['shop_open']:
+            raise ValueError("Shop is closed. Please order when the seller reopens.")
+
     def get_products(self, query):
         category = query.get("category", [""])[0]
         sql = "SELECT * FROM products"
@@ -1604,7 +1630,9 @@ class Handler(BaseHTTPRequestHandler):
         sql += " ORDER BY created_at DESC, id DESC"
         with connect() as con:
             rows = [row_to_dict(row) for row in con.execute(sql, params)]
+            sellers = {r['id']: bool(r['shop_open']) for r in con.execute("SELECT id, shop_open FROM users")}
         for row in rows:
+            row['shop_open'] = sellers.get(row['seller_id'], True)
             row["images"] = json.loads(row.get("images") or "[]")
             row["variants"] = json.loads(row.get("variants") or "[]")
         send_json(self, 200, {"products": rows})
@@ -2073,9 +2101,10 @@ class Handler(BaseHTTPRequestHandler):
             product_id = int(data.get("product_id") or 0)
             if not product_id:
                 raise ValueError("Product is required")
-            product = con.execute("SELECT id, stock FROM products WHERE id = ?", (product_id,)).fetchone()
+            product = con.execute("SELECT id, stock, seller_id FROM products WHERE id = ?", (product_id,)).fetchone()
             if not product:
                 raise ValueError("Product not found")
+            self.require_shop_open(con, product)
             stock = int(product["stock"] or 0)
             if stock < 1:
                 raise ValueError("Out of stock")
@@ -2423,6 +2452,7 @@ class Handler(BaseHTTPRequestHandler):
         product = con.execute("SELECT * FROM products WHERE id = ?", (int(data["product_id"]),)).fetchone()
         if not product:
             raise ValueError("Product not found")
+        self.require_shop_open(con, product)
         raw_qty = data.get("quantity", 1)
         try:
             number = float(raw_qty)

@@ -583,3 +583,17 @@ body,.app p,.app label,.app .label,.app .muted,.app th,.app td,.app .tag,.app na
 #previewGrid .photo-remove:hover{background:#fee4e2}
 #previewGrid .photo-remove:focus-visible{outline:3px solid #0f9f8f;outline-offset:-3px}
 @media(max-width:980px){.app h2{font-size:20px!important}.app .hero h2{font-size:22px!important}.app .stat b{font-size:22px!important}.app aside{z-index:70!important}.app aside nav{z-index:71!important}}
+/* A compact shop-wide switch, separate from product availability. */
+.shop-availability{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 0;margin-bottom:14px;border-bottom:1px solid #d8e4df;font-size:14px}
+.shop-availability[hidden]{display:none}
+.shop-availability>div{display:flex;gap:12px;align-items:center}
+.shop-availability [role=status]{color:#a42c38;font-size:13px;font-weight:600}
+.shop-availability[data-open=true] [role=status]{color:#167343}
+.shop-availability label{display:flex;align-items:center;gap:10px;min-height:44px;cursor:pointer}
+.shop-availability input[role=switch]{appearance:none;width:44px;height:26px;min-height:26px;min-width:44px;padding:0;border:1px solid #6b7280;border-radius:20px;background:#6b7280;position:relative;cursor:pointer}
+.shop-availability input[role=switch]:before{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:white}
+.shop-availability input[role=switch]:checked{background:#167343;border-color:#167343}
+.shop-availability input[role=switch]:checked:before{left:21px}
+.shop-availability input:focus-visible{outline:3px solid #3083dd;outline-offset:3px}
+.shop-availability input:disabled{opacity:.5;cursor:wait}
+.shop-availability p{flex-basis:100%;margin:0;color:#a42c38;font-size:13px}

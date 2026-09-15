@@ -43,6 +43,7 @@
       logout.onclick=()=>{localStorage.removeItem('pm_token');localStorage.removeItem('pm_user');location.replace('login.html')};nav.append(logout);
     }
     if(!publicPages.has(page)&&!active)return;
+    if(active){const script=document.createElement('script');script.src='shop-availability.js?v=1';document.head.append(script)}
     document.querySelectorAll('table').forEach(table=>{const wrap=document.createElement('div');wrap.className='seller-table-scroll';table.before(wrap);wrap.append(table)});
   }
   document.addEventListener('DOMContentLoaded',init);
