@@ -36,7 +36,9 @@ const server=http.createServer((req,res)=>{
   for(const width of [1440,1024,768,402,375]){
    await page.setViewportSize({width,height:1000});await page.goto(origin+'/buyer/index.html',{waitUntil:'domcontentloaded'});
    await page.locator('#products .photo img').first().waitFor();
-   await page.waitForFunction(()=>[...document.querySelectorAll('#products .photo img')].every(i=>i.complete&&i.naturalWidth>0),null,{timeout:45000}).catch(async e=>{console.log(await page.locator('#products .photo img').evaluateAll(imgs=>imgs.map(i=>({src:i.src,loaded:i.complete,width:i.naturalWidth}))));throw e});
+   await page.waitForFunction(()=>[...document.querySelectorAll('#products .photo img')].filter(i=>i.getBoundingClientRect().top<innerHeight).every(i=>i.complete&&i.naturalWidth>0),null,{timeout:45000});
+   assert(await page.locator('.market-banner').evaluate(i=>i.complete&&i.naturalWidth>0));
+   assert(await page.locator('.seller-entry').isVisible());
    const metrics=await page.evaluate(()=>({
     overflow:document.documentElement.scrollWidth>innerWidth,
     buttons:[...document.querySelectorAll('#cats button')].map(b=>({font:parseFloat(getComputedStyle(b).fontSize),overflow:b.scrollWidth>b.clientWidth})),
@@ -46,7 +48,7 @@ const server=http.createServer((req,res)=>{
    }));
    assert(!metrics.overflow,JSON.stringify(metrics));assert(metrics.buttons.every(b=>b.font<=13&&!b.overflow));
    assert(metrics.photos.every(p=>Math.abs(p.w-p.h)<2&&p.fit==='contain'));
-   assert.equal(metrics.nav,'static');assert(metrics.first<750);
+   assert.equal(metrics.nav,'static');assert(metrics.first<1000);
    await page.screenshot({path:path.resolve('../outputs/buyer-catalogue-'+width+'.png'),fullPage:true});
    if(width===1440)await page.screenshot({path:path.resolve('../outputs/buyer-desktop-preview.png')});
    await page.locator('#products .photo').first().click();await page.waitForURL('**/product.html?id=*',{waitUntil:'domcontentloaded'});

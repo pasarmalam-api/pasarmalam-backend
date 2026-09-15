@@ -18,7 +18,9 @@ body .soft,body .cart{border-color:#dce5e7}
 body :is(button,a,input,select):focus-visible{outline:2px solid #0d8174;outline-offset:3px}
 
 /* Home is a shopping catalogue, with navigation in flow instead of over cards. */
-.buyer-home .utility,.buyer-home .hero{display:none!important}
+.buyer-home .utility{display:none!important}
+.buyer-home .hero{display:block!important;margin:16px 0!important;padding:0!important;background:transparent!important}
+.buyer-home .market-banner{display:block;width:100%;height:auto;max-height:300px;object-fit:contain}
 .buyer-home .bar{max-width:1240px;grid-template-columns:200px minmax(200px,1fr) auto;gap:20px;padding:16px 20px}
 .buyer-home .quick button{color:#53666c}
 .buyer-home .quick{gap:14px}
@@ -53,6 +55,7 @@ body :is(button,a,input,select):focus-visible{outline:2px solid #0d8174;outline-
 .buyer-home .bottom-nav{position:static!important;inset:auto!important;display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr))!important;margin:0!important;width:100%!important;border:0;border-bottom:1px solid #dce5e7;border-radius:0!important;background:transparent!important;box-shadow:none!important;padding:0!important}
 .buyer-home .bottom-nav button{display:block!important;background:transparent;min-height:42px!important;padding:6px!important;font-size:12px!important;font-weight:500!important}
 .buyer-home .bottom-nav button.active{border-bottom:2px solid #168574}
+.buyer-home .bottom-nav .seller-entry{background:#168574!important;color:#fff!important;font-weight:600!important;border-radius:6px!important;white-space:normal}
 .buyer-home .pm-seller-switch,.buyer-home .pm-policy-link{display:none!important}
 .buyer-home .pm-mobile-links{display:none!important}
 .buyer-home #products>.panel{grid-column:1/-1;margin:0!important;padding:24px!important}
@@ -76,6 +79,7 @@ body :is(button,a,input,select):focus-visible{outline:2px solid #0d8174;outline-
  .buyer-home .price{font-size:16px!important}
  .buyer-home .buy{min-height:44px!important;font-size:12px!important;padding:0 4px!important}
  .buyer-home .bottom-nav button{font-size:10px!important;min-height:44px!important}
+ .buyer-home .bottom-nav{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:4px!important;padding:6px 0!important}
  body .photo img{padding:8px}
 }
 @media(max-width:340px){
