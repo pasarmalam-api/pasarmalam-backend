@@ -56,7 +56,7 @@
         <summary>Kategori</summary>
         <div class="pm-menu-grid compact">
           <button onclick="location.href='category.html?category=Phones'">Telefon</button>
-          <button onclick="location.href='category.html?category=Chargers'">Pengecas</button>
+          <button onclick="location.href='category.html?category=Chargers'">Aksesori Telefon</button>
           <button onclick="location.href='category.html?category=Electronics'">Elektronik</button>
           <button onclick="location.href='category.html?category=Car%20Parts'">Alat Ganti Kereta</button>
           <button onclick="location.href='category.html?category=Hardware'">Perkakasan</button>
@@ -129,7 +129,7 @@
     function drawUlasan(rows){reviewsList.innerHTML=rows.map(r=>`<div class="msg"><div class="stars">${"â˜…".repeat(r.rating)}</div><b>${r.title}</b><span>${r.body}</span></div>`).join("")}reviewBtn.onclick=async()=>{await api("/api/reviews",{method:"POST",body:JSON.stringify({product_id:selectedProduct?.id||1,buyer_name:"Buyer",rating:Number(reviewRating.value),title:reviewTitle.value,body:reviewBody.value})});drawUlasan((await api("/api/reviews")).reviews)}
     applyLang();drawCats();load();
   </script>
-<script src="badges.js"></script></body>
+<script src="badges.js?v=phone-accessories-1"></script></body>
 </html>
 
 
