@@ -21,6 +21,7 @@ class SellerOperationsTest(unittest.TestCase):
         self.reply = self.response.start()
         self.addCleanup(self.response.stop)
         with server.connect() as c:
+            c.execute("UPDATE users SET shop_category='Electronics' WHERE id=2")
             c.execute("UPDATE products SET seller_id=2 WHERE id=1")
             c.execute("UPDATE products SET seller_id=99 WHERE id<>1")
 

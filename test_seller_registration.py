@@ -17,7 +17,7 @@ class SellerRegistrationTest(unittest.TestCase):
         self.handler = object.__new__(server.Handler)
         self.data = dict(role="seller", name="<Test Seller>", email="seller@example.test",
                          password="test-password", phone="+60000000000", shop_name="Test & Shop",
-                         identity_type="Passport", identity_number="private-id",
+                         identity_type="Passport", identity_number="private-id", shop_category="Street Food",
                          bank_name="Test Bank", bank_account_name="Test Seller",
                          bank_account_number="private-bank", email_otp_token="test")
         self.otp = patch.object(server, "verify_email_otp_token", return_value=True)

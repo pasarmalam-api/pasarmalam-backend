@@ -48,6 +48,7 @@ BILLPLZ_MODE = os.environ.get("BILLPLZ_MODE", "sandbox").lower()
 BILLPLZ_BASE_URL = "https://www.billplz-sandbox.com" if BILLPLZ_MODE != "live" else "https://www.billplz.com"
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+SHOP_CATEGORIES = ("Phones", "Chargers", "Electronics", "Car Parts", "Hardware", "Stationery", "Toys", "Shoes", "Clothes", "Meals", "Street Food", "Food", "Drinks")
 
 
 if USE_POSTGRES:
@@ -1004,6 +1005,7 @@ def migrate_users(con):
     columns = table_columns(con, "users")
     additions = {
         "shop_open": "INTEGER DEFAULT 1",
+        "shop_category": "TEXT DEFAULT ''",
         "status": "TEXT DEFAULT 'active'",
         "seller_status": "TEXT DEFAULT 'pending'",
         "identity_type": "TEXT DEFAULT ''",
@@ -1372,6 +1374,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/health": lambda: send_json(self, 200, {"ok": True, "service": "PasarMalam API", "features": "marketplace", "version": "admin-ops-2026-06-05"}),
                 "/api/products": lambda: self.get_products(query),
                 "/api/seller/availability": self.seller_availability,
+                "/api/seller/category": self.seller_category,
                 "/api/messages": lambda: self.list_table("messages", "messages"),
                 "/api/reviews": lambda: self.list_table("reviews", "reviews"),
                 "/api/orders": self.get_orders,
@@ -1449,6 +1452,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.update_profile(data)
             elif parsed.path == "/api/seller/availability" and method == "POST":
                 self.seller_availability(data)
+            elif parsed.path == "/api/seller/category" and method == "POST":
+                self.seller_category(data)
             elif parsed.path == "/api/delivery/pickup" and method == "POST":
                 self.delivery_pickup(data)
             elif parsed.path == "/api/delivery/quotation" and method == "POST":
@@ -1591,12 +1596,41 @@ class Handler(BaseHTTPRequestHandler):
         except LalamoveError as exc:
             send_json(self, 503, {"error": str(exc)})
 
+    def seller_category(self, data=None):
+        user = self.require_user("seller")
+        with connect() as con:
+            suffix = " FOR UPDATE" if USE_POSTGRES else ""
+            row = con.execute("SELECT shop_category FROM users WHERE id=?" + suffix, (user['id'],)).fetchone()
+            category = row['shop_category'] or ''
+            if data is not None:
+                chosen = data.get('shop_category')
+                if chosen not in SHOP_CATEGORIES:
+                    raise ValueError("Choose a valid shop category")
+                if data.get('previous_category') != category:
+                    raise ValueError("Shop category changed elsewhere. Reload Settings before saving.")
+                if data.get('move_products') is not True:
+                    raise ValueError("Confirm moving all existing products to this category")
+                con.execute("UPDATE users SET shop_category=? WHERE id=?", (chosen, user['id']))
+                con.execute("UPDATE products SET category=? WHERE seller_id=?", (chosen, user['id']))
+                category = chosen
+            count = con.execute("SELECT COUNT(*) AS total FROM products WHERE seller_id=?", (user['id'],)).fetchone()['total']
+        send_json(self, 200, {'shop_category': category, 'categories': SHOP_CATEGORIES, 'product_count': count})
+
+    def require_product_category(self, con, seller_id, category):
+        # Lock the owner row so listing writes and bulk category changes serialize.
+        suffix = " FOR UPDATE" if USE_POSTGRES else ""
+        row = con.execute("SELECT shop_category FROM users WHERE id=?" + suffix, (seller_id,)).fetchone()
+        if not row or not row['shop_category']:
+            raise ValueError("Choose your shop category in Settings before saving products")
+        if category != row['shop_category']:
+            raise ValueError("Product category must match your shop category. Change it in Settings.")
+
     def seller_availability(self, data=None):
         user = self.require_user("seller")
         with connect() as con:
-            row = con.execute("SELECT shop_open FROM users WHERE id=?", (user['id'],)).fetchone()
+            row = con.execute("SELECT shop_open, shop_category FROM users WHERE id=?", (user['id'],)).fetchone()
             food = con.execute("SELECT id FROM products WHERE seller_id=? AND LOWER(TRIM(category)) IN ('food','street food','meals','drinks','makanan','makanan jalanan','hidangan','minuman') LIMIT 1", (user['id'],)).fetchone()
-            eligible = bool(food) or not bool(row['shop_open'])
+            eligible = (row['shop_category'] in ('Food', 'Street Food', 'Meals', 'Drinks') if row['shop_category'] else bool(food)) or not bool(row['shop_open'])
             if data is not None:
                 if type(data.get('is_open')) is not bool:
                     raise ValueError("is_open must be true or false")
@@ -1651,6 +1685,7 @@ class Handler(BaseHTTPRequestHandler):
         seller_id = user["id"] if user and user["role"] == "seller" else int(data.get("seller_id", 1))
         shop = user.get("shop_name") or user.get("name") if user and user["role"] == "seller" else data["shop"]
         with connect() as con:
+            self.require_product_category(con, seller_id, data['category'])
             cur = con.execute(
                 """
                 INSERT INTO products
@@ -1713,6 +1748,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
             allowed = ["name", "shop", "category", "price", "stock", "condition", "price_mode", "description", "warranty", "shipping_type", "weight_kg"]
             self.validate_product(data)
+            if "category" in data:
+                self.require_product_category(con, product['seller_id'], data['category'])
             updates = {key: data[key] for key in allowed if key in data}
             if "variants" in data:
                 updates["variants"] = json.dumps(data["variants"])
@@ -1877,6 +1914,8 @@ class Handler(BaseHTTPRequestHandler):
             if not verify_email_otp_token(data["email"], email_otp_token, f"{role}_signup"):
                 raise PermissionError("Email OTP verification required")
         if role == "seller":
+            if data.get("shop_category") not in SHOP_CATEGORIES:
+                raise ValueError("Choose a valid shop category")
             seller_required = {
                 "shop_name": "Shop name is required",
                 "identity_type": "Identity type is required",
@@ -1923,8 +1962,10 @@ class Handler(BaseHTTPRequestHandler):
                 ),
             )
             if role == "seller":
+                con.execute("UPDATE users SET shop_category=? WHERE id=?", (data['shop_category'], cur.lastrowid))
                 queue_seller_emails(con, cur.lastrowid, data)
         user = {"id": cur.lastrowid, "role": role, "name": data["name"], "phone": data.get("phone", ""), "email": data["email"], "address": data.get("address", ""), "shop_name": data.get("shop_name", ""), "status": "active", "seller_status": seller_status}
+        user['shop_category'] = data['shop_category'] if role == 'seller' else ''
         send_json(self, 201, {"token": make_token(user), "user": user})
 
     def send_email_otp(self, data):
@@ -2012,7 +2053,7 @@ class Handler(BaseHTTPRequestHandler):
         sql = ", ".join([f"{key} = ?" for key in updates])
         with connect() as con:
             con.execute(f"UPDATE users SET {sql} WHERE id = ?", [*updates.values(), user["id"]])
-            row = row_to_dict(con.execute("SELECT id, role, name, phone, email, address, shop_name, identity_type, identity_number, business_type, ssm_number, ssm_document_url, business_verification_status, business_verification_submitted_at, bank_name, bank_account_name, bank_account_number, status, seller_status FROM users WHERE id = ?", (user["id"],)).fetchone())
+            row = row_to_dict(con.execute("SELECT id, role, name, phone, email, address, shop_name, shop_category, identity_type, identity_number, business_type, ssm_number, ssm_document_url, business_verification_status, business_verification_submitted_at, bank_name, bank_account_name, bank_account_number, status, seller_status FROM users WHERE id = ?", (user["id"],)).fetchone())
         send_json(self, 200, {"ok": True, "user": row, "token": make_token(row)})
 
     def change_password(self, data):
