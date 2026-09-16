@@ -49,7 +49,7 @@ BILLPLZ_MODE = os.environ.get("BILLPLZ_MODE", "sandbox").lower()
 BILLPLZ_BASE_URL = "https://www.billplz-sandbox.com" if BILLPLZ_MODE != "live" else "https://www.billplz.com"
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-SHOP_CATEGORIES = ("Phones", "Chargers", "Electronics", "Car Parts", "Hardware", "Stationery", "Toys", "Shoes", "Clothes", "Meals", "Street Food", "Food", "Drinks")
+SHOP_CATEGORIES = ("Phones", "Chargers", "Electronics", "Car Parts", "Hardware", "Stationery", "Toys", "Shoes", "Clothes", "Meals", "Street Food", "Food", "Drinks", "Groceries")
 
 
 if USE_POSTGRES:

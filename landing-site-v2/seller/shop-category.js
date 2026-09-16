@@ -1,10 +1,10 @@
 (function () {
   'use strict';
-  const categories = ['Phones','Chargers','Electronics','Car Parts','Hardware','Stationery','Toys','Shoes','Clothes','Meals','Street Food','Food','Drinks'];
+  const categories = ['Phones','Chargers','Electronics','Car Parts','Hardware','Stationery','Toys','Shoes','Clothes','Meals','Street Food','Food','Drinks','Groceries'];
   const labels = {
-    en: ['Phones','Phone Accessories','Electronics','Car Parts','Hardware','Stationery','Toys','Shoes','Clothes','Meals','Street Food','Food','Drinks'],
-    ms: ['Telefon','Aksesori Telefon','Elektronik','Alat Ganti Kereta','Perkakasan','Alat Tulis','Mainan','Kasut','Pakaian','Hidangan','Makanan Jalanan','Makanan','Minuman'],
-    zh: ['手机','手机配件','电子产品','汽车配件','五金','文具','玩具','鞋子','服装','餐食','街头美食','食品','饮料']
+    en: ['Phones','Phone Accessories','Electronics','Car Parts','Hardware','Stationery','Toys','Shoes','Clothes','Meals','Street Food','Food','Drinks','Groceries'],
+    ms: ['Telefon','Aksesori Telefon','Elektronik','Alat Ganti Kereta','Perkakasan','Alat Tulis','Mainan','Kasut','Pakaian','Hidangan','Makanan Jalanan','Makanan','Minuman','Barangan Runcit'],
+    zh: ['手机','手机配件','电子产品','汽车配件','五金','文具','玩具','鞋子','服装','餐食','街头美食','食品','饮料','杂货']
   };
   const copy = {
     en: {label:'Shop category', choose:'Select category', settings:'Shop Settings', save:'Save category', retry:'Retry', missing:'Choose your shop category in Settings.', failed:'Unable to load shop category.', saved:'Shop category saved.', confirm:'Move all existing products into the selected category?', warning:'All existing products will move to the selected category.'},

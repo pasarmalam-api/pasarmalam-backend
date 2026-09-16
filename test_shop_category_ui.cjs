@@ -43,7 +43,9 @@ const server=http.createServer((req,res)=>{
   for(const width of [402,1440]){
    category='Street Food';await page.setViewportSize({width,height:900});
    await page.goto(origin+'/seller/register.html');
-   assert.equal(await page.locator('#shopCategory option').count(),14);
+   assert.equal(await page.locator('#shopCategory option').count(),15);
+   await page.selectOption('#shopCategory','Groceries');
+   assert.equal(await page.locator('#shopCategory').inputValue(),'Groceries');
    await page.selectOption('#shopCategory','Chargers');
    assert.equal(await page.locator('#shopCategory').inputValue(),'Chargers');
    await page.screenshot({path:path.resolve('../outputs/seller-category-signup-'+width+'.png'),fullPage:true});

@@ -8,6 +8,17 @@ import test_seller_registration
 class ShopCategoryTest(unittest.TestCase):
     setUp = test_seller_registration.SellerRegistrationTest.setUp
 
+    def test_groceries_registration_and_shop_change(self):
+        self.handler.signup({**self.data, 'shop_category': 'Groceries'})
+        with server.connect() as con:
+            row = con.execute('SELECT shop_category FROM users WHERE email=?', (self.data['email'],)).fetchone()
+            self.assertEqual(row['shop_category'], 'Groceries')
+        self.seller()
+        self.change('Groceries')
+        with server.connect() as con:
+            self.assertEqual(con.execute('SELECT shop_category FROM users WHERE id=2').fetchone()[0], 'Groceries')
+            self.assertTrue(all(r['category'] == 'Groceries' for r in con.execute('SELECT category FROM products WHERE seller_id=2')))
+
     def seller(self, seller_id=2):
         self.handler.current_user = lambda: {'id': seller_id, 'role': 'seller', 'name': 'Category seller', 'shop_name': 'Category shop'}
 
