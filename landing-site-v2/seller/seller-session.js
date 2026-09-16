@@ -21,7 +21,7 @@
     const loginRequired=url.origin===base&&(response.status===401||(response.status===403&&(await response.clone().json().catch(()=>({}))).error==='Login required'));
     if(loginRequired&&signedIn()&&!expired){
       expired=true;localStorage.removeItem('pm_token');localStorage.removeItem('pm_user');
-      location.replace('login.html?next='+encodeURIComponent(page));
+      location.replace('login.html?next='+encodeURIComponent(page+location.search));
     }
     return response;
   };
@@ -43,7 +43,14 @@
       logout.onclick=()=>{localStorage.removeItem('pm_token');localStorage.removeItem('pm_user');location.replace('login.html')};nav.append(logout);
     }
     if(!publicPages.has(page)&&!active)return;
-    if(active){const script=document.createElement('script');script.src='shop-availability.js?v=1';document.head.append(script)}
+    if(active&&document.querySelector('.app')){const script=document.createElement('script');script.src='shop-availability.js?v=1';document.head.append(script)}
+    if(page!=='index.html'){
+      const target=document.querySelector('header .top')||document.querySelector('main');
+      if(target){const back=document.createElement('button');back.type='button';back.className='soft';back.textContent='Back';back.id='sellerBack';back.onclick=()=>{
+        let sameOrigin=false;try{sameOrigin=new URL(document.referrer).origin===location.origin}catch(_){}
+        if(sameOrigin&&history.length>1)history.back();else location.href='index.html';
+      };target.prepend(back)}
+    }
     document.querySelectorAll('table').forEach(table=>{const wrap=document.createElement('div');wrap.className='seller-table-scroll';table.before(wrap);wrap.append(table)});
   }
   document.addEventListener('DOMContentLoaded',init);

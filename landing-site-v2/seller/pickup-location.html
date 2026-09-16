@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ms"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PasarMalam Pickup Location</title><link rel="stylesheet" href="seller.css?v=seller-logo1">
-<script src="seller-session.js?v=shop1"></script><script src="seller-auth-guard.js?v=seller-logo1"></script><link rel="icon" type="image/jpeg" href="seller-logo.jpg"></head>
+<title>PasarMalam Pickup Location</title><link rel="stylesheet" href="seller.css?v=seller-audit3">
+<script src="seller-session.js?v=seller-audit3"></script><script src="seller-auth-guard.js?v=seller-audit3"></script><link rel="icon" type="image/jpeg" href="seller-logo.jpg"></head>
 <body><div class="app"><aside><a class="brand" href="index.html"><img class="logo" src="seller-logo.jpg" alt="PasarMalam" width="46" height="46"><h1>PasarMalam</h1></a>
 <nav><a href="index.html">Dashboard</a><a href="store-profile.html">Store Profile</a><a href="products.html">Products</a><a href="orders.html">Orders</a></nav></aside>
 <div><header><div class="top"><h2>Lokasi Pengambilan</h2><a href="store-profile.html">Kembali</a></div></header>
@@ -27,4 +27,4 @@
   $('savePickup').disabled=true;
   api().then(d=>{if(d.pickup){$('pickupAddress').value=d.pickup.address;$('lat').value=d.pickup.coordinates.lat;$('lng').value=d.pickup.coordinates.lng;}else{try{$('pickupAddress').value=JSON.parse(localStorage.getItem('pm_user')||'{}').address||'';}catch(e){}}$('savePickup').disabled=false;}).catch(e=>{$('status').textContent=e.message;});
 })();
-</script><script src="seller-actions.js?v=1"></script><script src="badges.js?v=audit2"></script></body></html>
+</script><script src="seller-actions.js?v=seller-audit3"></script><script src="badges.js?v=audit2"></script></body></html>

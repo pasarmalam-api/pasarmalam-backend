@@ -39,7 +39,7 @@
   if(isSeller)return;
 
   window.PM_SELLER_AUTH_REQUIRED=true;
-  const loginUrl="login.html?next="+encodeURIComponent(page);
+  const loginUrl="login.html?next="+encodeURIComponent(page+location.search);
   const originalFetch=window.fetch;
   window.fetch=function(input,init){
     const target=String((input&&input.url)||input||"");

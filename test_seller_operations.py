@@ -83,6 +83,23 @@ class SellerOperationsTest(unittest.TestCase):
     def test_shipping_label_requires_owned_order(self):
         with self.assertRaises(PermissionError):self.h.awb({'order_id':999})
 
+    def test_campaign_creation_auth_and_real_discounts(self):
+        self.h.create_campaign({'name':'SAVE','type':'voucher','value':'10%','seller_id':99})
+        with server.connect() as c:
+            row=c.execute('SELECT * FROM campaigns ORDER BY id DESC LIMIT 1').fetchone()
+            self.assertEqual(row['seller_id'],2)
+            self.assertEqual(server.campaign_discount(c,2,'SAVE',100),(10.0,'SAVE'))
+        for kind,value in [('product_ads','10'),('free_shipping','10'),('voucher','abc'),('voucher','101%')]:
+            with self.assertRaises(ValueError):
+                self.h.create_campaign({'name':'INVALID','type':kind,'value':value})
+        self.h.current_user=lambda:None
+        with self.assertRaises(PermissionError):self.h.create_campaign({'name':'NO','value':'1'})
+
+    def test_rates_do_not_claim_fixed_courier_prices(self):
+        self.h.get_logistics_rates()
+        for rate in self.data()['rates']:
+            if rate['provider']=='Lalamove':self.assertIsNone(rate['fee'])
+
     def test_suspended_and_deleted_tokens_stop_working(self):
         h=object.__new__(server.Handler)
         h.headers={'Authorization':'Bearer '+server.make_token(self.seller)}
@@ -111,7 +128,9 @@ class SellerOperationsTest(unittest.TestCase):
     def test_shipping_label_paid_and_unpaid(self):
         paid=self.make_order()
         self.h.awb({'order_id':paid})
-        self.assertIn('PM-AWB',self.data()['awb_label'])
+        self.assertEqual(self.reply.call_args.args[1],503)
+        self.assertNotIn('awb_label',self.data())
+        self.assertIn('not connected',self.data()['error'])
         unpaid=self.make_order(payment='unpaid')
         with self.assertRaises(ValueError):self.h.awb({'order_id':unpaid})
 
@@ -123,6 +142,21 @@ class SellerOperationsTest(unittest.TestCase):
         with server.connect() as c:c.execute("UPDATE returns SET dispute_status='closed' WHERE id=?",(rid,))
         with self.assertRaisesRegex(ValueError,'closed'):
             self.h.seller_respond_return({'return_id':rid,'seller_response':'Reopen'})
+
+    def test_seller_cannot_release_escrow_or_reopen_closed_order(self):
+        oid=self.make_order()
+        with self.assertRaises(PermissionError):
+            self.h.update_order_status({'order_id':oid,'order_status':'completed'})
+        self.h.update_order_status({'order_id':oid,'order_status':'shipped','escrow_status':'released'})
+        with server.connect() as c:
+            self.assertNotEqual(c.execute('SELECT escrow_status FROM orders WHERE id=?',(oid,)).fetchone()[0],'released')
+        with self.assertRaises(ValueError):self.h.update_order_status({'order_id':oid,'order_status':'to_pack'})
+        self.h.update_order_status({'order_id':oid,'order_status':'delivered','return_window_days':0})
+        with server.connect() as c:
+            row=c.execute('SELECT * FROM orders WHERE id=?',(oid,)).fetchone()
+            self.assertGreater(row['return_deadline_at'],server.now())
+            c.execute("UPDATE orders SET order_status='cancelled' WHERE id=?",(oid,))
+        with self.assertRaises(ValueError):self.h.update_order_status({'order_id':oid,'order_status':'shipped'})
 
 
 if __name__ == '__main__':

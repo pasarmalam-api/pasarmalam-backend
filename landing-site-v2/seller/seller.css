@@ -566,6 +566,7 @@ td .primary{
 }
 
 img.logo{display:block;object-fit:contain;flex-shrink:0;background:#fff;box-shadow:none;border-radius:6px!important}
+input,select,textarea,button,nav a{font-family:Arial,sans-serif;font-size:var(--seller-text-size)!important}
 [hidden]{display:none!important}
 :root{--seller-text-size:14px}
 body{font-size:13px;line-height:1.5;letter-spacing:0}

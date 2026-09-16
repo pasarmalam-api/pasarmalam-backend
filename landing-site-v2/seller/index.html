@@ -1,10 +1,10 @@
 <!doctype html>
 <html lang="ms">
-<head><script src="seller-session.js?v=shop1"></script>
+<head><script src="seller-session.js?v=seller-audit3"></script>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Pusat Penjual PasarMalam</title>
-  <link rel="stylesheet" href="seller.css?v=seller-logo1">
+  <link rel="stylesheet" href="seller.css?v=seller-audit3">
   <style>
     .hero{min-height:214px;border-radius:8px;padding:22px;color:#fff;display:flex;align-items:flex-end;background:linear-gradient(90deg,#101828e6,#10182891,#10182822),url("pasar-malam-real.jpg") center/cover;margin-bottom:14px}
     .hero h2{font-size:34px;max-width:760px;margin-bottom:6px}
@@ -186,11 +186,11 @@ async function loadOrders(){if(!hasSellerSession())return;const d=await api("/ap
 async function loadReturns(){if(!hasSellerSession())return;const d=await api("/api/returns");const rows=(d.returns||[]).slice(0,5);returnsBox.innerHTML=rows.map(r=>`<div class="order"><b>${PMSellerSession.escape(r.request_type)}</b><p>${PMSellerSession.escape(r.reason)}</p><span class="tag warn">${PMSellerSession.escape(r.status)}</span></div>`).join("")||"<p class='muted'>Belum ada permintaan pulangan.</p>"}
 async function loadWallet(){if(!hasSellerSession())return;const d=await api("/api/wallet");walletBox.innerHTML=(d.wallet||[]).slice(0,5).map(w=>`<div class="wallet-line"><span>${PMSellerSession.escape(w.type)}<br><small class="muted">${PMSellerSession.escape(w.note)}</small></span><b>${money(w.amount)}</b></div>`).join("")}
 async function loadMessages(){if(!hasSellerSession())return;const d=await api("/api/messages");messagesBox.innerHTML=(d.messages||[]).slice(0,4).map(m=>`<div class="msg"><b>${m.sender_role}</b><div class="muted">${PMSellerSession.escape(m.body)}</div></div>`).join("")||"<p class='muted'>No messages.</p>"}
-async function loadRates(){if(!hasSellerSession())return;const d=await api("/api/logistics/rates");ratesBox.innerHTML=(d.rates||[]).slice(0,4).map(r=>`<div class="rate"><span>${r.method}<br><small class="muted">${r.eta}</small></span><strong>${money(r.fee||r.rate)}</strong></div>`).join("")}
+async function loadRates(){if(!hasSellerSession())return;const d=await api("/api/logistics/rates");ratesBox.innerHTML=(d.rates||[]).slice(0,4).map(r=>`<div class="rate"><span>${r.method}<br><small class="muted">${r.eta}</small></span><strong>${r.fee==null?"Live quote":money(r.fee)}</strong></div>`).join("")}
 async function loadReviews(){if(!hasSellerSession())return;const d=await api("/api/reviews");reviewsBox.innerHTML=(d.reviews||[]).slice(0,3).map(r=>`<div class="msg"><div class="stars">${"*".repeat(Number(r.rating)||5)}</div><b>${PMSellerSession.escape(r.title)}</b><div class="muted">${PMSellerSession.escape(r.body)}</div></div>`).join("")}
 loadMetrics();loadProducts();loadOrders();loadReturns();loadWallet();loadMessages();loadRates();loadReviews();
 </script>
-<script src="seller-actions.js?v=1"></script><script src="badges.js?v=audit2"></script></body>
+<script src="seller-actions.js?v=seller-audit3"></script><script src="badges.js?v=audit2"></script></body>
 </html>
 
 

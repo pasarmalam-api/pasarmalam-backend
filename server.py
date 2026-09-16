@@ -1906,8 +1906,8 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 200, {"ok": True, "seller_reply": reply})
 
     def create_campaign(self, data):
-        user = self.current_user()
-        seller_id = user["id"] if user and user["role"] == "seller" else int(data.get("seller_id", 1))
+        user = self.require_user("seller")
+        seller_id = user["id"]
         payload = {
             "seller_id": seller_id,
             "name": data.get("name", "").strip(),
@@ -1920,6 +1920,14 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("Campaign name is required")
         if not payload["value"]:
             raise ValueError("Campaign value is required")
+        if payload["type"] not in ("voucher", "bundle_deal", "flash_sale"):
+            raise ValueError("This campaign type is not available yet")
+        raw_value = payload["value"].rstrip("%")
+        if not re.fullmatch(r"\d+(\.\d{1,2})?", raw_value) or float(raw_value) <= 0:
+            raise ValueError("Enter a positive discount amount or percentage")
+        if payload["value"].endswith("%") and float(raw_value) > 100:
+            raise ValueError("Percentage cannot exceed 100")
+        payload["status"] = "active"
         with connect() as con:
             cur = con.execute(
                 "INSERT INTO campaigns (seller_id, name, type, value, status, created_at) VALUES (?, ?, ?, ?, ?, ?)",
@@ -2832,6 +2840,11 @@ class Handler(BaseHTTPRequestHandler):
         user = self.current_user()
         if not user or user["role"] not in ("seller", "admin"):
             raise PermissionError("Seller or admin login is required to update order status")
+        if user["role"] == "seller":
+            if data.get("order_status") == "completed":
+                raise PermissionError("Order completion and escrow release require platform approval")
+            data = {key: value for key, value in data.items() if key not in
+                    ("escrow_status", "return_window_days", "escrow_release_days", "awb_label")}
         aliases = {
             "placed": "to_pack",
             "paid": "to_pack",
@@ -2869,6 +2882,15 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("Order not found")
             if order["payment_status"] != "paid" and status not in ("cancelled",):
                 raise ValueError("Only paid orders can move to fulfillment")
+            if user["role"] == "seller":
+                current = aliases.get(order["order_status"], "to_pack")
+                allowed = {"to_pack": {"to_pack", "shipped", "cancelled"},
+                           "shipped": {"shipped", "delivered"}, "delivered": {"delivered"}}
+                if status not in allowed.get(current, set()):
+                    raise ValueError("This order cannot move to the requested status")
+                escrow = order["escrow_status"] or "holding"
+                if status == "cancelled":
+                    escrow = "cancelled"
             if user and user["role"] == "seller":
                 row = con.execute(
                     """
@@ -2880,10 +2902,10 @@ class Handler(BaseHTTPRequestHandler):
                 ).fetchone()
                 if not row:
                     raise PermissionError("Seller cannot update another seller order")
-            delivered_at = delivered_at or int(order["delivered_at"] or 0)
-            completed_at = completed_at or int(order["completed_at"] or 0)
-            return_deadline_at = return_deadline_at or int(order["return_deadline_at"] or 0)
-            escrow_release_at = escrow_release_at or int(order["escrow_release_at"] or 0)
+            delivered_at = int(order["delivered_at"] or 0) or delivered_at
+            completed_at = int(order["completed_at"] or 0) or completed_at
+            return_deadline_at = int(order["return_deadline_at"] or 0) or return_deadline_at
+            escrow_release_at = int(order["escrow_release_at"] or 0) or escrow_release_at
             tracking_no = data.get("tracking_no", order["tracking_no"] or "")
             awb_label = data.get("awb_label", order["awb_label"] or "")
             con.execute(
@@ -2909,14 +2931,13 @@ class Handler(BaseHTTPRequestHandler):
                 raise PermissionError("Order does not belong to this shop")
             if order["payment_status"] != "paid" or order["order_status"] == "cancelled":
                 raise ValueError("Only paid, non-cancelled orders can have a shipping label")
-        awb = f"PM-AWB-{int(data.get('order_id', 0)):06d}"
-        send_json(self, 200, {"awb_label": awb, "print_text": f"PasarMalam Shipping Label {awb}"})
+        send_json(self, 503, {"error": "Courier label generation is not connected. Arrange delivery with the courier and enter its real tracking reference in the order. No courier has been booked."})
 
     def get_logistics_rates(self):
         rows = [
             {"method": "In-Store Pickup", "fee": 0, "eta": "Tonight", "tracking": False, "provider": "Seller"},
-            {"method": "Lalamove Instant", "fee": 8.9, "eta": "Same day / ASAP", "tracking": True, "provider": "Lalamove"},
-            {"method": "Lalamove Regular", "fee": 4.9, "eta": "Scheduled / regular", "tracking": True, "provider": "Lalamove"},
+            {"method": "Lalamove Instant", "fee": None, "eta": "Live quote at checkout", "tracking": True, "provider": "Lalamove"},
+            {"method": "Lalamove Scheduled", "fee": None, "eta": "Live quote at checkout", "tracking": True, "provider": "Lalamove"},
         ]
         send_json(self, 200, {"rates": rows})
 
@@ -2929,7 +2950,7 @@ class Handler(BaseHTTPRequestHandler):
     def get_metrics(self):
         seller = self.require_user("seller")
         with connect() as con:
-            orders = con.execute("SELECT COUNT(*) AS c, COALESCE(SUM(o.total),0) AS total FROM orders o JOIN products p ON p.id=o.product_id WHERE p.seller_id=?", (seller["id"],)).fetchone()
+            orders = con.execute("SELECT COUNT(*) AS c, COALESCE(SUM(CASE WHEN o.payment_status='paid' AND o.order_status<>'cancelled' THEN o.total ELSE 0 END),0) AS total FROM orders o JOIN products p ON p.id=o.product_id WHERE p.seller_id=?", (seller["id"],)).fetchone()
             reviews = con.execute("SELECT COALESCE(AVG(rating),0) AS rating FROM reviews WHERE seller_id=?", (seller["id"],)).fetchone()
             products = con.execute("SELECT COUNT(*) AS c FROM products WHERE seller_id=?", (seller["id"],)).fetchone()
         send_json(

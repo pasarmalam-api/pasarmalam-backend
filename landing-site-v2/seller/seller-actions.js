@@ -3,13 +3,21 @@
   const byId=id=>document.getElementById(id);
   function error(message){let box=byId('sellerActionError');if(!box){box=document.createElement('p');box.id='sellerActionError';box.setAttribute('role','alert');document.querySelector('main')?.prepend(box)}box.textContent=message}
   window.addEventListener('unhandledrejection',event=>error(event.reason?.message||'Request failed. Please try again.'));
+  if(page==='notifications.html')document.addEventListener('click',async event=>{
+    const button=event.target.closest('[data-notice-id]');if(!button||button.disabled)return;
+    const target=button.dataset.target;
+    if(!/^[a-z0-9-]+\.html(?:\?[^#]*)?$/i.test(target)){error('Notification destination is unavailable.');return;}
+    button.disabled=true;
+    try{await api('/api/notifications/read',{method:'POST',body:JSON.stringify({notification_id:Number(button.dataset.noticeId)})});location.href=target}
+    catch(e){error(e.message);button.disabled=false}
+  });
   if(page==='messages.html'){
-    let rows=[];
+    let rows=[];let selectedOrder=null;const orderId=new URLSearchParams(location.search).get('order_id');
     const select=document.createElement('select');select.id='conversation';select.setAttribute('aria-label','Buyer conversation');byId('reply').before(select);
     const messageStatus=document.createElement('p');messageStatus.setAttribute('role','status');byId('reply').after(messageStatus);
-    function render(){const selected=rows[Number(select.value)];byId('msgs').innerHTML=selected?rows.filter(r=>r.product_id===selected.product_id&&r.buyer_name===selected.buyer_name).map(m=>`<div class="msg"><b>${esc(m.sender_role==='buyer'?m.buyer_name:m.seller_name)}</b><p>${esc(m.body)}</p></div>`).join(''):'No conversations yet.'}
+    function render(){const selected=rows[Number(select.value)];byId('msgs').innerHTML=selected?rows.filter(r=>r.product_id===selected.product_id&&r.buyer_name===selected.buyer_name&&r.body).map(m=>`<div class="msg"><b>${esc(m.sender_role==='buyer'?m.buyer_name:m.seller_name)}</b><p>${esc(m.body)}</p></div>`).join(''):'No conversations yet.'}
     select.onchange=render;
-    window.load=async function(){try{rows=(await api('/api/messages')).messages||[];const previous=select.selectedOptions[0]?.textContent;select.replaceChildren();const seen=new Set();rows.forEach((r,i)=>{const key=JSON.stringify([r.product_id,r.buyer_name]);if(seen.has(key))return;seen.add(key);select.add(new Option(`${r.buyer_name} / #${r.product_id}`,String(i)))});if(previous){for(const option of select.options)if(option.textContent===previous)option.selected=true}render()}catch(e){messageStatus.textContent=e.message}};
+    window.load=async function(){try{rows=(await api('/api/messages')).messages||[];if(orderId&&!selectedOrder){selectedOrder=((await api('/api/orders')).orders||[]).find(o=>String(o.id)===orderId);if(!selectedOrder)throw new Error('Order not found.');if(!rows.some(r=>r.product_id===selectedOrder.product_id&&r.buyer_name===selectedOrder.buyer_name))rows.push({product_id:selectedOrder.product_id,buyer_name:selectedOrder.buyer_name,body:'',sender_role:'buyer'});}const previous=select.selectedOptions[0]?.textContent;select.replaceChildren();const seen=new Set();rows.forEach((r,i)=>{const key=JSON.stringify([r.product_id,r.buyer_name]);if(seen.has(key))return;seen.add(key);select.add(new Option(`${r.buyer_name} / #${r.product_id}`,String(i)))});if(previous){for(const option of select.options)if(option.textContent===previous)option.selected=true}if(selectedOrder&&!previous){const index=rows.findIndex(r=>r.product_id===selectedOrder.product_id&&r.buyer_name===selectedOrder.buyer_name);select.value=String(index)}render()}catch(e){messageStatus.textContent=e.message}};
     window.send=async function(){const selected=rows[Number(select.value)];try{if(!selected)throw new Error('Select a buyer conversation.');if(!byId('reply').value.trim())throw new Error('Reply cannot be empty.');await api('/api/messages',{method:'POST',body:JSON.stringify({product_id:selected.product_id,buyer_name:selected.buyer_name,sender_role:'seller',body:byId('reply').value.trim()})});byId('reply').value='';messageStatus.textContent='Reply sent.';await load()}catch(e){messageStatus.textContent=e.message}};
     load();
   }
@@ -23,7 +31,7 @@
     window.handleFiles=async function(files){if(uploading)return;uploading=true;try{await upload(files.slice(0,Math.max(0,6-images.length)))}catch(e){error(e.message||'Image upload failed')}finally{uploading=false}};
     window.save=async function(){if(uploading){error('Wait for image uploads to finish.');return}return publish()};
   }
-  for(const name of ['save','create','send','createTicket','saveProfile','savePayoutProfile','submitVerification','askAi','changePassword','update','quick','respond','replyReview','removeProduct','markRead','awb']){
+  for(const name of ['login','save','create','send','createTicket','saveProfile','savePayoutProfile','submitVerification','askAi','changePassword','update','quick','respond','replyReview','removeProduct','markRead','awb']){
     const original=window[name];if(typeof original!=='function')continue;
     let pending=false;
     window[name]=async function(...args){

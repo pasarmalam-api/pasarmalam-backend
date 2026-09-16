@@ -115,13 +115,13 @@ class AdminActionsTest(unittest.TestCase):
             self.handler.admin_delete_user({'user_id': 2})
 
     def test_seller_metrics_are_scoped(self):
-        self.db.executescript('CREATE TABLE products(id INTEGER, seller_id INTEGER); CREATE TABLE orders(product_id INTEGER,total REAL); CREATE TABLE reviews(seller_id INTEGER,rating REAL); INSERT INTO products VALUES(1,2),(2,9); INSERT INTO orders VALUES(1,10),(2,900); INSERT INTO reviews VALUES(2,4),(9,1);')
+        self.db.executescript("CREATE TABLE products(id INTEGER, seller_id INTEGER); CREATE TABLE orders(product_id INTEGER,total REAL,payment_status TEXT,order_status TEXT); CREATE TABLE reviews(seller_id INTEGER,rating REAL); INSERT INTO products VALUES(1,2),(2,9); INSERT INTO orders VALUES(1,10,'paid','shipped'),(2,900,'paid','shipped'),(1,50,'unpaid','to_pack'),(1,30,'paid','cancelled'); INSERT INTO reviews VALUES(2,4),(9,1);")
         self.handler.current_user=lambda: {'id':2,'role':'seller'}
         with patch.object(server,'send_json') as response:
             self.handler.get_metrics()
         data=response.call_args.args[2]
         self.assertEqual(data['sales'],10)
-        self.assertEqual(data['orders'],1)
+        self.assertEqual(data['orders'],3)
         self.assertEqual(data['rating'],4)
         self.assertIsNone(data['response_rate'])
 
