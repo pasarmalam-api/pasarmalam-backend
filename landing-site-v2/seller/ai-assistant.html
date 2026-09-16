@@ -18,35 +18,13 @@
       <header><div class="top"><h2>AI Listing Helper</h2><button class="soft" onclick="location.href='add-product.html'">Add Product</button></div></header>
       <main>
         <section class="panel">
-          <h3>Create better product listings</h3>
-          <p class="muted">Enter item details. AI will draft a title, description, fair-pricing guidance, photo checklist and shipping suggestion.</p>
-          <div class="chips">
-            <button onclick="askPreset('Used iPhone, good condition, 128GB, needs fair price and safe delivery.')">Used phone</button>
-            <button onclick="askPreset('Homemade nasi lemak for Cyberjaya buyers, available tonight, Lalamove needed.')">Food listing</button>
-            <button onclick="askPreset('New phone charger with warranty, stock 20, want simple seller description.')">Charger listing</button>
-          </div>
-          <textarea id="prompt" placeholder="Example: New black school shoes, sizes 38 to 43, stock 18, seller pickup and Lalamove Regular available."></textarea>
-          <p><button class="primary" onclick="askAi()">Generate Listing Help</button></p>
-          <div id="answer" class="answer">AI listing guidance will appear here.</div>
+          <p role="status">Loading listing helper...</p>
+          <noscript>JavaScript is required for the listing helper.</noscript>
         </section>
       </main>
     </div>
   </div>
-  <script>
-    const API="https://pasarmalam-backend.onrender.com";
-    function askPreset(text){document.getElementById("prompt").value=text;askAi()}
-    async function askAi(){
-      const text=document.getElementById("prompt").value.trim();
-      if(!text){answer.textContent="Enter product details first.";return}
-      answer.textContent="Thinking...";
-      try{
-        const res=await fetch(API+"/api/ai/assistant",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({mode:"seller",prompt:text})});
-        const data=await res.json();
-        if(!res.ok||data.error)throw new Error(data.error||"AI request failed");
-        answer.textContent=(data.source==='local_fallback'?'General listing guidance (AI is unavailable):\n\n':'')+data.answer;
-      }catch(e){answer.textContent="AI is not reachable right now. Check Render first, then try again. "+e.message}
-    }
-  </script>
+  <script src="ai-listing.js?v=1"></script>
   <script src="seller-actions.js?v=seller-audit3"></script><script src="badges.js?v=audit2"></script>
 </body>
 </html>

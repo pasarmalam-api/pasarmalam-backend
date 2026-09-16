@@ -3,6 +3,7 @@ from urllib.parse import urlparse, parse_qs
 import base64
 from lalamove import Client as LalamoveClient, LalamoveError
 import delivery
+import seller_ai
 import hashlib
 import hmac
 import json
@@ -1533,6 +1534,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.mark_notifications_read(data)
             elif parsed.path == "/api/support/tickets":
                 self.create_support_ticket(data)
+            elif parsed.path == "/api/seller/ai/listing":
+                self.seller_ai_listing(data)
             elif parsed.path == "/api/ai/assistant":
                 mode = str(data.get("mode", "buyer")).lower()
                 if mode not in ("buyer", "seller"):
@@ -1573,6 +1576,16 @@ class Handler(BaseHTTPRequestHandler):
             send_json(self, 401, {"error": str(exc)})
         except Exception as exc:
             send_json(self, 400, {"error": str(exc)})
+
+    def seller_ai_listing(self, data):
+        user = self.require_user("seller")
+        action = data.get("action")
+        if action not in ("draft", "research"):
+            raise ValueError("Unknown AI action")
+        seller_ai.throttle((user["id"], action))
+        result = (seller_ai.draft(data, OPENAI_API_KEY, OPENAI_MODEL) if action == "draft"
+                  else seller_ai.research(data, OPENAI_API_KEY))
+        send_json(self, 200, {"ok": True, **result})
 
     def list_table(self, table, key):
         user = self.current_user()
