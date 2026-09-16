@@ -30,9 +30,16 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
       return route.fulfill({json:response});
     });
     const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+    async function checkLogo(file){
+      assert.ok(await page.locator('img.logo').evaluate(el=>el.complete&&el.naturalWidth>0),file+' logo loaded');
+      assert.equal(await page.locator('img.logo').evaluate(el=>getComputedStyle(el).objectFit),'contain');
+      assert.equal(await page.locator('link[rel=icon]').getAttribute('href'),'admin-logo.jpg');
+    }
+    for(const file of ['login.html','reset-admin.html']){await page.goto(origin+'/'+file);await checkLogo(file)}
     const pages=fs.readdirSync(root).filter(f=>f.endsWith('.html')&&!['login.html','reset-admin.html'].includes(f));
     for(const file of pages){
       await page.goto(origin+'/'+file);await page.waitForTimeout(120);
+      await checkLogo(file);
       assert.equal(await page.locator('aside nav a').count(),18,file+' navigation');
       assert.equal(await page.locator('aside nav [aria-current=page]').count(),1,file+' active navigation');
       assert.equal(await page.getByRole('button',{name:'Back',exact:true}).count(),1,file+' back');
