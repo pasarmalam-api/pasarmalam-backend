@@ -60,6 +60,25 @@
   dictionary.en.Chargers="Phone Accessories";
   const css=".pm-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;border-radius:999px;background:#f6c85f;color:#182236;padding:0 6px;font-size:12px;font-weight:900;margin-left:5px}.pm-badge.hide{display:none}.pm-seller-switch{position:fixed;right:22px;bottom:22px;z-index:30;border:0;border-radius:999px;background:linear-gradient(135deg,#0f9f8f,#6d5dfc);color:#fff;box-shadow:0 10px 26px #0003;min-height:44px;padding:0 15px;font-weight:900;font-size:13px}.pm-policy-link{position:fixed;left:22px;bottom:22px;z-index:30;border:1px solid #dbe4ea;border-radius:999px;background:#fff;color:#0f9f8f;box-shadow:0 10px 26px #0002;min-height:38px;padding:0 13px;font-weight:900;font-size:12px;display:inline-flex;align-items:center;text-decoration:none}.buyer-lang-toggle{border:1px solid #dbe4ea;border-radius:999px;background:#fff;color:#0f9f8f;font-weight:900;font-size:12px;min-height:34px;padding:0 10px}.pm-seller-switch:hover,.pm-policy-link:hover{filter:brightness(.98)}@media(max-width:760px){.pm-mobile-links{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 8px 0}.pm-mobile-links .pm-seller-switch,.pm-mobile-links .pm-policy-link{position:static;left:auto;right:auto;bottom:auto;z-index:1;box-shadow:none;width:100%;justify-content:center;min-height:42px;border-radius:8px}.pm-mobile-links .pm-policy-link{border:1px solid #dbe4ea}.pm-mobile-links .pm-seller-switch{border:0}}";
   const style=document.createElement("style");style.textContent=css;document.head.appendChild(style);
+  const switchStyle=document.createElement('style');
+  switchStyle.textContent=`
+    body .pm-seller-switch,.buyer-home .bottom-nav .seller-entry{
+      display:inline-flex!important;align-items:center;justify-content:center;gap:8px;
+      background:#087f72!important;color:#fff!important;border:1px solid #06675d!important;
+      border-radius:8px!important;min-height:44px!important;font-weight:700!important;
+      line-height:1.3;letter-spacing:0;box-shadow:inset 0 1px 0 #ffffff26,0 3px 7px #063d351a;
+      cursor:pointer;transition:background-color .15s,box-shadow .15s;
+    }
+    body .pm-seller-switch::before,.buyer-home .seller-entry::before{
+      content:'\\21c4';font-size:20px;line-height:1;width:22px;flex:0 0 22px;
+    }
+    body .pm-seller-switch:hover,.buyer-home .bottom-nav .seller-entry:hover{background:#06675d!important;filter:none}
+    body .pm-seller-switch:active,.buyer-home .bottom-nav .seller-entry:active{box-shadow:inset 0 2px 4px #003d3540}
+    body .pm-seller-switch:focus-visible,.buyer-home .bottom-nav .seller-entry:focus-visible{outline:3px solid #d49e28;outline-offset:3px}
+    .buyer-home .pm-seller-switch{display:none!important}
+    @media(max-width:760px){.buyer-home .bottom-nav .seller-entry{flex-direction:column;gap:3px}.buyer-home .seller-entry::before{flex-basis:auto}}
+  `;
+  document.head.appendChild(switchStyle);
   function token(){return localStorage.getItem("pm_token")||""}
   function currentLang(){try{if(localStorage.getItem(BUYER_LANG_VERSION_KEY)!==BUYER_LANG_VERSION){localStorage.setItem(LANG_KEY,"ms");localStorage.setItem(BUYER_LANG_VERSION_KEY,BUYER_LANG_VERSION);return"ms"}const stored=localStorage.getItem(LANG_KEY);if(stored==="ms"||stored==="en"||stored==="zh")return stored;localStorage.setItem(LANG_KEY,"ms");return"ms"}catch(e){return"ms"}}
   function sourceMap(){const map={Pengecas:"Chargers","\u5145\u7535\u5668":"Chargers"};[dictionary.ms,dictionary.en,dictionary.zh].forEach(group=>Object.entries(group).forEach(([key,value])=>{map[value]=key}));return map}

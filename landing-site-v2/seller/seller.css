@@ -599,3 +599,18 @@ body,.app p,.app label,.app .label,.app .muted,.app th,.app td,.app .tag,.app na
 .shop-availability input:focus-visible{outline:3px solid #3083dd;outline-offset:3px}
 .shop-availability input:disabled{opacity:.5;cursor:wait}
 .shop-availability p{flex-basis:100%;margin:0;color:#a42c38;font-size:13px}
+
+#switchToBuyer{
+  display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  min-height:44px;padding:10px 16px;flex-shrink:0;max-width:100%;
+  background:#087f72;color:#fff;border:1px solid #06675d;border-radius:8px;
+  font-size:13px;font-weight:700;line-height:1.3;letter-spacing:0;
+  box-shadow:inset 0 1px 0 #ffffff26,0 3px 7px #063d351a;
+  cursor:pointer;transition:background-color .15s,box-shadow .15s;
+}
+#switchToBuyer::before{content:'\21c4';font-size:20px;line-height:1;width:22px;flex:0 0 22px}
+#switchToBuyer:hover{background:#06675d}
+#switchToBuyer:active{box-shadow:inset 0 2px 4px #003d3540}
+#switchToBuyer:focus-visible{outline:3px solid #d49e28;outline-offset:3px}
+#switchToBuyer:disabled{opacity:.65;cursor:wait}
+@media(max-width:760px){#switchToBuyer{margin-top:10px}}

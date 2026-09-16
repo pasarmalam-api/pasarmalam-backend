@@ -60,8 +60,18 @@ const server=http.createServer((req,res)=>{
     sellerStatus='rejected';await page.reload();await page.locator('#support').waitFor({state:'visible'});
     sellerStatus='approved';await page.reload();await page.waitForURL('**/seller/index.html');
     assert.equal(await page.evaluate(()=>JSON.parse(localStorage.pm_user).role),'seller');
+    for(const width of [390,1440]){
+      await page.setViewportSize({width,height:900});
+      assert.equal(await page.locator('#switchToBuyer').evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(8, 127, 114)');
+      await page.screenshot({path:'../outputs/account-switch/seller-button-'+width+'.png'});
+    }
     await page.locator('#switchToBuyer').click();await page.waitForURL('**/buyer/index.html');
     assert.equal(await page.evaluate(()=>JSON.parse(localStorage.pm_user).role),'buyer');
+    for(const width of [390,1440]){
+      await page.setViewportSize({width,height:900});
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+      await page.screenshot({path:'../outputs/account-switch/buyer-button-'+width+'.png'});
+    }
     await page.locator('.seller-entry').click();await page.waitForURL('**/seller/index.html');
     sellerStatus='not_applicable';failure=true;
     await page.evaluate(()=>{localStorage.setItem('pm_token','token-buyer');localStorage.setItem('pm_user',JSON.stringify({id:1,role:'buyer'}))});
