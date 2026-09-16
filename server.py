@@ -185,7 +185,7 @@ def verify_password(password, stored):
 
 def make_token(user):
     payload = {"id": user["id"], "role": user["role"], "name": user["name"], "email": user.get("email", ""), "shop_name": user.get("shop_name", ""), "exp": now() + 60 * 60 * 24 * 30}
-    if user['role'] == 'buyer':
+    if user['role'] in ('buyer', 'seller'):
         with connect() as con:
             row = con.execute('SELECT password FROM users WHERE id=?', (user['id'],)).fetchone()
         if row:
@@ -1351,7 +1351,7 @@ class Handler(BaseHTTPRequestHandler):
             return None
         with connect() as con:
             row = con.execute("SELECT * FROM users WHERE id=?", (payload["id"],)).fetchone()
-            if row and row['role'] == 'buyer':
+            if row and row['role'] in ('buyer', 'seller'):
                 version = hmac.new(AUTH_SECRET.encode(), row['password'].encode(), hashlib.sha256).hexdigest()
                 reset = con.execute("SELECT id FROM email_otps WHERE email=? AND purpose='buyer_password_reset' AND verified=1 LIMIT 1", (row['email'].lower(),)).fetchone()
                 if (payload.get('password_version') and not hmac.compare_digest(payload['password_version'], version)) or (reset and not payload.get('password_version')):
@@ -1359,6 +1359,12 @@ class Handler(BaseHTTPRequestHandler):
         if not row or row["status"] != "active":
             return None
         user = row_to_dict(row)
+        # A seller retains shopping access; the signed session selects its mode.
+        mode = payload.get('role', user['role'])
+        if mode == 'buyer' and user['role'] in ('buyer', 'seller'):
+            user['role'] = 'buyer'
+        elif mode != user['role']:
+            return None
         if user["role"] == "seller" and user["seller_status"] != "approved":
             return None
         user.pop("password", None)
@@ -1387,6 +1393,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/": lambda: send_html(self, 200, backend_homepage()),
                 "/api/health": lambda: send_json(self, 200, {"ok": True, "service": "PasarMalam API", "features": "marketplace", "version": "admin-ops-2026-06-05"}),
                 "/api/profile": self.get_buyer_profile,
+                "/api/seller/onboarding": self.seller_onboarding,
                 "/api/products": lambda: self.get_products(query),
                 "/api/seller/availability": self.seller_availability,
                 "/api/seller/category": self.seller_category,
@@ -1451,6 +1458,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.signup(data)
             elif parsed.path == "/api/auth/login":
                 self.login(data)
+            elif parsed.path == "/api/auth/switch-role":
+                self.switch_role(data)
+            elif parsed.path == "/api/seller/onboarding":
+                self.seller_onboarding(data)
             elif parsed.path == "/api/otp/email/send":
                 self.send_email_otp(data)
             elif parsed.path == "/api/otp/email/verify":
@@ -2018,7 +2029,7 @@ class Handler(BaseHTTPRequestHandler):
             return send_json(self, 503, {"error": "Password reset email is temporarily unavailable. Please try again later."})
         message = "If an active buyer account matches this email, a reset link will arrive shortly."
         with connect() as con:
-            user = con.execute("SELECT id FROM users WHERE LOWER(email)=? AND role='buyer' AND status='active'", (email,)).fetchone()
+            user = con.execute("SELECT id FROM users WHERE LOWER(email)=? AND role IN ('buyer','seller') AND status='active'", (email,)).fetchone()
             recent = con.execute("SELECT id FROM email_otps WHERE email=? AND purpose='buyer_password_reset' AND created_at>?", (email, now()-60)).fetchone()
             if not user or recent:
                 return send_json(self, 200, {"ok": True, "message": message})
@@ -2044,7 +2055,7 @@ class Handler(BaseHTTPRequestHandler):
             raise PermissionError("Invalid or expired reset link. Request a new link.")
         with connect() as con:
             row = con.execute("SELECT id FROM email_otps WHERE email=? AND code_hash=? AND purpose='buyer_password_reset' AND verified=0 AND expires_at>?", (email, hash_otp_code(email, token), now())).fetchone()
-            user = con.execute("SELECT id FROM users WHERE LOWER(email)=? AND role='buyer' AND status='active'", (email,)).fetchone()
+            user = con.execute("SELECT id FROM users WHERE LOWER(email)=? AND role IN ('buyer','seller') AND status='active'", (email,)).fetchone()
             if not row or not user:
                 raise PermissionError("Invalid or expired reset link. Request a new link.")
             # Claim the single-use link inside the same transaction as the password change.
@@ -2118,6 +2129,8 @@ class Handler(BaseHTTPRequestHandler):
         if user.get("status") != "active":
             send_json(self, 403, {"error": "Account is suspended"})
             return
+        if data.get('role') == 'buyer' and user['role'] in ('buyer', 'seller'):
+            user['role'] = 'buyer'
         if user.get("role") == "seller" and user.get("seller_status") != "approved":
             send_json(self, 403, {"error": "Seller account is waiting for admin approval"})
             return
@@ -2130,6 +2143,55 @@ class Handler(BaseHTTPRequestHandler):
     def get_buyer_profile(self):
         user = self.require_user('buyer')
         send_json(self, 200, {'user': {key: user.get(key, '') for key in ('id', 'role', 'name', 'email', 'phone', 'address')}})
+
+    def switch_role(self, data):
+        user = self.require_user()
+        mode = data.get('role')
+        if user['role'] not in ('buyer', 'seller') or mode not in ('buyer', 'seller'):
+            raise PermissionError('Buyer or seller account required')
+        with connect() as con:
+            row = row_to_dict(con.execute('SELECT * FROM users WHERE id=?', (user['id'],)).fetchone())
+        if mode == 'seller' and (row['role'] != 'seller' or row['seller_status'] != 'approved'):
+            send_json(self, 200, {'onboarding_required': True, 'seller_status': row['seller_status']})
+            return
+        row.pop('password', None)
+        row['role'] = mode
+        send_json(self, 200, {'user': row, 'token': make_token(row)})
+
+    def seller_onboarding(self, data=None):
+        user = self.require_user('buyer')
+        fields = ('name', 'email', 'phone', 'address', 'shop_name', 'shop_category',
+                  'identity_type', 'identity_number', 'business_type', 'ssm_number',
+                  'bank_name', 'bank_account_name', 'bank_account_number')
+        with connect() as con:
+            row = row_to_dict(con.execute('SELECT * FROM users WHERE id=?', (user['id'],)).fetchone())
+            if data is not None and row['role'] == 'buyer':
+                values = {key: str(row.get(key) or '').strip() for key in fields}
+                # Email/password are retained from the authenticated account.
+                for key in fields:
+                    if key != 'email' and key in data:
+                        values[key] = str(data[key] or '').strip()
+                required = [key for key in fields if key not in ('business_type', 'ssm_number')]
+                if any(not values[key] for key in required):
+                    raise ValueError('Complete all required seller profile fields')
+                if values['shop_category'] not in SHOP_CATEGORIES:
+                    raise ValueError('Choose a valid shop category')
+                if values['identity_type'] not in ('MyKad', 'Passport', 'Business Owner ID'):
+                    raise ValueError('Choose MyKad or Passport')
+                keys = [key for key in fields if key != 'email']
+                result = con.execute("UPDATE users SET role='seller', seller_status='pending', " +
+                                     ', '.join(key+'=?' for key in keys) + " WHERE id=? AND role='buyer'",
+                                     [values[key] for key in keys] + [user['id']])
+                if result.rowcount == 1:
+                    if values['ssm_number']:
+                        con.execute("UPDATE users SET business_verification_status='pending_review', business_verification_submitted_at=? WHERE id=?", (now(), user['id']))
+                    queue_seller_emails(con, user['id'], values)
+                    create_notification(con, 'buyer', user['id'], 'Seller profile complete',
+                                        'Your seller profile is complete and pending approval. You can continue shopping.',
+                                        'seller', 'become-seller.html')
+                row = row_to_dict(con.execute('SELECT * FROM users WHERE id=?', (user['id'],)).fetchone())
+        send_json(self, 200, {'profile': {key: row.get(key, '') for key in fields},
+                             'seller_status': row['seller_status'], 'categories': SHOP_CATEGORIES})
 
     def update_profile(self, data):
         user = self.require_user()
@@ -2149,6 +2211,7 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as con:
             con.execute(f"UPDATE users SET {sql} WHERE id = ?", [*updates.values(), user["id"]])
             row = row_to_dict(con.execute("SELECT id, role, name, phone, email, address, shop_name, shop_category, identity_type, identity_number, business_type, ssm_number, ssm_document_url, business_verification_status, business_verification_submitted_at, bank_name, bank_account_name, bank_account_number, status, seller_status FROM users WHERE id = ?", (user["id"],)).fetchone())
+        row['role'] = user['role']
         send_json(self, 200, {"ok": True, "user": row, "token": make_token(row)})
 
     def change_password(self, data):
@@ -3329,6 +3392,7 @@ class Handler(BaseHTTPRequestHandler):
                             (int(data["user_id"]), "decision-" + secrets.token_hex(12), account["email"],
                              f"PasarMalam seller application {seller_status}", html, now()))
                 create_notification(con, "seller", int(data["user_id"]), f"Seller application {seller_status}", message, "seller", "index.html")
+                create_notification(con, "buyer", int(data["user_id"]), f"Seller application {seller_status}", message, "seller", "become-seller.html")
                 con.execute("UPDATE notifications SET read_at = ? WHERE role = 'admin' AND title = ? AND target_url = 'sellers.html' AND read_at = 0",
                             (now(), f"New seller application #{data['user_id']}"))
             if changed or account["status"] != status:

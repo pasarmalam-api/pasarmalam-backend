@@ -25,7 +25,7 @@
 <body class="buyer-home buyer-page">
   <header><div class="utility"><span id="utilityLeft">Pusat Penjual | Muat Turun Aplikasi | Ikuti PasarMalam</span><span><a id="notifLink" href="notifications.html" style="color:#fff">Notifikasi</a> | <span id="helpText">Bantuan</span> | <a id="loginLink" href="login.html" style="color:#fff">Log Masuk</a></span></div><div class="bar"><div class="brand"><a class="logo" id="homeLogo" href="index.html" title="Home"><img src="pasarmalam-logo.png" width="56" height="56" alt="PasarMalam"></a><div><h1>PasarMalam</h1><div class="label" id="buyerLabel">Aplikasi Pembeli</div><div class="version">Malaysia Marketplace</div></div></div><div><form class="search" id="searchForm" action="category.html"><input id="search" name="q" autocomplete="search" placeholder="Cari telefon, perkakasan, alat tulis, mainan, makanan, makanan jalanan"><button id="searchButton" type="submit">Cari</button></form><div class="quick"><button onclick="selectCategory('Phones')">Telefon</button><button onclick="selectCategory('Hardware')">Perkakasan</button><button onclick="selectCategory('Stationery')">Alat Tulis</button><button onclick="selectCategory('Street Food')">Makanan Jalanan</button><button onclick="location.href='vouchers.html'">Penghantaran Percuma</button></div></div><div style="display:flex;gap:8px;align-items:center"><button class="lang" id="langToggle">English</button><button class="cart" id="ordersButton" onclick="location.href='orders.html'">Pesanan</button><button class="cart" id="cartButton">Troli 0</button></div></div></header>
   <main>
-    <nav class="bottom-nav"><button class="active" onclick="location.href='index.html'">Laman Utama</button><button class="seller-entry" onclick="location.href='https://www.pasarmalamapp.com/seller/'">Switch to Seller</button><button onclick="selectCategory('All')">Kategori</button><button onclick="location.href='cart.html'">Troli</button><button onclick="location.href='policies.html'">Polisi</button><button onclick="location.href='profile.html'">Saya</button></nav>
+    <nav class="bottom-nav"><button class="active" onclick="location.href='index.html'">Laman Utama</button><button class="seller-entry" onclick="location.href='become-seller.html'">Switch to Seller</button><button onclick="selectCategory('All')">Kategori</button><button onclick="location.href='cart.html'">Troli</button><button onclick="location.href='policies.html'">Polisi</button><button onclick="location.href='profile.html'">Saya</button></nav>
     <section class="hero" aria-label="PasarMalam"><img class="market-banner" src="pasarmalam-buyer-banner.png" width="1672" height="941" alt="PasarMalam - Shop Local. Sell Faster."></section>
     <section class="app-download-strip" aria-label="Download PasarMalam apps">
       <div><b>Get PasarMalam</b><span>Install the marketplace app from Google Play.</span></div>
@@ -49,7 +49,7 @@
           <button onclick="location.href='chat.html'">Chat</button>
           <button onclick="location.href='policies.html'">Privacy & Terms</button>
           <button onclick="location.href='support.html'">Sokongan</button>
-          <button class="seller-app-badge compact" onclick="location.href='https://www.pasarmalamapp.com/seller/'"><span>PENJUAL</span><b>Buka Aplikasi</b></button>
+          <button class="seller-app-badge compact" onclick="location.href='become-seller.html'"><span>PENJUAL</span><b>Buka Aplikasi</b></button>
         </div>
       </details>
       <details>
@@ -136,7 +136,7 @@
     function drawUlasan(rows){reviewsList.innerHTML=rows.map(r=>`<div class="msg"><div class="stars">${"â˜…".repeat(r.rating)}</div><b>${r.title}</b><span>${r.body}</span></div>`).join("")}reviewBtn.onclick=async()=>{await api("/api/reviews",{method:"POST",body:JSON.stringify({product_id:selectedProduct?.id||1,buyer_name:"Buyer",rating:Number(reviewRating.value),title:reviewTitle.value,body:reviewBody.value})});drawUlasan((await api("/api/reviews")).reviews)}
     applyLang();drawCats();load();
   </script>
-<script src="badges.js?v=buyer-actions-2"></script><script src="buyer-ui.js?v=2"></script></body>
+<script src="badges.js?v=role-switch1"></script><script src="buyer-ui.js?v=2"></script></body>
 </html>
 
 

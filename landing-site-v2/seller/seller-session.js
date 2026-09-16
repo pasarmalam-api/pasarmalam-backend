@@ -27,6 +27,26 @@
   };
   function init(){
     const active=signedIn();
+    if(page==='register.html'&&localStorage.getItem('pm_token')&&user().role==='buyer'&&location.pathname.startsWith('/seller/')){
+      location.replace('../buyer/become-seller.html');return;
+    }
+    const switchBuyer=document.createElement('button');
+    switchBuyer.type='button';switchBuyer.className='soft';switchBuyer.id='switchToBuyer';switchBuyer.textContent='Switch to Buyer';
+    switchBuyer.onclick=async()=>{
+      switchBuyer.disabled=true;
+      try{
+        if(active){
+          const response=await fetch(base+'/api/auth/switch-role',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:'buyer'})});
+          const data=await response.json();
+          if(!response.ok||!data.token)throw new Error(data.error||'Unable to switch account. Please retry.');
+          if(location.pathname.startsWith('/seller/')){
+            localStorage.setItem('pm_token',data.token);localStorage.setItem('pm_user',JSON.stringify(data.user));
+          }
+        }
+        location.href=location.pathname.startsWith('/seller/')?'../buyer/index.html':'https://www.pasarmalamapp.com/buyer/login.html';
+      }catch(error){alert(error.message);switchBuyer.disabled=false}
+    };
+    (document.querySelector('header .top')||document.querySelector('main'))?.append(switchBuyer);
     document.querySelectorAll('a[href],button[onclick]').forEach(el=>{
       const target=el.getAttribute('href')||el.getAttribute('onclick')||'';
       if(/(?:login|register)\.html/.test(target)&&active)el.hidden=true;

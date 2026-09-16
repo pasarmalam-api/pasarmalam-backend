@@ -3,7 +3,6 @@
   const LANG_KEY="pasarmalam-lang";
   const BUYER_LANG_VERSION_KEY="pasarmalam-buyer-lang-version";
   const BUYER_LANG_VERSION="20260903-ms-default";
-  const SELLER_URL="https://www.pasarmalamapp.com/seller/";
   const labels={ms:"Bahasa: Melayu",en:"Language: English",zh:"\u8bed\u8a00\uff1a\u4e2d\u6587"};
   const dictionary={
     ms:{
@@ -126,7 +125,7 @@
     const holder=mobileHolder();
     const btn=document.createElement("button");
     btn.type="button";btn.className="pm-seller-switch";btn.textContent=translateString("Switch to Seller");
-    btn.onclick=()=>{location.href=SELLER_URL};
+    btn.onclick=()=>{location.href='become-seller.html'};
     holder.appendChild(btn);
   }
   function addPolicyLink(){

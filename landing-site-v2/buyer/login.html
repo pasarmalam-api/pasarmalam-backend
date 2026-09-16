@@ -37,7 +37,7 @@ async function login(){
   if(!email.value.trim()||!password.value){setStatus("Email and password are required.","error");return}
   if(login.busy)return;login.busy=true;
   try{
-  const r=await fetch(API+"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:email.value.trim().toLowerCase(),password:password.value})});
+  const r=await fetch(API+"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({role:'buyer',email:email.value.trim().toLowerCase(),password:password.value})});
   const d=await r.json().catch(()=>({}));
   if(r.ok&&d.token&&d.user?.role==='buyer'){localStorage.setItem("pm_token",d.token);localStorage.setItem("pm_user",JSON.stringify(d.user));setStatus("Signed in. Redirecting...","success");const next=new URLSearchParams(location.search).get('next')||'index.html';setTimeout(()=>location.href=/^[a-z-]+\.html(?:\?[^#]*)?$/.test(next)?next:'index.html',650)}
   else if(d.user&&d.user.role!=='buyer'){setStatus('Please use a buyer account. Seller sign-in is available through Switch to Seller.','error')}
@@ -46,5 +46,5 @@ async function login(){
 }
 document.addEventListener("DOMContentLoaded",()=>$("password").addEventListener("keydown",e=>{if(e.key==="Enter")login()}));
 </script>
-<script src="badges.js?v=buyer-actions-2"></script><script src="buyer-ui.js?v=2"></script></body>
+<script src="badges.js?v=role-switch1"></script><script src="buyer-ui.js?v=2"></script></body>
 </html>
