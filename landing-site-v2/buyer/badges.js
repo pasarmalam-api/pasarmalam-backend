@@ -188,6 +188,7 @@
     }catch(e){}
   }
   function setupLiveNotifications(){
+    window.addEventListener('pm-chat-read',load);
     const start=()=>window.PMNotify&&window.PMNotify.start({role:"buyer",api:API,token:token});
     if(window.PMNotify){start();return}
     if(document.querySelector('script[data-pm-notify]'))return;

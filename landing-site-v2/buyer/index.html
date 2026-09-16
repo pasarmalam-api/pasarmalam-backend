@@ -132,7 +132,7 @@
     function rateValue(r){return r.fee??r.rate??r.price??r.amount??0}
     function drawRates(rows){ratesList.innerHTML=rows.map(r=>`<div class="rate"><b>${r.method}</b><span>${r.eta} ${r.penjejakan?"Penjejakan":"No penjejakan"}</span><strong>${money(rateValue(r))}</strong></div>`).join("")}
     async function wish(id,event){if(event)event.stopPropagation();if(!userToken())return requireSignIn();await api("/api/wishlist",{method:"POST",body:JSON.stringify({product_id:id})});alert("Added to wishlist")}
-    function drawChat(rows){chatList.innerHTML=rows.map(m=>`<div class="msg ${m.sender_role==="buyer"?"me":""}"><b>${m.sender_role==="buyer"?"Anda":m.seller_name}</b><span>${m.body}</span></div>`).join("")||"<p class='muted'>Belum ada mesej</p>"}sendChat.onclick=async()=>{if(!userToken())return requireSignIn();await api("/api/messages",{method:"POST",body:JSON.stringify({product_id:1,buyer_name:"Buyer",seller_name:"PasarMalam Seller",sender_role:"buyer",body:chatText.value})});chatText.value="";drawChat((await api("/api/messages")).messages)}
+    function drawChat(rows){chatList.textContent=rows.length+" messages";}sendChat.onclick=()=>{location.href="chat.html"};
     function drawUlasan(rows){reviewsList.innerHTML=rows.map(r=>`<div class="msg"><div class="stars">${"â˜…".repeat(r.rating)}</div><b>${r.title}</b><span>${r.body}</span></div>`).join("")}reviewBtn.onclick=async()=>{await api("/api/reviews",{method:"POST",body:JSON.stringify({product_id:selectedProduct?.id||1,buyer_name:"Buyer",rating:Number(reviewRating.value),title:reviewTitle.value,body:reviewBody.value})});drawUlasan((await api("/api/reviews")).reviews)}
     applyLang();drawCats();load();
   </script>

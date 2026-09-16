@@ -11,7 +11,7 @@
     try{await api('/api/notifications/read',{method:'POST',body:JSON.stringify({notification_id:Number(button.dataset.noticeId)})});location.href=target}
     catch(e){error(e.message);button.disabled=false}
   });
-  if(page==='messages.html'){
+  if(page==='messages.html'&&!document.getElementById('chatForm')){
     let rows=[];let selectedOrder=null;const orderId=new URLSearchParams(location.search).get('order_id');
     const select=document.createElement('select');select.id='conversation';select.setAttribute('aria-label','Buyer conversation');byId('reply').before(select);
     const messageStatus=document.createElement('p');messageStatus.setAttribute('role','status');byId('reply').after(messageStatus);

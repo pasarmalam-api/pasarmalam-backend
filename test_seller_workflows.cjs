@@ -79,9 +79,10 @@ const data={is_open:true,eligible:false,shop_category:'Chargers',products:[produ
  page.once('dialog',d=>d.accept());await page.locator('button[onclick="removeProduct()"]').click();await page.waitForTimeout(100);assert.equal(writes.at(-1).endpoint,'/api/products/101');
  await action('campaigns.html',{name:'Campaign',value:'10'},'create()','/api/campaigns');assert.equal(writes.at(-1).body.name,'Campaign');
  await action('support.html',{subject:'Help',message:'Upload problem'},'createTicket()','/api/support/tickets');assert.ok((await page.locator('#status').textContent()).includes('submitted'));
- await action('messages.html',{reply:'Reply for buyer A'},'send()','/api/messages');assert.equal(writes.at(-1).body.product_id,101);assert.equal(writes.at(-1).body.buyer_name,'Buyer A');
+ data.messages[0].buyer_id=1;data.messages[0].read_at=1;order.buyer_id=1;
+ await visit('messages.html');await page.locator('#conversations button').click();await fill({chatText:'Reply for buyer A'});await page.locator('#chatSend').click();await page.waitForTimeout(250);assert.equal(writes.at(-1).body.product_id,101);assert.equal(writes.at(-1).body.buyer_id,1);
  data.messages.unshift({product_id:999,buyer_name:'Other Buyer',body:'Other thread',sender_role:'buyer'});
- await action('messages.html?order_id=201',{reply:'Correct order buyer'},'send()','/api/messages');assert.equal(writes.at(-1).body.product_id,101);assert.equal(writes.at(-1).body.buyer_name,'Buyer A');
+ await visit('messages.html?order_id=201');await fill({chatText:'Correct order buyer'});await page.locator('#chatSend').click();await page.waitForTimeout(250);assert.equal(writes.at(-1).body.product_id,101);assert.equal(writes.at(-1).body.buyer_id,1);
  data.messages.shift();
  await action('reviews.html',{reply401:'Thank you'},'replyReview(401)','/api/reviews/reply');
  await action('returns.html',{resp301:'Please return item'},'respond(301)','/api/returns/respond');

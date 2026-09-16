@@ -68,8 +68,8 @@ class SellerOperationsTest(unittest.TestCase):
 
     def test_chat_reply_uses_owned_conversation(self):
         with server.connect() as c:
-            c.execute("INSERT INTO messages(product_id,buyer_name,seller_name,sender_role,body,created_at) VALUES(1,'Aina Buyer','Shop One','buyer','Hello',1)")
-        self.h.create_message({'product_id':1,'buyer_name':'Aina Buyer','body':'Hello back','sender_role':'buyer'})
+            c.execute("INSERT INTO messages(product_id,buyer_id,buyer_name,seller_name,sender_role,body,created_at) VALUES(1,1,'Aina Buyer','Shop One','buyer','Hello',1)")
+        self.h.create_message({'product_id':1,'buyer_id':1,'body':'Hello back','sender_role':'buyer'})
         with server.connect() as c:
             row=c.execute('SELECT sender_role,seller_name FROM messages ORDER BY id DESC LIMIT 1').fetchone()
             self.assertEqual(tuple(row),('seller','Shop One'))

@@ -4,6 +4,7 @@ import base64
 from lalamove import Client as LalamoveClient, LalamoveError
 import delivery
 import seller_ai
+import chat
 import hashlib
 import hmac
 import json
@@ -441,6 +442,7 @@ def init_db():
             """
         )
         migrate_products(con)
+        chat.migrate(con, table_columns(con, "messages"))
         migrate_orders(con)
         migrate_payments(con)
         migrate_wallet(con)
@@ -1507,6 +1509,11 @@ class Handler(BaseHTTPRequestHandler):
                     else:
                         raise ValueError('Unsupported wishlist action')
                 send_json(self, 200, {'ok': True})
+            elif parsed.path == "/api/messages/read":
+                user = self.require_user()
+                with connect() as con:
+                    chat.read(con, user, data, now())
+                send_json(self, 200, {"ok": True})
             elif parsed.path == "/api/messages":
                 self.create_message(data)
             elif parsed.path == "/api/reviews":
@@ -1592,10 +1599,10 @@ class Handler(BaseHTTPRequestHandler):
         where, params = "", []
         if table == "messages":
             user = self.require_user()
-            if user["role"] == "seller":
-                where, params = " WHERE product_id IN (SELECT id FROM products WHERE seller_id=?)", [user["id"]]
-            elif user["role"] == "buyer":
-                where, params = " WHERE buyer_name=?", [user["name"]]
+            with connect() as con:
+                rows = chat.listing(con, user)
+            send_json(self, 200, {key: rows})
+            return
         elif table in ("reviews", "campaigns") and user and user["role"] == "seller":
             where, params = " WHERE seller_id=?", [user["id"]]
         with connect() as con:
@@ -1827,49 +1834,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def create_message(self, data):
         user = self.require_user()
-        if user["role"] not in ("buyer", "seller"):
-            raise PermissionError("Buyer or seller account required")
-        data = dict(data, sender_role=user["role"])
-        if user["role"] == "buyer":
-            data["buyer_name"] = user["name"]
-        sender_role = data.get("sender_role") or (user["role"] if user and user["role"] in ("buyer", "seller") else "buyer")
-        if sender_role not in ("buyer", "seller"):
-            raise ValueError("sender_role must be buyer or seller")
-        body = str(data.get("body", "")).strip()
-        if not body:
-            raise ValueError("Message cannot be empty")
-        product_id = int(data.get("product_id") or 0) or None
-        buyer_name = data.get("buyer_name") or (user["name"] if user and user["role"] == "buyer" else "Buyer")
-        seller_name = data.get("seller_name") or (user.get("shop_name") or user.get("name") if user and user["role"] == "seller" else "PasarMalam Seller")
         with connect() as con:
-            product = con.execute("SELECT seller_id, shop, name FROM products WHERE id = ?", (product_id,)).fetchone() if product_id else None
-            seller_id = int(product["seller_id"]) if product else 0
-            if not product:
-                raise ValueError("Select a product conversation first")
-            if user["role"] == "seller":
-                if seller_id != user["id"]:
-                    raise PermissionError("Cannot reply to another shop conversation")
-                if not con.execute("SELECT id FROM messages WHERE product_id=? AND buyer_name=? LIMIT 1", (product_id, buyer_name)).fetchone():
-                    raise ValueError("Buyer conversation not found")
-                seller_name = user.get("shop_name") or user["name"]
-            if product and not seller_name:
-                seller_name = product["shop"]
-            cur = con.execute(
-                "INSERT INTO messages (product_id, buyer_name, seller_name, sender_role, body, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-                (product_id, buyer_name, seller_name, sender_role, body, now()),
-            )
-            message_id = cur.lastrowid
-            product_label = f" about {product['name']}" if product else ""
-            if sender_role == "buyer":
-                if seller_id:
-                    create_notification(con, "seller", seller_id, f"New buyer message{product_label}", body, "message", "messages.html")
-                notify_admins(con, "Buyer-seller chat message", body, "message", "tickets.html")
-            else:
-                matches = con.execute("SELECT id FROM users WHERE role = 'buyer' AND name = ? LIMIT 2", (buyer_name,)).fetchall()
-                buyer = matches[0] if len(matches) == 1 else None
-                if buyer:
-                    create_notification(con, "buyer", buyer["id"], f"Seller replied{product_label}", body, "message", "chat.html")
-                notify_admins(con, "Seller chat reply", body, "message", "tickets.html")
+            message_id = chat.send(con, user, data, now(), create_notification)
         send_json(self, 201, {"id": message_id, "ok": True})
 
     def create_review(self, data):
