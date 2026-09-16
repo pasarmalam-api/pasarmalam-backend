@@ -565,6 +565,7 @@ td .primary{
   cursor:pointer;
 }
 
+img.logo{display:block;object-fit:contain;flex-shrink:0;background:#fff;box-shadow:none;border-radius:6px!important}
 [hidden]{display:none!important}
 :root{--seller-text-size:14px}
 body{font-size:13px;line-height:1.5;letter-spacing:0}

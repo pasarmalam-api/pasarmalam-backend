@@ -51,7 +51,7 @@
 
   function showLocked(){
     document.documentElement.lang=lang;
-    document.body.innerHTML='<main class="auth-lock" role="main"><div class="logo">'+copy.logo+'</div><h1>'+copy.brand+'</h1><h2>'+copy.title+'</h2><p>'+copy.body+'</p><button type="button" id="sellerLoginButton">'+copy.button+'</button></main>';
+    document.body.innerHTML='<main class="auth-lock" role="main"><img class="logo" src="seller-logo.jpg" alt="PasarMalam" width="46" height="46"><h1>'+copy.brand+'</h1><h2>'+copy.title+'</h2><p>'+copy.body+'</p><button type="button" id="sellerLoginButton">'+copy.button+'</button></main>';
     document.getElementById("sellerLoginButton").addEventListener("click",()=>{location.href=loginUrl});
   }
 
