@@ -3,6 +3,7 @@ from urllib.parse import urlparse, parse_qs
 import base64
 from lalamove import Client as LalamoveClient, LalamoveError
 import delivery
+import branches
 import seller_ai
 import chat
 import hashlib
@@ -18,7 +19,7 @@ import math
 from html import escape
 import urllib.parse
 import urllib.request
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 DB_PATH = os.environ.get("PASARMALAM_DB", "pasarmalam.sqlite3")
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
@@ -805,6 +806,7 @@ def migrate_products(con):
 
 def migrate_orders(con):
     delivery.migrate(con)
+    branches.migrate(con)
     columns = table_columns(con, "orders")
     additions = {
         "buyer_id": "INTEGER DEFAULT 1",
@@ -1400,6 +1402,8 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/products": lambda: self.get_products(query),
                 "/api/seller/availability": self.seller_availability,
                 "/api/seller/category": self.seller_category,
+                "/api/seller/branches": self.seller_branches,
+                "/api/product/branches": lambda: self.product_branches(query),
                 "/api/messages": lambda: self.list_table("messages", "messages"),
                 "/api/reviews": lambda: self.list_table("reviews", "reviews"),
                 "/api/orders": self.get_orders,
@@ -1486,6 +1490,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.seller_availability(data)
             elif parsed.path == "/api/seller/category" and method == "POST":
                 self.seller_category(data)
+            elif parsed.path == "/api/seller/branches" and method == "POST":
+                self.seller_branches(data)
             elif parsed.path == "/api/delivery/pickup" and method == "POST":
                 self.delivery_pickup(data)
             elif parsed.path == "/api/delivery/quotation" and method == "POST":
@@ -1625,6 +1631,22 @@ class Handler(BaseHTTPRequestHandler):
             point = delivery.pickup(con, user["id"]) if data is None else delivery.save_pickup(con, user["id"], data)
         send_json(self, 200, {"pickup": point})
 
+    def seller_branches(self, data=None):
+        user = self.require_user('seller')
+        with connect() as con:
+            ident = branches.save(con, user['id'], data, USE_POSTGRES) if data is not None else None
+            rows = branches.listing(con, user['id'])
+        send_json(self, 200, {'branches': rows, 'saved_id': ident})
+
+    def product_branches(self, query):
+        product_id = int(query.get('product_id', ['0'])[0])
+        with connect() as con:
+            product = con.execute('SELECT * FROM products WHERE id=?', (product_id,)).fetchone()
+            if not product:
+                raise ValueError('Product not found')
+            rows = branches.offers(con, product)
+        send_json(self, 200, {'branches': rows})
+
     def delivery_services(self):
         self.require_user("buyer")
         try:
@@ -1643,6 +1665,8 @@ class Handler(BaseHTTPRequestHandler):
         if details:
             con.execute("UPDATE orders SET delivery_data=?, logistics_admin_fee=?, tracking_no='', awb_label='' WHERE id=?",
                         (json.dumps(details), details.get('charges', {}).get('admin_fee', 0), order_id))
+            if details.get('provider') == 'pickup':
+                return
             if details.get('provider') == 'pm_express':
                 notify_admins(con, f"PM Express rider required for PM-{order_id}",
                               "Assign a Pasar Malam rider. Do not book Lalamove. Check payment method and collect the full order total on arrival if unpaid.",
@@ -1808,6 +1832,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError("Products with order history cannot be deleted. Set stock to zero instead.")
                 for table in ("cart_items", "wishlist", "reviews", "messages"):
                     con.execute(f"DELETE FROM {table} WHERE product_id=?", (product_id,))
+                con.execute("DELETE FROM branch_prices WHERE product_id = ?", (product_id,))
                 con.execute("DELETE FROM products WHERE id = ?", (product_id,))
                 send_json(self, 200, {"ok": True})
                 return
@@ -2131,7 +2156,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def maps_config(self):
         # This is a public browser key, restricted by HTTP referrer and API in Google Cloud.
-        self.require_user('buyer')
+        user = self.require_user()
+        if user['role'] not in ('buyer', 'seller'):
+            raise PermissionError('Buyer or seller login required')
         send_json(self, 200, {'browser_key': os.environ.get('GOOGLE_MAPS_BROWSER_KEY', ''), 'country': 'my'})
 
     def switch_role(self, data):
@@ -2647,6 +2674,16 @@ class Handler(BaseHTTPRequestHandler):
         if not product:
             raise ValueError("Product not found")
         self.require_shop_open(con, product)
+        selected = branches.resolve(con, product, data.get('branch_id'), USE_POSTGRES)
+        if selected:
+            product = {**dict(product), 'price': selected['price']}
+        if data.get('expected_unit_price') is not None:
+            try:
+                expected = Decimal(str(data['expected_unit_price']))
+                if not expected.is_finite() or expected != Decimal(str(product['price'])):
+                    raise ValueError()
+            except (InvalidOperation, ValueError):
+                raise ValueError('Product or branch price changed. Refresh checkout before paying.') from None
         raw_qty = data.get("quantity", 1)
         try:
             number = float(raw_qty)
@@ -3350,6 +3387,8 @@ class Handler(BaseHTTPRequestHandler):
             for table, column in (("cart_items", "buyer_id"), ("wishlist", "buyer_id"), ("notifications", "user_id"), ("support_tickets", "user_id"), ("seller_email_queue", "user_id")):
                 con.execute(f"DELETE FROM {table} WHERE {column} = ?", (user_id,))
             con.execute("DELETE FROM email_otps WHERE email = ?", (account["email"],))
+            con.execute("DELETE FROM branch_prices WHERE branch_id IN (SELECT id FROM shop_branches WHERE seller_id=?)", (user_id,))
+            con.execute("DELETE FROM shop_branches WHERE seller_id=?", (user_id,))
             con.execute("DELETE FROM users WHERE id = ?", (user_id,))
             con.execute("INSERT INTO audit_logs (actor_id, action, target_type, target_id, note, created_at) VALUES (?, ?, ?, ?, ?, ?)",
                         (admin["id"], "user_deleted", "user", user_id, "Account deleted after explicit admin confirmation", now()))

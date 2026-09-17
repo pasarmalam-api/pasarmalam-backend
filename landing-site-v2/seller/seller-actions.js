@@ -1,6 +1,18 @@
 (function(){
   const page=location.pathname.split('/').pop();
   const byId=id=>document.getElementById(id);
+  const settingsLink=document.querySelector('nav a[href="settings.html"]');
+  if(settingsLink&&!document.querySelector('nav a[href="branches.html"]')){
+    const link=document.createElement('a');link.href='branches.html';link.textContent='Branches';settingsLink.after(link);
+  }
+  if(page==='orders.html'&&typeof window.html==='function'){
+    const original=window.html;
+    window.html=function(order){
+      let branch;try{branch=JSON.parse(order.delivery_data||'{}').context?.branch;}catch{}
+      const note=branch?`<p class="muted">Branch: ${PMSellerSession.escape(branch.name)} | ${PMSellerSession.escape(branch.pickup.address)}</p>`:'';
+      return original(order).replace('<div class="order">','<div class="order">'+note);
+    };
+  }
   function error(message){let box=byId('sellerActionError');if(!box){box=document.createElement('p');box.id='sellerActionError';box.setAttribute('role','alert');document.querySelector('main')?.prepend(box)}box.textContent=message}
   window.addEventListener('unhandledrejection',event=>error(event.reason?.message||'Request failed. Please try again.'));
   if(page==='notifications.html')document.addEventListener('click',async event=>{

@@ -190,7 +190,7 @@ async function loadRates(){if(!hasSellerSession())return;const d=await api("/api
 async function loadReviews(){if(!hasSellerSession())return;const d=await api("/api/reviews");reviewsBox.innerHTML=(d.reviews||[]).slice(0,3).map(r=>`<div class="msg"><div class="stars">${"*".repeat(Number(r.rating)||5)}</div><b>${PMSellerSession.escape(r.title)}</b><div class="muted">${PMSellerSession.escape(r.body)}</div></div>`).join("")}
 loadMetrics();loadProducts();loadOrders();loadReturns();loadWallet();loadMessages();loadRates();loadReviews();
 </script>
-<script src="seller-actions.js?v=seller-audit3"></script><script src="badges.js?v=audit2"></script></body>
+<script src="seller-actions.js?v=branches1"></script><script src="badges.js?v=audit2"></script></body>
 </html>
 
 

@@ -7,6 +7,7 @@ import secrets
 import time
 
 from lalamove import Client, waypoint
+import branches
 
 
 METHODS = {
@@ -48,7 +49,8 @@ def context(con, user, product, qty, data):
     seller = con.execute('SELECT status,seller_status FROM users WHERE id=?', (product['seller_id'],)).fetchone()
     if not seller or seller['status'] != 'active' or seller['seller_status'] != 'approved':
         raise ValueError('This seller is not available for delivery.')
-    origin = pickup(con, product['seller_id'])
+    branch = branches.resolve(con, product, data.get('branch_id'))
+    origin = branch['pickup'] if branch else pickup(con, product['seller_id'])
     if not origin:
         raise ValueError('The seller must confirm their pickup location before Lalamove delivery is available.')
     if data.get('location_confirmed') is not True:
@@ -56,7 +58,7 @@ def context(con, user, product, qty, data):
     destination = waypoint({'address': data.get('address'), 'coordinates': data.get('coordinates')})
     if data.get('package_confirmed') is not True:
         raise ValueError('Confirm the package fits the selected vehicle limits.')
-    return {'buyer_id': user['id'], 'product_id': product['id'], 'seller_id': product['seller_id'],
+    return {**({'branch': branch} if branch else {}), 'buyer_id': user['id'], 'product_id': product['id'], 'seller_id': product['seller_id'],
             'quantity': qty, 'variant': str(data.get('variant') or ''), 'price': str(product['price']),
             'weight_kg': str(product['weight_kg']), 'pickup': origin, 'dropoff': destination,
             'mode': method, 'city': str(data.get('city') or ''),
@@ -102,6 +104,11 @@ def create_quote(con, user, product, qty, data, client=None):
 def consume(con, user, product, qty, data):
     method = METHODS.get(data.get('logistics_method'))
     if method == 'pickup':
+        branch = branches.resolve(con, product, data.get('branch_id'))
+        if branch:
+            return 0.0, {'provider': 'pickup', 'context': {'branch': branch, 'pickup': branch['pickup']},
+                         'pickup_contact': {'name': branch['name'], 'phone': branch['phone']},
+                         'dispatch_status': 'self_pickup'}
         return 0.0, None
     ctx = context(con, user, product, qty, data)
     row = con.execute('SELECT * FROM delivery_quotes WHERE id=? AND buyer_id=?',
@@ -122,6 +129,8 @@ def consume(con, user, product, qty, data):
     if not claimed:
         raise ValueError('This delivery quote was already used.')
     seller = con.execute('SELECT name,phone FROM users WHERE id=?', (product['seller_id'],)).fetchone()
+    if ctx.get('branch'):
+        seller = {'name': ctx['branch']['name'], 'phone': ctx['branch']['phone']}
     return charges['total'], {'context': ctx, 'quotation': quote, 'charges': charges,
                                                   'pickup_contact': dict(seller),
                                                   'recipient': {'name': user['name'], 'phone': str(data.get('buyer_phone') or user.get('phone') or '')},

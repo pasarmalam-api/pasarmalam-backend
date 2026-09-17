@@ -1,0 +1,10 @@
+body .app main { padding: 20px; }
+body .app main .branch-section { background: transparent; box-shadow: none; }
+@media(max-width:650px) {
+  .branch-table thead { display: none; }
+  .branch-table table, .branch-table tbody { display: block; }
+  .branch-table tr { display: block; padding: 12px 0; border-bottom: 1px solid #d7e2df; }
+  body .branch-table td { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 0; border: 0; }
+  .branch-table td:first-child { font-weight: 700; }
+  .branch-table td[data-label]::before { content: attr(data-label); }
+}

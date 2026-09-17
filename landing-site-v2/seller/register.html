@@ -21,4 +21,4 @@ async function applySeller(){if(submittingSeller)return;try{
   await post("/api/auth/signup",{role:"seller",shop_category:$("shopCategory").value,name:$("sellerName").value.trim(),email:$("sellerEmail").value.trim(),password:$("sellerPassword").value,phone:$("sellerPhone").value.trim(),address:$("sellerAddress").value.trim(),shop_name:$("shopName").value.trim(),identity_type:$("identityType").value,identity_number:$("identityNumber").value.trim(),business_type:$("businessType").value,ssm_number:$("ssmNumber").value.trim(),bank_name:$("bankName").value.trim(),bank_account_name:$("bankAccountName").value.trim(),bank_account_number:$("bankAccountNumber").value.trim(),email_otp_token:sellerOtpToken});
   location.replace("thank-you.html");
 }catch(e){submittingSeller=false;setText("applyStatus",e.message)}}
-</script><script src="seller-actions.js?v=seller-audit3"></script><script src="badges.js?v=audit2"></script></body></html>
+</script><script src="seller-actions.js?v=branches1"></script><script src="badges.js?v=audit2"></script></body></html>

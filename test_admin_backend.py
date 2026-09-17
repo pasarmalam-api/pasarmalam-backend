@@ -16,6 +16,7 @@ class AdminActionsTest(unittest.TestCase):
             CREATE TABLE audit_logs (id INTEGER PRIMARY KEY, actor_id INTEGER, action TEXT, target_type TEXT, target_id INTEGER, note TEXT, created_at INTEGER);
         """)
         server.migrate_seller_email_queue(self.db)
+        server.branches.migrate(self.db)
         self.handler = object.__new__(server.Handler)
         self.handler.current_user = lambda: {'id': 1, 'role': 'admin'}
         self.handler.audit = lambda *args: None
@@ -86,7 +87,11 @@ class AdminActionsTest(unittest.TestCase):
     def test_delete_account_and_only_its_data(self):
         self.prepare_deletion()
         self.db.execute('INSERT INTO cart_items VALUES (1,3),(2,2)')
+        self.db.execute("INSERT INTO shop_branches(id,seller_id,name,pickup,phone,updated_at) VALUES ('keep',2,'Other shop','{}','123',1),('remove',3,'Deleted account','{}','123',1)")
+        self.db.execute("INSERT INTO branch_prices VALUES ('keep',1,'10.00'),('remove',2,'12.00')")
         self.handler.admin_delete_user({'user_id': 3, 'confirm_email': 'buyer@example.test'})
+        self.assertEqual([r['id'] for r in self.db.execute('SELECT id FROM shop_branches')], ['keep'])
+        self.assertEqual([r['branch_id'] for r in self.db.execute('SELECT branch_id FROM branch_prices')], ['keep'])
         self.assertIsNone(self.db.execute('SELECT id FROM users WHERE id=3').fetchone())
         self.assertIsNotNone(self.db.execute('SELECT id FROM users WHERE id=2').fetchone())
         self.assertEqual(self.db.execute('SELECT buyer_id FROM cart_items').fetchone()[0], 2)

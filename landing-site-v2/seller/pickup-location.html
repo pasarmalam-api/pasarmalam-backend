@@ -27,4 +27,4 @@
   $('savePickup').disabled=true;
   api().then(d=>{if(d.pickup){$('pickupAddress').value=d.pickup.address;$('lat').value=d.pickup.coordinates.lat;$('lng').value=d.pickup.coordinates.lng;}else{try{$('pickupAddress').value=JSON.parse(localStorage.getItem('pm_user')||'{}').address||'';}catch(e){}}$('savePickup').disabled=false;}).catch(e=>{$('status').textContent=e.message;});
 })();
-</script><script src="seller-actions.js?v=seller-audit3"></script><script src="badges.js?v=audit2"></script></body></html>
+</script><script src="seller-actions.js?v=branches1"></script><script src="badges.js?v=audit2"></script></body></html>

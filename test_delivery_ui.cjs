@@ -19,6 +19,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    if(!url.startsWith('https://pasarmalam-backend.onrender.com'))return route.abort();
    const endpoint=new URL(url).pathname;
    if(endpoint==='/api/maps/config')return route.fulfill({json:{browser_key:'fake-test-key'}});
+   if(endpoint==='/api/product/branches')return route.fulfill({json:{branches:[{id:'',name:'Main store',address:'Test pickup',price:20,is_open:true,delivery_available:true}]}});
    if(req.method()!=='GET')writes.push({endpoint,body:req.postDataJSON()});
    if(endpoint==='/api/profile')return route.fulfill({json:{user:{address:'Test delivery'}}});
    if(endpoint==='/api/delivery/services')return route.fulfill({json:{cities:[{name:'Kuala Lumpur',locode:'MY KUL',services:[{key:'MOTORCYCLE',load:{value:'10',unit:'kg'},dimensions:{length:{value:'0.4',unit:'m'}}}]}]}});

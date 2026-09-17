@@ -64,7 +64,7 @@
   window.pmDeliveryAdminFee = () => isPickup() ? 0 : valid() ? Number(quote.admin_fee || 0) : NaN;
   window.pmDeliveryCourierFee = () => isPickup() ? 0 : valid() ? Number(quote.courier_fee ?? quote.fee) : NaN;
   function fields() {
-    return {fee_version: 1, coordinates: {lat: get('deliveryLat').value, lng: get('deliveryLng').value},
+    return {...(window.pmBranchFields ? window.pmBranchFields() : {}), fee_version: 1, coordinates: {lat: get('deliveryLat').value, lng: get('deliveryLng').value},
       city: get('deliveryCity').value, service_type: get('deliveryVehicle').value,
       location_confirmed: get('deliveryConfirmed').checked, package_confirmed: get('deliveryPackage').checked,
       schedule_at: shipping.value === 'Lalamove Biasa' && get('deliverySchedule').value
@@ -90,6 +90,7 @@
     if (services.some(s => s.key === 'MOTORCYCLE')) get('deliveryVehicle').value = 'MOTORCYCLE';
     capacity();
   }
+  window.pmDeliveryInvalidate = reset;
   function capacity() {
     const service = cities.find(c => c.locode === get('deliveryCity').value)?.services.find(s => s.key === get('deliveryVehicle').value);
     const dims = Object.values(service?.dimensions || {}).map(d => `${d.value} ${d.unit}`).join(' x ');
@@ -160,6 +161,7 @@
     if (['/api/checkout','/api/payments/billplz/create','/api/payments/toyyibpay/create'].includes(path)) {
       requireCheckoutReady();
       const data = JSON.parse(options.body);
+      if(window.pmBranchFields)Object.assign(data,window.pmBranchFields());
       delete data.logistics_fee;
       delete data.logistics_admin_fee;
       if (!isPickup()) Object.assign(data, fields(), {quote_id: quote.quote_id});
