@@ -1642,6 +1642,11 @@ class Handler(BaseHTTPRequestHandler):
         if details:
             con.execute("UPDATE orders SET delivery_data=?, logistics_admin_fee=?, tracking_no='', awb_label='' WHERE id=?",
                         (json.dumps(details), details.get('charges', {}).get('admin_fee', 0), order_id))
+            if details.get('provider') == 'pm_express':
+                notify_admins(con, f"PM Express rider required for PM-{order_id}",
+                              "Assign a Pasar Malam rider. Do not book Lalamove. Check payment method and collect the full order total on arrival if unpaid.",
+                              "logistics", "orders.html")
+                return
             notify_admins(con, f"Courier booking required for PM-{order_id}",
                           "Check payment before manually booking Lalamove. A quotation is not a courier booking.",
                           "logistics", "orders.html")
@@ -2586,7 +2591,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def checkout(self, data):
         user = self.require_user("buyer")
-        if data.get("payment_method") != "Cash Pickup" or delivery.METHODS.get(data.get("logistics_method")) != "pickup":
+        arrival = data.get("payment_method") == "Pay on Arrival" and data.get("logistics_method") == "PM Express"
+        if not arrival and (data.get("payment_method") != "Cash Pickup" or delivery.METHODS.get(data.get("logistics_method")) != "pickup"):
             raise ValueError("Use the payment gateway for delivery orders. Cash payment is for pickup only.")
         buyer_id = user["id"]
         buyer_name = user["name"]
@@ -2598,10 +2604,10 @@ class Handler(BaseHTTPRequestHandler):
             if voucher_code and str(data.get("voucher_code", "")).strip() and str(voucher_code).lower() != str(data.get("voucher_code", "")).strip().lower():
                 voucher_code = data.get("voucher_code", "")
             total = max(subtotal + fee - discount, 0)
-            tracking = f"PM{now()}{product['id']}"
-            awb = f"AWB-{tracking}-{data.get('logistics_method', product['shipping_type']).replace(' ', '-')}"
+            tracking = "" if arrival else f"PM{now()}{product['id']}"
+            awb = "" if arrival else f"AWB-{tracking}-{data.get('logistics_method', product['shipping_type']).replace(' ', '-')}"
             payment_status = "unpaid"
-            order_status = "pending_payment"
+            order_status = "placed" if arrival else "pending_payment"
             escrow_status = "pending"
             payment_proof_url = data.get("payment_proof_url", "")
             payment_reference = data.get("payment_reference", "")
@@ -2615,6 +2621,10 @@ class Handler(BaseHTTPRequestHandler):
                 """,
                 (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), address, total, data.get("logistics_method", product["shipping_type"]), fee, payment_method, payment_status, payment_reference, data.get("payment_url", ""), payment_proof_url, order_status, escrow_status, tracking, awb, now()),
             )
+            self.attach_delivery(con, cur.lastrowid, delivery_details)
+            if arrival:
+                create_notification(con, "seller", product["seller_id"], f"PM Express order PM-{cur.lastrowid}",
+                                    "Pay on Arrival order received. Prepare for a PM rider; payment has not been collected.", "order", "orders.html")
             if payment_status == "paid":
                 if USE_POSTGRES:
                     con.execute("UPDATE products SET stock = GREATEST(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, product["id"]))
@@ -2627,7 +2637,7 @@ class Handler(BaseHTTPRequestHandler):
             raise PermissionError("Buyer login is required before checkout")
         if not data.get("product_id"):
             raise ValueError("Product is required")
-        product = con.execute("SELECT * FROM products WHERE id = ?", (int(data["product_id"]),)).fetchone()
+        product = con.execute("SELECT * FROM products WHERE id = ?" + (" FOR UPDATE" if USE_POSTGRES else ""), (int(data["product_id"]),)).fetchone()
         if not product:
             raise ValueError("Product not found")
         self.require_shop_open(con, product)
@@ -2641,8 +2651,12 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("Quantity must be a whole number") from None
         if qty < 1:
             raise ValueError("Quantity must be at least 1")
-        if qty > int(product["stock"] or 0):
-            raise ValueError(f"Only {product['stock']} item(s) available")
+        reserved = con.execute("""SELECT COALESCE(SUM(quantity),0) AS qty FROM orders
+            WHERE product_id=? AND payment_method='Pay on Arrival' AND logistics_method='PM Express'
+            AND payment_status='unpaid' AND order_status<>'cancelled'""", (product['id'],)).fetchone()['qty']
+        available = max(0, int(product['stock'] or 0) - int(reserved))
+        if qty > available:
+            raise ValueError(f"Only {available} item(s) available")
         address = str(data.get("address") or user.get("address") or "").strip()
         if not address:
             raise ValueError("Delivery address is required")
@@ -2922,8 +2936,11 @@ class Handler(BaseHTTPRequestHandler):
             order = con.execute("SELECT * FROM orders WHERE id = ?", (int(data["order_id"]),)).fetchone()
             if not order:
                 raise ValueError("Order not found")
-            if order["payment_status"] != "paid" and status not in ("cancelled",):
+            arrival = order["payment_method"] == "Pay on Arrival" and order["logistics_method"] == "PM Express" and order["payment_status"] == "unpaid"
+            if order["payment_status"] != "paid" and status != "cancelled" and not (arrival and status in ("to_pack", "shipped", "delivered")):
                 raise ValueError("Only paid orders can move to fulfillment")
+            if arrival and status != "cancelled":
+                escrow = "pending"
             if user["role"] == "seller":
                 current = aliases.get(order["order_status"], "to_pack")
                 allowed = {"to_pack": {"to_pack", "shipped", "cancelled"},
@@ -3413,6 +3430,12 @@ class Handler(BaseHTTPRequestHandler):
             if not order:
                 raise ValueError("Order not found")
             was_paid = order["payment_status"] == "paid"
+            if order["payment_method"] == "Pay on Arrival" and order["logistics_method"] == "PM Express":
+                if order["order_status"] == "cancelled":
+                    raise ValueError("A cancelled PM Express order cannot be marked paid")
+                if decision != "paid":
+                    raise ValueError("Cancel the PM Express order if cash was not collected")
+                order_status = order["order_status"]
             con.execute(
                 "UPDATE orders SET payment_status = ?, order_status = ?, escrow_status = ?, payment_review_note = ?, payment_reviewed_at = ?, status_updated_at = ? WHERE id = ?",
                 (decision, order_status, escrow_status, note, now(), now(), order_id),

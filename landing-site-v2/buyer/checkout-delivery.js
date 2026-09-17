@@ -7,13 +7,15 @@
   const payment = get('payment');
   payment.replaceChildren(
     new Option(t('Perbankan dalam talian (Billplz FPX)', 'Online banking (Billplz FPX)'), 'Billplz'),
-    new Option(t('Tunai semasa ambil sendiri', 'Cash on self pickup'), 'Cash Pickup')
+    new Option(t('Tunai semasa ambil sendiri', 'Cash on self pickup'), 'Cash Pickup'),
+    new Option(t('Bayar semasa tiba (PM Express)', 'Pay on Arrival (PM Express)'), 'Pay on Arrival')
   );
   payment.value = 'Billplz';
   shipping.replaceChildren(...[
     ['Ambil Sendiri', t('Ambil sendiri', 'Self pickup')],
-    ['Lalamove Segera', t('Ekspres - pengambilan segera', 'Express - immediate pickup')],
-    ['Lalamove Biasa', t('Standard - pengambilan berjadual', 'Standard - scheduled pickup')]
+    ['PM Express', 'Pasar Malam Express'],
+    ['Lalamove Segera', t('Lalamove - pengambilan segera', 'Lalamove - immediate pickup')],
+    ['Lalamove Biasa', t('Lalamove - pengambilan berjadual', 'Lalamove - scheduled pickup')]
   ].map(([value, label]) => new Option(label, value)));
   shipping.value = 'Lalamove Segera';
   shipping.removeAttribute('onchange');
@@ -77,6 +79,9 @@
     cash.disabled = !isPickup();
     cash.hidden = !isPickup();
     if (cash.disabled && payment.value === 'Cash Pickup') payment.value = 'Billplz';
+    const arrival = payment.querySelector('option[value="Pay on Arrival"]');
+    arrival.disabled = arrival.hidden = shipping.value !== 'PM Express';
+    if (arrival.disabled && payment.value === 'Pay on Arrival') payment.value = 'Billplz';
     status(''); renderSummary();
   }
   function vehicles() {
@@ -92,6 +97,12 @@
     get('deliveryPackage').checked = false; reset();
   }
   shipping.addEventListener('change', reset);
+  window.pmCheckoutButtonLabel = () => payment.value === 'Pay on Arrival'
+    ? t('Buat pesanan - bayar semasa tiba', 'Place order - pay on arrival')
+    : t('Bayar Sekarang', 'Pay Now');
+  const updatePayLabel = () => { pay.textContent = window.pmCheckoutButtonLabel(); };
+  payment.addEventListener('change', updatePayLabel);
+  shipping.addEventListener('change', updatePayLabel);
   for (const id of ['address','deliveryLat','deliveryLng','buyerPhone']) get(id).addEventListener('input', () => {
     if (id !== 'buyerPhone') get('deliveryConfirmed').checked = false;
     if (id === 'address') get('deliveryLocationStatus').textContent = t('Sahkan semula lokasi penerima.', 'Confirm the recipient location again.');
@@ -143,6 +154,7 @@
     baseReady();
     if (!valid()) throw new Error(t('Dapatkan sebut harga penghantaran baharu.', 'Get a fresh delivery quotation.'));
     if (!isPickup() && get('payment').value === 'Cash Pickup') throw new Error('Cash is for self pickup only.');
+    if (shipping.value !== 'PM Express' && payment.value === 'Pay on Arrival') throw new Error('Pay on Arrival is for PM Express only.');
   };
   api = async function(path, options = {}) {
     if (['/api/checkout','/api/payments/billplz/create','/api/payments/toyyibpay/create'].includes(path)) {

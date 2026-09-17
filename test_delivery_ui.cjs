@@ -34,7 +34,8 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    await page.setViewportSize({width,height:900});await page.goto(origin+'/buyer/checkout.html?product_id=1');
    await page.locator('#deliveryVehicle option').waitFor({state:'attached'});
    assert.equal(await page.locator('#payment').inputValue(),'Billplz');
-   assert.deepEqual(await page.locator('#payment option').evaluateAll(options=>options.map(o=>o.value)),['Billplz','Cash Pickup']);
+   assert.deepEqual(await page.locator('#payment option').evaluateAll(options=>options.map(o=>o.value)),['Billplz','Cash Pickup','Pay on Arrival']);
+   assert.equal(await page.locator('#payment option[value="Pay on Arrival"]').evaluate(o=>o.disabled && o.hidden),true);
    assert.equal(await page.locator('#payment option[value="Cash Pickup"]').evaluate(o=>o.disabled && o.hidden),true);
    assert.equal(await page.locator('#deliveryLat').isVisible(),false);
    assert.equal(await page.locator('#deliveryOptions').getAttribute('open'),null);
@@ -63,6 +64,18 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    await page.locator('#payment').selectOption('Cash Pickup');await page.locator('#pay').click();
    await page.waitForFunction(()=>document.getElementById('result').textContent.includes('PM-123'));
    assert.equal(writes.at(-1).body.logistics_method,'Ambil Sendiri');writes.length=0;
+   await page.locator('input[name="deliveryChoice"][value="PM Express"]').check();
+   await page.locator('#payment').selectOption('Pay on Arrival');
+   await page.locator('#deliveryConfirmed').check();
+   await page.locator('#deliveryQuote').click();
+   await page.waitForFunction(()=>document.getElementById('deliveryStatus').textContent.includes('RM9.40'));
+   await page.locator('#pay').click();
+   await page.waitForFunction(()=>document.getElementById('result').textContent.includes('Pay on Arrival'));
+   assert.equal(writes.at(-1).endpoint,'/api/checkout');
+   assert.equal(writes.at(-1).body.payment_method,'Pay on Arrival');
+   assert.equal(writes.at(-1).body.logistics_method,'PM Express');
+   assert.equal(writes.at(-1).body.quote_id,'server-quote');
+   writes.length=0;
    await page.locator('input[name="deliveryChoice"][value="Lalamove Segera"]').check();
    assert.equal(await page.locator('#payment').inputValue(),'Billplz');
    assert.equal(await page.locator('#payment option[value="Cash Pickup"]').evaluate(o=>o.disabled && o.hidden),true);

@@ -56,6 +56,55 @@ class DeliveryTest(unittest.TestCase):
         with server.connect() as con, self.assertRaises(ValueError):
             delivery.consume(con, self.user, self.product, 1, data)
 
+    def test_pm_express_cash_order_and_collection(self):
+        self.data.update(logistics_method='PM Express', payment_method='Pay on Arrival')
+        data = self.quoted()
+        self.assertEqual(self.client.quote.call_args.args[0]['mode'], 'express')
+        with patch.object(server, 'send_json') as send:
+            self.handler.checkout({**data, 'payment_status': 'paid', 'logistics_fee': 0})
+        result = send.call_args.args[2]
+        ident = result['id']
+        self.assertEqual(result['payment_status'], 'unpaid')
+        with server.connect() as con:
+            row = dict(con.execute('SELECT * FROM orders WHERE id=?', (ident,)).fetchone())
+        self.assertEqual(row['logistics_fee'], 9.4)
+        self.assertEqual(row['order_status'], 'placed')
+        details = json.loads(row['delivery_data'])
+        self.assertEqual(details['provider'], 'pm_express')
+        self.assertEqual(details['dispatch_status'], 'pm_rider_assignment_required')
+        self.assertEqual(row['tracking_no'], '')
+        self.handler.current_user = lambda: {'id': 2, 'role': 'seller'}
+        with patch.object(server, 'send_json'):
+            self.handler.update_order_status({'order_id': ident, 'order_status': 'shipped'})
+            self.handler.update_order_status({'order_id': ident, 'order_status': 'delivered'})
+        self.handler.current_user = lambda: {'id': 3, 'role': 'admin'}
+        with self.assertRaises(ValueError):
+            self.handler.update_order_status({'order_id': ident, 'order_status': 'completed'})
+        with patch.object(server, 'send_json'), patch.object(self.handler, 'audit'):
+            self.handler.admin_update_payment_status({'order_id': ident, 'payment_status': 'paid'})
+            self.handler.admin_update_payment_status({'order_id': ident, 'payment_status': 'paid'})
+        with server.connect() as con:
+            row = con.execute('SELECT * FROM orders WHERE id=?', (ident,)).fetchone()
+            self.assertEqual(row['order_status'], 'delivered')
+            self.assertEqual(row['payment_status'], 'paid')
+            self.assertEqual(con.execute('SELECT stock FROM products WHERE id=1').fetchone()['stock'], 4)
+        self.assertEqual([c[0] for c in self.client.mock_calls], ['cities', 'quote'])
+
+    def test_arrival_rejected_for_other_methods_and_quote_cannot_cross_provider(self):
+        for method in ('Lalamove Segera', 'Lalamove Biasa', 'Ambil Sendiri'):
+            with self.assertRaises(ValueError):
+                self.handler.checkout({**self.data, 'payment_method': 'Pay on Arrival', 'logistics_method': method})
+        data = self.quoted()
+        with server.connect() as con, self.assertRaises(ValueError):
+            delivery.consume(con, self.user, self.product, 1, {**data, 'logistics_method': 'PM Express'})
+
+    def test_arrival_reserves_available_stock(self):
+        self.data.update(logistics_method='PM Express', payment_method='Pay on Arrival')
+        with patch.object(server, 'send_json'):
+            self.handler.checkout(self.quoted())
+        with server.connect() as con, self.assertRaises(ValueError):
+            self.handler.validate_checkout_payload(con, {**self.data, 'quantity': 5}, self.user)
+
     def test_quote_binding(self):
         original = self.quoted()
         for change in ({'address': 'Different address'}, {'coordinates': {'lat': 4, 'lng': 102}},

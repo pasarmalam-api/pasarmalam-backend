@@ -10,6 +10,7 @@ from lalamove import Client, waypoint
 
 
 METHODS = {
+    'PM Express': 'pm_express',
     'Ambil Sendiri': 'pickup', 'In-Store Pickup': 'pickup',
     'Lalamove Biasa': 'standard', 'Lalamove Regular': 'standard', 'Standard Rider': 'standard',
     'Lalamove Segera': 'express', 'Lalamove Instant': 'express', 'Express Rider': 'express',
@@ -42,7 +43,7 @@ def save_pickup(con, seller_id, data):
 
 def context(con, user, product, qty, data):
     method = METHODS.get(data.get('logistics_method'))
-    if method not in ('express', 'standard'):
+    if method not in ('express', 'standard', 'pm_express'):
         raise ValueError('Select immediate or scheduled Lalamove delivery.')
     seller = con.execute('SELECT status,seller_status FROM users WHERE id=?', (product['seller_id'],)).fetchone()
     if not seller or seller['status'] != 'active' or seller['seller_status'] != 'approved':
@@ -81,7 +82,8 @@ def create_quote(con, user, product, qty, data, client=None):
         raise ValueError('Package or vehicle weight information is missing.') from None
     if load.get('unit') != 'kg' or not math.isfinite(limit) or not math.isfinite(weight) or weight <= 0 or weight > limit:
         raise ValueError('The package weight exceeds this vehicle capacity or cannot be verified.')
-    quote = client.quote(ctx)
+    # PM riders use an immediate quote as a price reference only; never dispatch.
+    quote = client.quote({**ctx, 'mode': 'express'} if ctx['mode'] == 'pm_express' else ctx)
     courier = Decimal(str(quote['priceBreakdown']['total'])).quantize(Decimal('0.01'))
     charges = {'courier_fee': float(courier), 'admin_fee': float(ADMIN_FEE),
                'total': float(courier + ADMIN_FEE), 'version': 1}
@@ -123,4 +125,6 @@ def consume(con, user, product, qty, data):
     return charges['total'], {'context': ctx, 'quotation': quote, 'charges': charges,
                                                   'pickup_contact': dict(seller),
                                                   'recipient': {'name': user['name'], 'phone': str(data.get('buyer_phone') or user.get('phone') or '')},
-                                                  'dispatch_status': 'manual_booking_required'}
+                                                  'provider': 'pm_express' if method == 'pm_express' else 'lalamove',
+                                                  'quote_provider': 'lalamove',
+                                                  'dispatch_status': 'pm_rider_assignment_required' if method == 'pm_express' else 'manual_booking_required'}
