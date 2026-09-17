@@ -6,7 +6,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;
  const browser=await chromium.launch({channel:'msedge',headless:true});
  try{
-  const ctx=await browser.newContext();
+  const ctx=await browser.newContext({geolocation:{latitude:3.14,longitude:101.69},permissions:['geolocation']});
   await ctx.addInitScript(()=>{localStorage.setItem('pm_token','test');localStorage.setItem('pm_user',JSON.stringify({id:1,role:'buyer',name:'Buyer',phone:'01123456789',email:'buyer@example.test',address:'Test delivery'}));localStorage.setItem('pasarmalam-lang','ms');localStorage.setItem('pasarmalam-buyer-lang-version','20260903-ms-default');});
   const writes=[];let quoteFailure=false,delayQuote=false,pendingQuote;
   await ctx.route('**/*',async route=>{
@@ -33,9 +33,17 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
   for(const width of [402,1440]){
    await page.setViewportSize({width,height:900});await page.goto(origin+'/buyer/checkout.html?product_id=1');
    await page.locator('#deliveryVehicle option').waitFor({state:'attached'});
+   assert.equal(await page.locator('#payment').inputValue(),'Billplz');
+   assert.deepEqual(await page.locator('#payment option').evaluateAll(options=>options.map(o=>o.value)),['Billplz','Cash Pickup']);
+   assert.equal(await page.locator('#payment option[value="Cash Pickup"]').evaluate(o=>o.disabled && o.hidden),true);
+   assert.equal(await page.locator('#deliveryLat').isVisible(),false);
+   assert.equal(await page.locator('#deliveryOptions').getAttribute('open'),null);
    await page.locator('#payment').selectOption('Billplz');
    await page.locator('#pay').click();assert.equal(writes.filter(x=>x.endpoint.includes('/payments/')).length,0);
-   await page.locator('#deliveryLat').fill('3.14');await page.locator('#deliveryLng').fill('101.69');
+   await page.locator('#deliveryLocate').click();
+   await page.waitForFunction(()=>document.getElementById('deliveryLat').value==='3.140000');
+   assert.equal(await page.locator('#deliveryConfirmed').isChecked(),false);
+   assert.equal(await page.locator('#deliveryLat').isVisible(),false);
    await page.locator('#deliveryConfirmed').check();await page.locator('#deliveryPackage').check();
    await page.locator('#deliveryQuote').click();await page.waitForFunction(()=>document.getElementById('deliveryStatus').textContent.includes('RM9.40'));
    assert.match(await page.locator('#summary').textContent(),/RM29.40/);assert.match(await page.locator('#summary').textContent(),/RM0.40/);assert.match(await page.locator('#summary').textContent(),/RM9.00/);
@@ -44,16 +52,25 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    await page.locator('#pay').click();await page.waitForFunction(()=>document.getElementById('result').textContent.includes('mocked'));
    const sent=writes.findLast(x=>x.endpoint.includes('/payments/')).body;
    assert.equal(sent.quote_id,'server-quote');assert.equal(sent.fee_version,1);assert.equal(sent.logistics_fee,undefined);
+   await page.locator('#buyerPhone').fill('01123456780');
+   assert.equal(await page.evaluate(()=>Number.isNaN(window.pmDeliveryFee())),true);
+   await page.locator('#deliveryQuote').click();await page.waitForFunction(()=>document.getElementById('deliveryStatus').textContent.includes('RM9.40'));
    await page.locator('#address').fill('Changed address');assert.equal(await page.locator('#deliveryConfirmed').isChecked(),false);
    const n=writes.length;await page.locator('#pay').click();assert.equal(writes.length,n);
-   await page.locator('#shipping').selectOption('Lalamove Biasa');assert.equal(await page.locator('#deliverySchedule').isVisible(),true);
-   await page.locator('#shipping').selectOption('Ambil Sendiri');assert.equal(await page.locator('#deliveryControls').isVisible(),false);
+   await page.locator('input[name="deliveryChoice"][value="Lalamove Biasa"]').check();assert.equal(await page.locator('#deliverySchedule').isVisible(),true);
+   await page.locator('input[name="deliveryChoice"][value="Ambil Sendiri"]').check();assert.equal(await page.locator('#deliveryControls').isVisible(),false);
    assert.match(await page.locator('#summary').textContent(),/RM0.00/);
    await page.locator('#payment').selectOption('Cash Pickup');await page.locator('#pay').click();
    await page.waitForFunction(()=>document.getElementById('result').textContent.includes('PM-123'));
    assert.equal(writes.at(-1).body.logistics_method,'Ambil Sendiri');writes.length=0;
+   await page.locator('input[name="deliveryChoice"][value="Lalamove Segera"]').check();
+   assert.equal(await page.locator('#payment').inputValue(),'Billplz');
+   assert.equal(await page.locator('#payment option[value="Cash Pickup"]').evaluate(o=>o.disabled && o.hidden),true);
   }
   await page.goto(origin+'/buyer/checkout.html?product_id=1');await page.locator('#deliveryVehicle option').waitFor({state:'attached'});
+  await ctx.clearPermissions();
+  await page.locator('#deliveryLocate').click();
+  await page.locator('#deliveryLat').waitFor({state:'visible'});
   await page.locator('#deliveryLat').fill('3.14');await page.locator('#deliveryLng').fill('101.69');await page.locator('#deliveryConfirmed').check();await page.locator('#deliveryPackage').check();
   quoteFailure=true;await page.locator('#deliveryQuote').click();await page.waitForTimeout(250);console.log('Failure status:',await page.locator('#deliveryStatus').textContent());await page.waitForFunction(()=>document.getElementById('deliveryStatus').textContent.includes('pickup missing'));
   quoteFailure=false;delayQuote=true;await page.locator('#deliveryQuote').click();await page.waitForTimeout(100);await page.locator('#address').fill('Changed during quote');pendingQuote();

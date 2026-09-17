@@ -4,6 +4,12 @@
   const english = localStorage.getItem('pasarmalam-lang') === 'en';
   const t = (ms, en) => english ? en : ms;
   const shipping = get('shipping'), address = get('address'), pay = get('pay');
+  const payment = get('payment');
+  payment.replaceChildren(
+    new Option(t('Perbankan dalam talian (Billplz FPX)', 'Online banking (Billplz FPX)'), 'Billplz'),
+    new Option(t('Tunai semasa ambil sendiri', 'Cash on self pickup'), 'Cash Pickup')
+  );
+  payment.value = 'Billplz';
   shipping.replaceChildren(...[
     ['Ambil Sendiri', t('Ambil sendiri', 'Self pickup')],
     ['Lalamove Segera', t('Ekspres - pengambilan segera', 'Express - immediate pickup')],
@@ -11,24 +17,42 @@
   ].map(([value, label]) => new Option(label, value)));
   shipping.value = 'Lalamove Segera';
   shipping.removeAttribute('onchange');
+  const choices = document.createElement('fieldset');
+  choices.className = 'delivery-choices';
+  choices.innerHTML = `<legend>${t('Pilihan penghantaran', 'Delivery option')}</legend>`;
+  for (const option of shipping.options) {
+    const label = document.createElement('label');
+    const radio = document.createElement('input');
+    radio.type = 'radio'; radio.name = 'deliveryChoice'; radio.value = option.value;
+    radio.checked = option.value === shipping.value;
+    radio.addEventListener('change', () => { shipping.value = radio.value; shipping.dispatchEvent(new Event('change')); });
+    const name = document.createElement('span'); name.textContent = option.textContent;
+    label.append(radio, name); choices.append(label);
+  }
+  shipping.hidden = true;
+  shipping.closest('.row').before(choices);
   const box = document.createElement('div');
   box.id = 'deliveryControls';
   box.innerHTML = `
-    <h3>${t('Lokasi penghantaran', 'Delivery location')}</h3>
+    <h3>${t('Lokasi penerima', 'Recipient location')}</h3>
     <button type="button" class="soft" id="deliveryLocate">${t('Gunakan lokasi semasa', 'Use current location')}</button>
+    <p id="deliveryLocationStatus" role="status" class="muted"></p>
+    <details id="deliveryLocationDetails"><summary>${t('Tetapkan lokasi lain', 'Set another location')}</summary>
     <div class="row"><label>${t('Latitud', 'Latitude')}<input id="deliveryLat" type="number" step="any" min="-90" max="90"></label>
     <label>${t('Longitud', 'Longitude')}<input id="deliveryLng" type="number" step="any" min="-180" max="180"></label></div>
-    <label style="display:block;margin:12px 0"><input id="deliveryConfirmed" type="checkbox" style="width:auto">
-    ${t('Saya sahkan koordinat sepadan dengan alamat penghantaran.', 'I confirm these coordinates match the delivery address.')}</label>
+    </details>
+    <label class="delivery-check"><input id="deliveryConfirmed" type="checkbox">
+    ${t('Lokasi ini ialah alamat penerima.', 'This location matches the recipient address.')}</label>
+    <details id="deliveryOptions"><summary>${t('Kawasan & kenderaan', 'Area & vehicle')}</summary>
     <div class="row"><label>${t('Kawasan', 'Area')}<select id="deliveryCity"></select></label>
     <label>${t('Kenderaan', 'Vehicle')}<select id="deliveryVehicle"></select></label></div>
-    <p id="deliveryCapacity" class="muted"></p>
-    <label style="display:block;margin:12px 0"><input id="deliveryPackage" type="checkbox" style="width:auto">
-    ${t('Bungkusan muat dalam had kenderaan ini.', 'The package fits within this vehicle capacity.')}</label>
+    </details>
+    <label class="delivery-check"><input id="deliveryPackage" type="checkbox">
+    <span>${t('Bungkusan muat dalam kenderaan', 'Package fits the vehicle')} <span id="deliveryCapacity" class="muted"></span></span></label>
     <label id="deliveryScheduleLabel">${t('Masa pengambilan', 'Pickup time')}<input id="deliverySchedule" type="datetime-local"></label>
     <button type="button" class="soft" id="deliveryQuote">${t('Dapatkan caj penghantaran', 'Get delivery charge')}</button>
     <p id="deliveryStatus" role="status" class="muted"></p>`;
-  shipping.closest('.row').after(box);
+  choices.after(box);
   let cities = [], quote = null, revision = 0, requesting = false;
   const baseApi = api, baseReady = requireCheckoutReady;
   const isPickup = () => shipping.value === 'Ambil Sendiri';
@@ -47,10 +71,12 @@
   function reset() {
     revision++; quote = null;
     box.hidden = isPickup();
+    for (const radio of choices.querySelectorAll('input')) radio.checked = radio.value === shipping.value;
     get('deliveryScheduleLabel').hidden = shipping.value !== 'Lalamove Biasa';
     const cash = get('payment').querySelector('option[value="Cash Pickup"]');
     cash.disabled = !isPickup();
-    if (cash.disabled && get('payment').value === 'Cash Pickup') get('payment').value = '';
+    cash.hidden = !isPickup();
+    if (cash.disabled && payment.value === 'Cash Pickup') payment.value = 'Billplz';
     status(''); renderSummary();
   }
   function vehicles() {
@@ -62,11 +88,15 @@
   function capacity() {
     const service = cities.find(c => c.locode === get('deliveryCity').value)?.services.find(s => s.key === get('deliveryVehicle').value);
     const dims = Object.values(service?.dimensions || {}).map(d => `${d.value} ${d.unit}`).join(' x ');
-    get('deliveryCapacity').textContent = service ? `${service.load?.value || '?'} ${service.load?.unit || ''}${dims ? ' | ' + dims : ''}` : '';
+    get('deliveryCapacity').textContent = service ? `(${service.key.replaceAll('_', ' ')}: ${service.load?.value || '?'} ${service.load?.unit || ''}${dims ? ' | ' + dims : ''})` : '';
     get('deliveryPackage').checked = false; reset();
   }
   shipping.addEventListener('change', reset);
-  for (const id of ['address','deliveryLat','deliveryLng']) get(id).addEventListener('input', () => { get('deliveryConfirmed').checked = false; reset(); });
+  for (const id of ['address','deliveryLat','deliveryLng','buyerPhone']) get(id).addEventListener('input', () => {
+    if (id !== 'buyerPhone') get('deliveryConfirmed').checked = false;
+    if (id === 'address') get('deliveryLocationStatus').textContent = t('Sahkan semula lokasi penerima.', 'Confirm the recipient location again.');
+    reset();
+  });
   for (const id of ['deliveryConfirmed','deliveryPackage','deliverySchedule']) get(id).addEventListener('change', reset);
   get('deliveryCity').addEventListener('change', vehicles);
   get('deliveryVehicle').addEventListener('change', capacity);
@@ -77,7 +107,11 @@
       get('deliveryLat').value = pos.coords.latitude.toFixed(6);
       get('deliveryLng').value = pos.coords.longitude.toFixed(6);
       get('deliveryConfirmed').checked = false; reset();
-    }, () => status(t('Lokasi tidak dibenarkan. Masukkan koordinat alamat.', 'Location denied. Enter the address coordinates.')),
+      get('deliveryLocationStatus').textContent = t('Lokasi semasa dipilih. Sahkan alamat penerima di bawah.', 'Current location selected. Confirm it matches the recipient address below.');
+    }, () => {
+      get('deliveryLocationDetails').open = true;
+      status(t('Lokasi tidak dibenarkan. Tetapkan lokasi penerima secara manual.', 'Location denied. Set the recipient location manually.'));
+    },
     {enableHighAccuracy: true, timeout: 15000, maximumAge: 0});
   };
   get('deliveryQuote').onclick = async () => {
@@ -87,6 +121,10 @@
     try {
       if (!checkoutProduct || !checkoutItem) throw new Error(t('Pilih produk dahulu.', 'Select a product first.'));
       const route = fields();
+      if (!route.coordinates.lat || !route.coordinates.lng) {
+        get('deliveryLocationDetails').open = true;
+        throw new Error(t('Pilih lokasi penerima dahulu.', 'Choose the recipient location first.'));
+      }
       if (!address.value.trim() || !route.location_confirmed || !route.package_confirmed)
         throw new Error(t('Sahkan alamat, koordinat dan saiz bungkusan.', 'Confirm the address, coordinates and package size.'));
       status(t('Mendapatkan sebut harga...', 'Getting quotation...'));
