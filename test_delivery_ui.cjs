@@ -12,9 +12,15 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
   await ctx.route('**/*',async route=>{
    const req=route.request(),url=req.url();
    if(url.startsWith(origin))return route.continue();
+   if(url.startsWith('https://maps.googleapis.com/maps/api/js'))return route.fulfill({contentType:'text/javascript',body:`
+     class FakeAutocomplete extends HTMLElement{constructor(options){super();Object.assign(this,options);}};customElements.define('test-autocomplete',FakeAutocomplete);
+     class FakeGeocoder {async geocode(){return {results:[{formatted_address:'Test delivery, Malaysia',address_components:[{types:['country'],short_name:'MY'}],geometry:{location:{lat:()=>3.14,lng:()=>101.69}}}]};}}
+     window.google={maps:{importLibrary:async()=>({PlaceAutocompleteElement:FakeAutocomplete}),Geocoder:FakeGeocoder}};window.pmMapsLoaded();`});
    if(!url.startsWith('https://pasarmalam-backend.onrender.com'))return route.abort();
    const endpoint=new URL(url).pathname;
+   if(endpoint==='/api/maps/config')return route.fulfill({json:{browser_key:'fake-test-key'}});
    if(req.method()!=='GET')writes.push({endpoint,body:req.postDataJSON()});
+   if(endpoint==='/api/profile')return route.fulfill({json:{user:{address:'Test delivery'}}});
    if(endpoint==='/api/delivery/services')return route.fulfill({json:{cities:[{name:'Kuala Lumpur',locode:'MY KUL',services:[{key:'MOTORCYCLE',load:{value:'10',unit:'kg'},dimensions:{length:{value:'0.4',unit:'m'}}}]}]}});
    if(endpoint==='/api/delivery/quotation'){
     if(delayQuote)await new Promise(r=>{pendingQuote=r;});
@@ -33,6 +39,31 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
   for(const width of [402,1440]){
    await page.setViewportSize({width,height:900});await page.goto(origin+'/buyer/checkout.html?product_id=1');
    await page.locator('#deliveryVehicle option').waitFor({state:'attached'});
+   assert.equal(await page.locator('#address').inputValue(),'Test delivery');
+   assert.equal(await page.locator('#address').getAttribute('readonly'),'');
+   await page.waitForFunction(()=>Number(document.getElementById('deliveryLat').value)===3.14);
+   assert.equal(await page.locator('#deliveryConfirmed').isChecked(),false);
+   await page.locator('#changeAddress').click();
+   await page.locator('test-autocomplete').waitFor({state:'attached'}).catch(async e=>{console.log(await page.locator('#addressSearchStatus').textContent(), errors);throw e;});
+   assert.equal(await page.locator('test-autocomplete').evaluate(e=>e.includedRegionCodes[0]),'my');
+   await page.locator('test-autocomplete').evaluate(widget=>{
+    const event=new Event('gmp-select');event.placePrediction={toPlace:()=>({fetchFields:async()=>{},formattedAddress:'Selected Kuala Lumpur, Malaysia',location:{lat:()=>3.15,lng:()=>101.7},addressComponents:[{types:['country'],shortText:'MY'}]})};widget.dispatchEvent(event);
+   });
+   await page.waitForFunction(()=>document.getElementById('address').value==='Selected Kuala Lumpur, Malaysia');
+   assert.equal(await page.locator('#deliveryConfirmed').isChecked(),false);
+   assert.equal(writes.some(x=>x.endpoint==='/api/profile'),false);
+   await page.locator('#saveDefaultAddress').click();
+   await page.waitForFunction(()=>document.getElementById('addressSearchStatus').textContent.includes('disimpan'));
+   assert.equal(writes.at(-1).body.address,'Selected Kuala Lumpur, Malaysia');
+   await page.locator('test-autocomplete').evaluate(widget=>{
+    const event=new Event('gmp-select');event.placePrediction={toPlace:()=>({fetchFields:()=>new Promise(resolve=>{window.finishOldPlace=resolve;}),formattedAddress:'Old result, Malaysia',location:{lat:()=>3.1,lng:()=>101.6},addressComponents:[{types:['country'],shortText:'MY'}]})};widget.dispatchEvent(event);
+   });
+   await page.locator('#addressUnit').fill('Unit 8');
+   await page.evaluate(async()=>{window.finishOldPlace();await new Promise(resolve=>setTimeout(resolve,0));});
+   assert.equal(await page.locator('#addressUnit').inputValue(),'Unit 8');
+   assert.equal(await page.locator('#address').inputValue(),'Unit 8, Selected Kuala Lumpur, Malaysia');
+   await page.locator('#addressUnit').fill('');
+   await page.evaluate(()=>localStorage.setItem('pm_user',JSON.stringify({...JSON.parse(localStorage.getItem('pm_user')),address:'Test delivery'})));
    assert.equal(await page.locator('#payment').inputValue(),'Billplz');
    assert.deepEqual(await page.locator('#payment option').evaluateAll(options=>options.map(o=>o.value)),['Billplz','Cash Pickup','Pay on Arrival']);
    assert.equal(await page.locator('#payment option[value="Pay on Arrival"]').evaluate(o=>o.disabled && o.hidden),true);
@@ -42,7 +73,8 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    await page.locator('#payment').selectOption('Billplz');
    await page.locator('#pay').click();assert.equal(writes.filter(x=>x.endpoint.includes('/payments/')).length,0);
    await page.locator('#deliveryLocate').click();
-   await page.waitForFunction(()=>document.getElementById('deliveryLat').value==='3.140000');
+   await page.waitForFunction(()=>Number(document.getElementById('deliveryLat').value)===3.14);
+   assert.equal(await page.locator('#address').inputValue(),'Test delivery, Malaysia');
    assert.equal(await page.locator('#deliveryConfirmed').isChecked(),false);
    assert.equal(await page.locator('#deliveryLat').isVisible(),false);
    await page.locator('#deliveryConfirmed').check();await page.locator('#deliveryPackage').check();
@@ -81,6 +113,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    assert.equal(await page.locator('#payment option[value="Cash Pickup"]').evaluate(o=>o.disabled && o.hidden),true);
   }
   await page.goto(origin+'/buyer/checkout.html?product_id=1');await page.locator('#deliveryVehicle option').waitFor({state:'attached'});
+  await page.locator('#changeAddress').click();
   await ctx.clearPermissions();
   await page.locator('#deliveryLocate').click();
   await page.locator('#deliveryLat').waitFor({state:'visible'});

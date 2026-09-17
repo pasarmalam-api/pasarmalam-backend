@@ -40,6 +40,14 @@ class DeliveryTest(unittest.TestCase):
             q = delivery.create_quote(con, self.user, self.product, 1, self.data, self.client)
         return {**self.data, 'quote_id': q['quote_id']}
 
+    def test_maps_config_exposes_only_browser_key_to_buyer(self):
+        with patch.dict(os.environ, {'GOOGLE_MAPS_BROWSER_KEY':'restricted-browser-key','OPENAI_API_KEY':'private-secret'}), patch.object(server,'send_json') as send:
+            self.handler.maps_config()
+        self.assertEqual(send.call_args.args[2], {'browser_key':'restricted-browser-key','country':'my'})
+        self.handler.current_user=lambda: None
+        with self.assertRaises(PermissionError):
+            self.handler.maps_config()
+
     def test_price_is_server_owned_and_quote_single_use(self):
         data = {**self.quoted(), 'logistics_fee': -999}
         with server.connect() as con:

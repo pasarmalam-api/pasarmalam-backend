@@ -25,3 +25,11 @@
 .buyer-checkout #deliveryStatus{padding:10px 12px;background:#eaf2f8;border-left:3px solid #527c9d;overflow-wrap:anywhere}
 .buyer-checkout [hidden]{display:none!important}
 @media(max-width:760px){.buyer-checkout .checkout-layout{grid-template-columns:minmax(0,1fr);gap:24px}.buyer-checkout .checkout-summary{position:static;padding:0;border:0}.buyer-checkout .checkout-section{padding:18px 0}.buyer-checkout #pay{min-height:48px}}
+.address-tools { margin-bottom: 12px; }
+.address-tools button { margin: 0 8px 10px 0; }
+#addressSearch { margin: 8px 0; min-width: 0; }
+#addressSearch gmp-place-autocomplete { width: 100%; max-width: 100%; }
+#savedAddress { overflow-wrap: anywhere; }
+#address[readonly] { background: #f1f5f4; }
+#addressUnit { margin-bottom: 10px; }
+#saveDefaultAddress { margin-bottom: 14px; }

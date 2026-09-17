@@ -1414,6 +1414,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/logistics/rates": self.get_logistics_rates,
                 "/api/delivery/pickup": self.delivery_pickup,
                 "/api/delivery/services": self.delivery_services,
+                "/api/maps/config": self.maps_config,
                 "/api/public/settings": self.public_settings,
                 "/api/payments/toyyibpay/status": lambda: self.toyyibpay_status(query),
                 "/api/payments/toyyibpay/return": lambda: self.toyyibpay_return(query),
@@ -2127,6 +2128,11 @@ class Handler(BaseHTTPRequestHandler):
     def get_buyer_profile(self):
         user = self.require_user('buyer')
         send_json(self, 200, {'user': {key: user.get(key, '') for key in ('id', 'role', 'name', 'email', 'phone', 'address')}})
+
+    def maps_config(self):
+        # This is a public browser key, restricted by HTTP referrer and API in Google Cloud.
+        self.require_user('buyer')
+        send_json(self, 200, {'browser_key': os.environ.get('GOOGLE_MAPS_BROWSER_KEY', ''), 'country': 'my'})
 
     def switch_role(self, data):
         user = self.require_user()
