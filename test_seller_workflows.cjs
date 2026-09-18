@@ -5,7 +5,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
 const user={id:17,role:'seller',name:'Seller',shop_name:'Shop',email:'seller@example.test',identity_type:'Passport',identity_number:'TEST',bank_name:'Bank',bank_account_name:'Seller',bank_account_number:'123',business_type:'Sole Proprietor',ssm_number:'123'};
 const product={id:101,seller_id:17,name:'Camera',shop:'Shop',category:'Electronics',condition:'New',price_mode:'Fixed',price:50,stock:3,variants:[],images:[]};
 const order={id:201,product_id:101,buyer_name:'Buyer A',payment_status:'paid',order_status:'to_pack',escrow_status:'holding',total:50};
-const data={is_open:true,eligible:false,shop_category:'Chargers',products:[product],orders:[order],returns:[{id:301,order_id:201,status:'requested',dispute_status:'open',request_type:'Refund',reason:'Wrong size'}],reviews:[{id:401,rating:4,title:'Review',body:'Good',buyer_name:'Buyer A'}],messages:[{id:1,product_id:101,buyer_name:'Buyer A',seller_name:'Shop',sender_role:'buyer',body:'Hello'}],campaigns:[],notifications:[{id:501,title:'Order',body:'New order',target_url:'orders.html',read_at:0}],rates:[],wallet:[],summary:{},tickets:[],unread:1};
+const data={user,is_open:true,eligible:false,shop_category:'Chargers',products:[product],orders:[order],returns:[{id:301,order_id:201,status:'requested',dispute_status:'open',request_type:'Refund',reason:'Wrong size'}],reviews:[{id:401,rating:4,title:'Review',body:'Good',buyer_name:'Buyer A'}],messages:[{id:1,product_id:101,buyer_name:'Buyer A',seller_name:'Shop',sender_role:'buyer',body:'Hello'}],campaigns:[],notifications:[{id:501,title:'Order',body:'New order',target_url:'orders.html',read_at:0}],rates:[],wallet:[],summary:{},tickets:[],unread:1};
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;
  const browser=await chromium.launch({channel:'msedge',headless:true});
@@ -106,7 +106,7 @@ const data={is_open:true,eligible:false,shop_category:'Chargers',products:[produ
  await visit('order-detail.html?id=999');assert.ok((await page.locator('#detail').textContent()).includes('No order'));
  await action('notifications.html',{},'markRead()','/api/notifications/read');
  await page.getByRole('button',{name:'Open',exact:true}).click();await page.waitForURL('**/orders.html');
- await visit('ai-assistant.html');await fill({prompt:'Camera listing'});await page.locator('button[onclick="askAi()"]').click();await page.waitForTimeout(200);assert.equal(writes.at(-1).endpoint,'/api/ai/assistant');
+ await visit('ai-assistant.html');await fill({aiNotes:'Camera listing'});await page.locator('#aiGenerate').click();assert.match(await page.locator('#aiStatus').textContent(),/Select at least one product photo/);
  fail=true;await action('support.html',{subject:'Failure',message:'Failure'},'createTicket()','/api/support/tickets');assert.ok((await page.locator('#status').textContent()).includes('Simulated validation failure'));
  fail=false;
  assert.deepEqual(errors,[]);

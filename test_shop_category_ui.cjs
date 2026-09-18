@@ -14,6 +14,7 @@ const server=http.createServer((req,res)=>{
  try{
   let category='Street Food',fail=false,failSave=false;
   const writes=[],errors=[];
+  let profile={id:2,role:'seller',name:'Test seller',shop_name:'Server shop',phone:'01123456789',address:'Saved address'},profileFail=false;
   const ctx=await browser.newContext();
   await ctx.addInitScript(()=>{
    localStorage.setItem('pm_token','test');
@@ -29,6 +30,11 @@ const server=http.createServer((req,res)=>{
    if(url.origin!=='https://pasarmalam-backend.onrender.com')return route.abort();
    if(req.method()==='POST'||req.method()==='PUT')writes.push({path:url.pathname,data:req.postDataJSON()});
    if(url.pathname==='/api/otp/email/verify')return route.fulfill({json:{email_otp_token:'verified'}});
+   if(url.pathname==='/api/seller/profile')return route.fulfill({status:profileFail?503:200,json:profileFail?{error:'Profile unavailable'}:{user:profile}});
+   if(url.pathname==='/api/profile'){
+    profile={...profile,...req.postDataJSON(),shop_category:category};
+    return route.fulfill({json:{user:profile,token:'test'}});
+   }
    if(url.pathname==='/api/seller/category'){
     assert.equal(req.headers().authorization,'Bearer test');
     if(fail || (failSave&&req.method()==='POST'))return route.fulfill({status:503,json:{error:'Unavailable'}});
@@ -40,6 +46,29 @@ const server=http.createServer((req,res)=>{
     is_open:true,eligible:true,notifications:[],unread:0,metrics:{}}});
   });
   const page=await ctx.newPage();page.setDefaultTimeout(8000);page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(origin+'/seller/settings.html');
+  await page.waitForFunction(()=>document.getElementById('shopName').value==='Server shop');
+  await page.selectOption('#shopCategory','Groceries');
+  await page.locator('#shopName').fill('Updated shop');
+  page.once('dialog',d=>d.accept());
+  await page.locator('button[onclick="saveProfile()"]').click();
+  await page.waitForFunction(()=>document.getElementById('profileStatus').textContent==='Profile saved.');
+  assert.equal(category,'Groceries');
+  assert.equal(profile.shop_name,'Updated shop');
+  await page.reload();
+  await page.waitForFunction(()=>document.getElementById('shopName').value==='Updated shop');
+  assert.equal(await page.locator('#shopCategory').inputValue(),'Groceries');
+  await page.locator('#shopName').fill('Unsaved shop edit');
+  for(const [id,value]of Object.entries({sellerName:'Test seller',identityNumber:'TEST',bankName:'Bank',bankAccountName:'Test seller',bankAccountNumber:'123'}))await page.locator('#'+id).fill(value);
+  await page.selectOption('#identityType','Passport');
+  await page.locator('button[onclick="savePayoutProfile()"]').click();
+  await page.waitForFunction(()=>document.getElementById('bankStatus').textContent.includes('saved'));
+  assert.equal(await page.locator('#shopName').inputValue(),'Unsaved shop edit');
+  profileFail=true;await page.reload();
+  await page.getByRole('button',{name:'Retry loading settings'}).waitFor();
+  assert.equal(await page.locator('button[onclick="saveProfile()"]').isDisabled(),true);
+  profileFail=false;await page.getByRole('button',{name:'Retry loading settings'}).click();
+  await page.waitForFunction(()=>!document.getElementById('shopName').disabled);
   for(const width of [402,1440]){
    category='Street Food';await page.setViewportSize({width,height:900});
    await page.goto(origin+'/seller/register.html');

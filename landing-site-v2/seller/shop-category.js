@@ -60,11 +60,11 @@
     } finally { readyResolve(); }
   }
   async function persist() {
-    if (busy || !loaded) return;
+    if (busy || !loaded) return false;
     const chosen = select.value;
-    if (!categories.includes(chosen)) { status.textContent = t('choose'); return; }
-    if (chosen === selected) return;
-    if (!confirm(t('confirm'))) { select.value = selected; return; }
+    if (!categories.includes(chosen)) { status.textContent = t('choose'); return false; }
+    if (chosen === selected) return true;
+    if (!confirm(t('confirm'))) { select.value = selected; return false; }
     busy = true; save.disabled = true; select.disabled = true;
     try {
       const data = await request({method:'POST',body:JSON.stringify({
@@ -78,10 +78,12 @@
       } catch (_) {}
       status.textContent = t('saved');
       window.dispatchEvent(new Event('seller-data-changed'));
+      return true;
     } catch (error) {
       status.textContent = error.message;
       select.value = selected;
       retry.hidden = false;
+      return false;
     } finally { busy = false; select.disabled = false; save.disabled = false; }
   }
   function init() {
@@ -98,6 +100,7 @@
   }
   window.PMShopCategory = {
     ready,
+    persist,
     async require() {
       await ready;
       if (!loaded || !categories.includes(selected)) throw new Error(t('missing'));

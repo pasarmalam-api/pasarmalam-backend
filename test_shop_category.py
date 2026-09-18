@@ -27,6 +27,17 @@ class ShopCategoryTest(unittest.TestCase):
                                       'previous_category': previous, 'move_products': True})
 
     def test_registration_requires_valid_category(self):
+        self.seller()
+        with patch.object(server, 'send_json') as reply:
+            self.handler.seller_profile()
+            profile = reply.call_args.args[2]['user']
+            self.assertEqual(profile['id'], 2)
+            self.assertNotIn('password', profile)
+        self.handler.current_user = lambda: {'id': 1, 'role': 'buyer'}
+        with self.assertRaises(PermissionError):
+            self.handler.seller_profile()
+
+    def test_signup_requires_valid_category(self):
         for category in ('', 'Anything', None, ['Food']):
             with self.subTest(category=category), self.assertRaises(ValueError):
                 self.handler.signup({**self.data, 'shop_category': category})
@@ -91,6 +102,10 @@ class ShopCategoryTest(unittest.TestCase):
         self.handler.update_profile({'shop_category':'Phones', 'shop_name':'Updated'})
         with server.connect() as con:
             self.assertEqual(con.execute('SELECT shop_category FROM users WHERE id=2').fetchone()[0], 'Food')
+            self.assertTrue(all(r[0] == 'Updated' for r in con.execute('SELECT shop FROM products WHERE seller_id=2')))
+        with patch.object(server, 'send_json') as reply:
+            self.handler.seller_profile()
+            self.assertEqual(reply.call_args.args[2]['user']['shop_name'], 'Updated')
 
     def test_failed_bulk_move_rolls_back_shop_category(self):
         self.seller()

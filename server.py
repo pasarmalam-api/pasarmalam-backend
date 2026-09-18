@@ -1402,6 +1402,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/products": lambda: self.get_products(query),
                 "/api/seller/availability": self.seller_availability,
                 "/api/seller/category": self.seller_category,
+                "/api/seller/profile": self.seller_profile,
                 "/api/seller/branches": self.seller_branches,
                 "/api/product/branches": lambda: self.product_branches(query),
                 "/api/messages": lambda: self.list_table("messages", "messages"),
@@ -1684,6 +1685,19 @@ class Handler(BaseHTTPRequestHandler):
                                   "booking_enabled": False})
         except LalamoveError as exc:
             send_json(self, 503, {"error": str(exc)})
+
+    def seller_profile(self):
+        user = self.require_user("seller")
+        fields = ("id", "role", "name", "email", "phone", "address", "shop_name",
+                  "shop_category", "identity_type", "identity_number", "bank_name",
+                  "bank_account_name", "bank_account_number", "business_type",
+                  "ssm_number", "ssm_document_url", "business_verification_status")
+        with connect() as con:
+            row = con.execute("SELECT " + ",".join(fields) + " FROM users WHERE id=?",
+                              (user["id"],)).fetchone()
+        profile = {field: row[field] for field in fields}
+        profile["role"] = user["role"]
+        send_json(self, 200, {"user": profile})
 
     def seller_category(self, data=None):
         user = self.require_user("seller")
@@ -2229,6 +2243,9 @@ class Handler(BaseHTTPRequestHandler):
         sql = ", ".join([f"{key} = ?" for key in updates])
         with connect() as con:
             con.execute(f"UPDATE users SET {sql} WHERE id = ?", [*updates.values(), user["id"]])
+            if user["role"] == "seller" and "shop_name" in updates:
+                con.execute("UPDATE products SET shop=? WHERE seller_id=?",
+                            (updates["shop_name"], user["id"]))
             row = row_to_dict(con.execute("SELECT id, role, name, phone, email, address, shop_name, shop_category, identity_type, identity_number, business_type, ssm_number, ssm_document_url, business_verification_status, business_verification_submitted_at, bank_name, bank_account_name, bank_account_number, status, seller_status FROM users WHERE id = ?", (user["id"],)).fetchone())
         row['role'] = user['role']
         send_json(self, 200, {"ok": True, "user": row, "token": make_token(row)})
