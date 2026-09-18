@@ -54,6 +54,19 @@ class BuyerResetTest(unittest.TestCase):
         with server.connect() as con: con.execute('UPDATE email_otps SET expires_at=0')
         with self.assertRaises(PermissionError): self.h.confirm_buyer_password_reset(data)
 
+    def test_seller_reset_and_login(self):
+        with server.connect() as con:
+            con.execute("UPDATE users SET role='seller', seller_status='approved' WHERE email=?", (self.email,))
+        self.h.request_buyer_password_reset({'email': self.email, 'mode': 'seller'})
+        link = unescape(re.search('href="([^"]+)"', self.mail.call_args.args[2])[1])
+        params = parse_qs(urlparse(link).fragment)
+        self.assertEqual(params['mode'], ['seller'])
+        self.assertNotIn('buyer', self.mail.call_args.args[1])
+        self.h.confirm_buyer_password_reset({'email': self.email, 'token': params['token'][0], 'new_password': 'seller-new-password'})
+        self.h.login({'email': self.email, 'password': 'seller-new-password'})
+        self.assertEqual(self.reply.call_args.args[1], 200)
+        self.assertEqual(self.reply.call_args.args[2]['user']['role'], 'seller')
+
     def test_short_password_does_not_consume_link(self):
         data=self.request()
         with self.assertRaises(ValueError): self.h.confirm_buyer_password_reset({**data,'new_password':'short'})

@@ -2037,7 +2037,7 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("Valid email is required")
         if not RESEND_API_KEY:
             return send_json(self, 503, {"error": "Password reset email is temporarily unavailable. Please try again later."})
-        message = "If an active buyer account matches this email, a reset link will arrive shortly."
+        message = "If an active account matches this email, a reset link will arrive shortly."
         with connect() as con:
             user = con.execute("SELECT id FROM users WHERE LOWER(email)=? AND role IN ('buyer','seller') AND status='active'", (email,)).fetchone()
             recent = con.execute("SELECT id FROM email_otps WHERE email=? AND purpose='buyer_password_reset' AND created_at>?", (email, now()-60)).fetchone()
@@ -2047,8 +2047,10 @@ class Handler(BaseHTTPRequestHandler):
             cur = con.execute("INSERT INTO email_otps (email, code_hash, purpose, verified, attempts, expires_at, created_at) VALUES (?, ?, 'buyer_password_reset', 0, 0, ?, ?)", (email, hash_otp_code(email, token), now()+1800, now()))
             reset_id = cur.lastrowid
         link = BUYER_APP_URL.rstrip('/') + '/password-reset.html#' + urllib.parse.urlencode({"email": email, "token": token})
+        if data.get("mode") == "seller":
+            link += "&mode=seller"
         try:
-            send_email(email, "Reset your PasarMalam buyer password", f'<p>A password reset was requested for your buyer account.</p><p><a href="{escape(link, quote=True)}">Reset password</a></p><p>This link expires in 30 minutes and can only be used once. If you did not request this, ignore this email.</p>')
+            send_email(email, "Reset your PasarMalam password", f'<p>A password reset was requested for your PasarMalam account.</p><p><a href="{escape(link, quote=True)}">Reset password</a></p><p>This link expires in 30 minutes and can only be used once. If you did not request this, ignore this email.</p>')
         except Exception:
             with connect() as con:
                 con.execute("DELETE FROM email_otps WHERE id=?", (reset_id,))
