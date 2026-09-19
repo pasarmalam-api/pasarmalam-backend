@@ -6,6 +6,7 @@ import delivery
 import branches
 import seller_ai
 import chat
+import easyparcel
 import hashlib
 import hmac
 import json
@@ -1389,29 +1390,59 @@ class Handler(BaseHTTPRequestHandler):
 
     def log_request(self, code='-', size='-'):
         # OAuth query parameters may contain authorization codes; never log them.
-        if urlparse(self.path).path == '/api/integrations/easyparcel/callback':
+        if urlparse(self.path).path.startswith('/api/integrations/easyparcel/'):
             self.log_message('%s %s %s', 'EasyParcel callback', str(code), str(size))
         else:
             super().log_request(code, size)
 
     def easyparcel_callback(self):
-        # Registration precedes client credentials. Fail closed until OAuth is wired.
-        attempted = bool(urlparse(self.path).query)
-        body = ('''<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PasarMalam - EasyParcel setup</title></head><body>
-<main><h1>EasyParcel connection setup</h1>
-<p>This is PasarMalam's registered EasyParcel callback address.</p>
-<p>Account authorization is not enabled yet. No EasyParcel account has been connected.</p>
-<p>The administrator must finish configuring the integration before trying to connect.</p>
-<a href="https://www.pasarmalamapp.com/">Return to PasarMalam</a>
-</main></body></html>''').encode('utf-8')
-        self.send_response(503 if attempted else 200)
+        query = parse_qs(urlparse(self.path).query, keep_blank_values=True)
+        if not query:
+            return self.easyparcel_page('Start the connection from Admin Settings. No account is connected by visiting this page.')
+        try:
+            easyparcel.finish(connect, query, self.headers.get('Cookie', ''))
+        except easyparcel.ConnectionError as exc:
+            return self.easyparcel_page(str(exc), 400)
+        except Exception:
+            return self.easyparcel_page('Connection could not be saved. Start again from Admin Settings.', 503)
+        self.easyparcel_page('EasyParcel authorized. Demo/live account selection is not yet verified. Booking remains disabled.')
+
+    def easyparcel_authorize(self):
+        try:
+            tickets = parse_qs(urlparse(self.path).query).get('ticket', [])
+            if len(tickets) != 1:
+                raise ValueError()
+            url, browser = easyparcel.launch(connect, tickets[0])
+        except Exception:
+            return self.easyparcel_page('Connection link expired or unavailable. Start again from Admin Settings.', 400)
+        self.send_response(303)
+        self.send_header('Location', url)
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Referrer-Policy', 'no-referrer')
+        self.send_header('Set-Cookie', easyparcel.COOKIE + '=' + browser + '; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=600')
+        self.end_headers()
+
+    def easyparcel_admin(self, start=False):
+        admin = self.require_user('admin')
+        try:
+            data = {'authorization_url': easyparcel.start(connect, admin['id'])} if start else easyparcel.status(connect)
+        except easyparcel.ConnectionError as exc:
+            return send_json(self, 503, {'error': str(exc)})
+        send_json(self, 200, data)
+
+    def easyparcel_page(self, message, status=200):
+        body = ('<!doctype html><html lang="en"><meta charset="utf-8">'
+                '<meta name="viewport" content="width=device-width,initial-scale=1">'
+                '<title>PasarMalam EasyParcel</title><h1>EasyParcel connection</h1><p>'
+                + escape(message) + '</p><p>No shipment was booked.</p>'
+                '<p>Return to Admin Settings to check connection status.</p></html>').encode()
+        self.send_response(status)
         self.send_header('Content-Type', 'text/html; charset=utf-8')
         self.send_header('Cache-Control', 'no-store')
         self.send_header('Referrer-Policy', 'no-referrer')
         self.send_header('X-Content-Type-Options', 'nosniff')
-        self.send_header('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+        self.send_header('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+        self.send_header('Set-Cookie', easyparcel.COOKIE + '=; Path=/; Secure; HttpOnly; SameSite=Lax; Max-Age=0')
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -1428,6 +1459,8 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/health": lambda: send_json(self, 200, {"ok": True, "service": "PasarMalam API", "features": "marketplace", "version": "admin-ops-2026-06-05"}),
                 "/api/profile": self.get_buyer_profile,
                 "/api/integrations/easyparcel/callback": self.easyparcel_callback,
+                "/api/integrations/easyparcel/authorize": self.easyparcel_authorize,
+                "/api/admin/easyparcel/status": self.easyparcel_admin,
                 "/api/seller/onboarding": self.seller_onboarding,
                 "/api/products": lambda: self.get_products(query),
                 "/api/seller/availability": self.seller_availability,
@@ -1493,7 +1526,9 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         try:
             data = read_json(self)
-            if parsed.path == "/api/auth/signup":
+            if parsed.path == "/api/admin/easyparcel/connect" and method == "POST":
+                self.easyparcel_admin(start=True)
+            elif parsed.path == "/api/auth/signup":
                 self.signup(data)
             elif parsed.path == "/api/auth/login":
                 self.login(data)

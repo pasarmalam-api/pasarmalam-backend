@@ -1,1 +1,2 @@
 psycopg[binary]
+cryptography>=46,<51

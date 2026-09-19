@@ -13,6 +13,7 @@ class EasyParcelCallbackTests(unittest.TestCase):
         handler.send_response = Mock()
         handler.send_header = Mock()
         handler.end_headers = Mock()
+        handler.headers = {}
         return handler
 
     def test_registration_page(self):
@@ -21,13 +22,13 @@ class EasyParcelCallbackTests(unittest.TestCase):
         handler.send_response.assert_called_once_with(200)
         handler.send_header.assert_any_call('Cache-Control', 'no-store')
         handler.send_header.assert_any_call('Referrer-Policy', 'no-referrer')
-        self.assertIn(b'not enabled yet', handler.wfile.getvalue())
+        self.assertIn(b'Start the connection', handler.wfile.getvalue())
 
     def test_unsolicited_authorization_fails_closed_without_echo(self):
         for query in ('?code=secret-code&state=secret-state', '?error=access_denied', '?code=%3Cscript%3E'):
             handler = self.handler(query)
             handler.easyparcel_callback()
-            handler.send_response.assert_called_once_with(503)
+            handler.send_response.assert_called_once_with(400)
             self.assertNotIn(b'secret-code', handler.wfile.getvalue())
             self.assertNotIn(b'<script>', handler.wfile.getvalue())
 
