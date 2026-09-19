@@ -1387,6 +1387,35 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
 
+    def log_request(self, code='-', size='-'):
+        # OAuth query parameters may contain authorization codes; never log them.
+        if urlparse(self.path).path == '/api/integrations/easyparcel/callback':
+            self.log_message('%s %s %s', 'EasyParcel callback', str(code), str(size))
+        else:
+            super().log_request(code, size)
+
+    def easyparcel_callback(self):
+        # Registration precedes client credentials. Fail closed until OAuth is wired.
+        attempted = bool(urlparse(self.path).query)
+        body = ('''<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PasarMalam - EasyParcel setup</title></head><body>
+<main><h1>EasyParcel connection setup</h1>
+<p>This is PasarMalam's registered EasyParcel callback address.</p>
+<p>Account authorization is not enabled yet. No EasyParcel account has been connected.</p>
+<p>The administrator must finish configuring the integration before trying to connect.</p>
+<a href="https://www.pasarmalamapp.com/">Return to PasarMalam</a>
+</main></body></html>''').encode('utf-8')
+        self.send_response(503 if attempted else 200)
+        self.send_header('Content-Type', 'text/html; charset=utf-8')
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Referrer-Policy', 'no-referrer')
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_OPTIONS(self):
         send_json(self, 204, {})
 
@@ -1398,6 +1427,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/": lambda: send_html(self, 200, backend_homepage()),
                 "/api/health": lambda: send_json(self, 200, {"ok": True, "service": "PasarMalam API", "features": "marketplace", "version": "admin-ops-2026-06-05"}),
                 "/api/profile": self.get_buyer_profile,
+                "/api/integrations/easyparcel/callback": self.easyparcel_callback,
                 "/api/seller/onboarding": self.seller_onboarding,
                 "/api/products": lambda: self.get_products(query),
                 "/api/seller/availability": self.seller_availability,
