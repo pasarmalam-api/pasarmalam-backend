@@ -3733,12 +3733,17 @@ def campaign_discount(con, seller_id, code, subtotal):
     discount = 0.0
     if row["type"] == "free_shipping":
         return 0.0, row["name"]
-    if value.endswith("%"):
-        percent = max(0.0, min(float(value[:-1] or 0), 100.0))
-        discount = subtotal * percent / 100
-    else:
-        cleaned = "".join(ch for ch in value if ch.isdigit() or ch == ".")
-        discount = float(cleaned or 0)
+    # Keep the discount and minimum spend separate in legacy campaign text.
+    match = re.fullmatch(r"(?:RM\s*)?(\d+(?:\.\d{1,2})?)\s*(%)?\s*(?:off)?(?:\s+(?:above|over|minimum|min)\s*(?:RM\s*)?(\d+(?:\.\d{1,2})?))?", value, re.I)
+    if not match:
+        raise ValueError("Voucher value is invalid. Please contact the seller")
+    amount = float(match.group(1))
+    minimum = float(match.group(3) or 0)
+    if amount <= 0 or (match.group(2) and amount > 100):
+        raise ValueError("Voucher value is invalid. Please contact the seller")
+    if subtotal < minimum:
+        raise ValueError(f"Minimum purchase for this voucher is RM{minimum:.2f}")
+    discount = subtotal * amount / 100 if match.group(2) else amount
     return round(min(discount, subtotal), 2), row["name"]
 
 

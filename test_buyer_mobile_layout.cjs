@@ -19,8 +19,8 @@ const user={id:88,role:'buyer',name:'Test Buyer',email:'buyer@example.test',phon
    if(url.hostname!=='pasarmalam-backend.onrender.com')return route.abort();
    return route.fulfill({json:{ok:true,user,products:[product],product,cart:[{...product,id:7,product_id:2,quantity:2}],orders:[{id:1,product_id:2,product_name:product.name,order_status:'delivered',payment_status:'paid',total:20}],notifications:[],unread:0,reviews:[],rates:[],messages:[],returns:[],wishlist:[{product_id:2}],items:[],vouchers:[],payments:[],tickets:[],branches:[]}});
   });
-  const pages=fs.readdirSync(root).filter(f=>f.endsWith('.html'));
-  for(const width of [320,360,390,768,1440]){
+  const pages=fs.readdirSync(root).filter(f=>f.endsWith('.html')&&(!process.env.PAGES||process.env.PAGES.split(',').includes(f)));
+  for(const width of (process.env.WIDTHS?process.env.WIDTHS.split(',').map(Number):[320,360,390,768,1440])){
    const page=await ctx.newPage();await page.setViewportSize({width,height:844});
    for(const file of pages){
     await page.goto('http://buyer.test/'+file+'?id=2&product_id=2&seller_id=5&order_id=1');
@@ -28,6 +28,8 @@ const user={id:88,role:'buyer',name:'Test Buyer',email:'buyer@example.test',phon
     const issues=await page.evaluate(()=>{
      const bad=[];
      if(document.documentElement.scrollWidth>innerWidth+1)bad.push('page overflow');
+     const brand=document.querySelector('header .brand h1');
+     if(brand&&brand.scrollWidth>brand.clientWidth+1)bad.push('brand text squeezed');
      for(const el of document.querySelectorAll('main button,main input,main select,main textarea,header button')){
       const r=el.getBoundingClientRect();if(!r.width||!r.height)continue;
       const scroll=el.closest('.cats');
