@@ -1,6 +1,11 @@
 /* Shared buyer typography and page chrome. Catalogue geometry stays in catalogue.css. */
 body.buyer-page{margin:0;font-family:Arial,sans-serif!important;font-size:14px!important;line-height:1.5;letter-spacing:0;color:#243137;background:#f6f8fa}
 .buyer-page *{box-sizing:border-box}
+.buyer-page :is(main,section,article,fieldset,.panel,.card,.item,.box,.grid,.row,.bar,.buyer-header-actions){min-width:0}
+.buyer-page :is(p,a,label,h1,h2,h3,.msg,.item,.box){overflow-wrap:anywhere}
+.buyer-page :is(img,video,canvas){max-width:100%}
+.buyer-page textarea{resize:vertical}
+.buyer-page [hidden]{display:none!important}
 .buyer-page :is(button,input,select,textarea){font-family:inherit!important;letter-spacing:0;max-width:100%;min-width:0}
 body.buyer-page :is(button,.soft,.outline){font-size:13px!important;font-weight:600!important;line-height:1.4;min-height:40px;border-radius:6px;cursor:pointer;white-space:normal}
 .buyer-page :is(input,select,textarea){font-size:14px!important;border:1px solid #cbd5dc;border-radius:6px;background:#fff;color:#243137;padding:10px 12px}
@@ -49,6 +54,10 @@ body.buyer-page :is(button,.soft,.outline){font-size:13px!important;font-weight:
 .buyer-page.buyer-auth .status:empty{display:none}
 .buyer-page.buyer-auth .pm-mobile-links{max-width:512px;margin-top:24px}
 @media(max-width:760px){
+ .buyer-page:not(.buyer-home) header{position:static}
+ .buyer-page .buyer-header-actions>div{max-width:100%}
+ .buyer-page main>.panel{margin-left:0!important;margin-right:0!important}
+ .buyer-page .qty{flex-wrap:wrap}
  .buyer-page:not(.buyer-home) header .bar{padding:12px 16px;gap:12px}
  .buyer-header-actions{width:100%;justify-content:flex-start}
  .buyer-page:not(.buyer-home) main{padding:24px 16px 32px}
@@ -58,5 +67,20 @@ body.buyer-page :is(button,.soft,.outline){font-size:13px!important;font-weight:
  .buyer-page:not(.buyer-home) .pm-mobile-links{margin:0 16px;padding:16px 0}
  .buyer-page.buyer-auth main{max-width:560px}
  .buyer-page.buyer-auth .pm-mobile-links{max-width:528px;margin:16px auto;padding:16px}
+}
+/* Product detail is not a catalogue grid. Keep buying controls below the image on phones. */
+.buyer-product .product-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;padding:0}
+.buyer-product .product-layout>.panel{min-width:0;margin:0!important;padding:0;border:0;background:transparent}
+.buyer-product .product-layout .photo{aspect-ratio:1;background:#fff;max-height:520px}
+.buyer-product #detail .row{grid-template-columns:minmax(0,1fr) minmax(80px,120px)}
+.buyer-product #detail .row :is(input,select){width:100%}
+.buyer-product #detail>button{display:block;width:100%;min-height:44px;margin:10px 0;padding:10px 14px}
+.buyer-product .trust{grid-template-columns:minmax(0,1fr);gap:0}
+.buyer-product .trust>div{border:0;border-bottom:1px solid #e1e7eb;border-radius:0;padding:10px 0;background:transparent}
+.buyer-product main>section{margin-top:28px!important}
+@media(max-width:760px){
+ .buyer-product .product-layout{grid-template-columns:minmax(0,1fr);gap:20px}
+ .buyer-product .product-layout .photo{width:100%;max-height:none}
+ .buyer-product #detail .row{grid-template-columns:minmax(0,1fr)}
 }
 @media print{.buyer-header-actions,.buyer-page .pm-mobile-links,.buyer-page .pm-notify-enable{display:none!important}}

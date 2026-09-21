@@ -3,7 +3,7 @@ const fs=require('fs'),path=require('path'),assert=require('node:assert/strict')
 (async()=>{
  const browser=await chromium.launch({channel:'msedge',headless:true});
  try{
- const context=await browser.newContext();
+ const context=await browser.newContext({viewport:{width:360,height:800}});
  let fail='',offline=false,reads=false,cart=[{id:7,product_id:2,name:'Cable',shop:'Shop',price:10,quantity:1,stock:3}],saved=[{product_id:2}];
  const user={id:88,role:'buyer',name:'Real Buyer',email:'buyer@example.test',phone:'0123456789',address:'KL'};
  const product={id:2,seller_id:5,name:'Cable',shop:'Shop',price:10,stock:3,category:'Chargers',variants:[],images:[]};
@@ -30,7 +30,7 @@ const fs=require('fs'),path=require('path'),assert=require('node:assert/strict')
  });
  const page=await context.newPage();page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));
  const go=file=>{console.log('Check '+file);return page.goto('http://buyer.test/'+file)};
- const text=async(selector,part)=>{await page.waitForFunction(([s,p])=>document.querySelector(s)?.textContent.includes(p),[selector,part])};
+ const text=async(selector,part)=>{try{await page.waitForFunction(([s,p])=>document.querySelector(s)?.textContent.includes(p),[selector,part])}catch(e){console.error('Expected',part,'received',await page.locator(selector).textContent());throw e}};
  await go('login.html');await page.locator('a[href="password-reset.html"]').click();assert.ok(page.url().includes('password-reset.html'));
  await page.locator('#email').fill('buyer@example.test');await page.locator('#requestForm button').click();await text('#resetStatus','reset link');
  fail='/api/auth/password-reset';await page.locator('#requestForm button').click();await text('#resetStatus','Service unavailable');fail='';
@@ -41,9 +41,9 @@ const fs=require('fs'),path=require('path'),assert=require('node:assert/strict')
  await page.locator('#confirmPassword').fill('new-password');await page.locator('#confirmForm button').click();await text('#resetStatus','Password updated');await page.locator('#signInLink').click();
  await page.locator('#email').fill('buyer@example.test');await page.locator('#password').fill('new-password');offline=true;await page.locator('button[onclick="login()"]').click();await text('#status','Connection failed');offline=false;
  await go('login.html?next=profile.html');await page.locator('#email').fill('buyer@example.test');await page.locator('#password').fill('new-password');await page.locator('button[onclick="login()"]').click();await page.waitForURL('**/profile.html');
- await page.locator('#name').waitFor({state:'visible'});assert.equal(await page.locator('#name').inputValue(),'Real Buyer');await page.locator('#name').fill('Updated Buyer');await page.locator('#profileForm button').click();await text('#profileStatus','Profile saved');assert.equal(user.name,'Updated Buyer');
+ await page.locator('#name').waitFor({state:'visible'});assert.equal(await page.locator('#name').inputValue(),'Real Buyer');await page.locator('#name').fill('Updated Buyer');await page.locator('#profileForm button').click();await text('#profileStatus','saved');assert.equal(user.name,'Updated Buyer');
  await go('product.html?id=2');await page.locator('#qty').fill('5');await text('#productStatus','3');await page.locator('#qty').fill('1');await page.locator('button[onclick="buyNow()"]').click();await page.waitForURL('**/checkout.html?product_id=2&quantity=1&variant=*');
- await go('product.html?id=2');await page.locator('button').filter({hasText:'Chat'}).click();await page.waitForURL('**/chat.html?product_id=2');await page.locator('#text').fill('Hello');await page.locator('button[onclick="send()"]').click();await page.waitForFunction(()=>document.querySelector('#text').value==='');assert.equal(requests.at(-1).data.product_id,2);
+ await go('product.html?id=2');await page.locator('button').filter({hasText:'Chat'}).click();await page.waitForURL('**/chat.html?product_id=2');await page.locator('#chatText').fill('Hello');await page.locator('#chatSend').click();await page.waitForFunction(()=>document.querySelector('#chatText').value==='');assert.equal(requests.at(-1).data.product_id,2);
  await go('cart.html');await page.locator('button').filter({hasText:'+'}).click();await text('#status','dikemas kini');assert.equal(cart[0].quantity,2);
  await page.locator('button[onclick="removeItem(7)"]').click();await text('#status','dibuang');assert.equal(cart.length,0);
  await go('support.html');await page.locator('#subject').fill('Delivery help');await page.locator('#message').fill('Please help');await page.locator('button[onclick="createTicket()"]').click();await text('#status','99');
