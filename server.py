@@ -1722,6 +1722,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def delivery_quotation(self, data):
         user = self.require_user("buyer")
+        if data.get('logistics_method') == 'EasyParcel':
+            easyparcel.refresh_if_needed(connect)
         with connect() as con:
             product, qty, _, _, _ = self.validate_checkout_payload(con, {**data, "payment_method": "quotation"}, user)
             quote = delivery.create_quote(con, user, product, qty, data)

@@ -11,6 +11,7 @@ import branches
 
 
 METHODS = {
+    'EasyParcel': 'easyparcel',
     'PM Express': 'pm_express',
     'Ambil Sendiri': 'pickup', 'In-Store Pickup': 'pickup',
     'Lalamove Biasa': 'standard', 'Lalamove Regular': 'standard', 'Standard Rider': 'standard',
@@ -44,6 +45,9 @@ def save_pickup(con, seller_id, data):
 
 def context(con, user, product, qty, data):
     method = METHODS.get(data.get('logistics_method'))
+    if method == 'easyparcel':
+        from parcel_delivery import context as parcel_context
+        return parcel_context(con, user, product, qty, data)
     if method not in ('express', 'standard', 'pm_express'):
         raise ValueError('Select immediate or scheduled Lalamove delivery.')
     seller = con.execute('SELECT status,seller_status FROM users WHERE id=?', (product['seller_id'],)).fetchone()
@@ -67,6 +71,9 @@ def context(con, user, product, qty, data):
 
 
 def create_quote(con, user, product, qty, data, client=None):
+    if METHODS.get(data.get('logistics_method')) == 'easyparcel':
+        from parcel_delivery import create_quotes
+        return create_quotes(con, user, product, qty, data)
     if data.get('fee_version') != 1:
         raise ValueError('Please refresh checkout to view the delivery fee breakdown.')
     ctx = context(con, user, product, qty, data)
@@ -134,6 +141,6 @@ def consume(con, user, product, qty, data):
     return charges['total'], {'context': ctx, 'quotation': quote, 'charges': charges,
                                                   'pickup_contact': dict(seller),
                                                   'recipient': {'name': user['name'], 'phone': str(data.get('buyer_phone') or user.get('phone') or '')},
-                                                  'provider': 'pm_express' if method == 'pm_express' else 'lalamove',
-                                                  'quote_provider': 'lalamove',
+                                                  'provider': method if method in ('pm_express', 'easyparcel') else 'lalamove',
+                                                  'quote_provider': 'easyparcel' if method == 'easyparcel' else 'lalamove',
                                                   'dispatch_status': 'pm_rider_assignment_required' if method == 'pm_express' else 'manual_booking_required'}

@@ -14,6 +14,7 @@
   shipping.replaceChildren(...[
     ['Ambil Sendiri', t('Ambil sendiri', 'Self pickup')],
     ['PM Express', 'Pasar Malam Express'],
+    ['EasyParcel', t('EasyParcel - kurier standard', 'EasyParcel - standard courier')],
     ['Lalamove Segera', t('Lalamove - pengambilan segera', 'Lalamove - immediate pickup')],
     ['Lalamove Biasa', t('Lalamove - pengambilan berjadual', 'Lalamove - scheduled pickup')]
   ].map(([value, label]) => new Option(label, value)));
@@ -53,11 +54,13 @@
     <span>${t('Bungkusan muat dalam kenderaan', 'Package fits the vehicle')} <span id="deliveryCapacity" class="muted"></span></span></label>
     <label id="deliveryScheduleLabel">${t('Masa pengambilan', 'Pickup time')}<input id="deliverySchedule" type="datetime-local"></label>
     <button type="button" class="soft" id="deliveryQuote">${t('Dapatkan caj penghantaran', 'Get delivery charge')}</button>
+    <fieldset id="parcelOffers" hidden><legend>${t('Pilih kurier', 'Choose courier')}</legend></fieldset>
     <p id="deliveryStatus" role="status" class="muted"></p>`;
   choices.after(box);
   let cities = [], quote = null, revision = 0, requesting = false;
   const baseApi = api, baseReady = requireCheckoutReady;
   const isPickup = () => shipping.value === 'Ambil Sendiri';
+  const isParcel = () => shipping.value === 'EasyParcel';
   const status = text => { get('deliveryStatus').textContent = text; };
   const valid = () => isPickup() || (quote && quote.expires_at * 1000 > Date.now());
   window.pmDeliveryFee = () => isPickup() ? 0 : valid() ? Number(quote.fee) : NaN;
@@ -72,7 +75,14 @@
   }
   function reset() {
     revision++; quote = null;
+    get('result').textContent = '';
+    box.querySelector('h3').textContent = isParcel() ? t('Kurier standard', 'Standard courier') : t('Lokasi penerima', 'Recipient location');
+    get('parcelOffers').hidden = true;
+    get('parcelOffers').querySelectorAll('label').forEach(label => label.remove());
     box.hidden = isPickup();
+    for (const id of ['deliveryLocate', 'deliveryLocationStatus', 'deliveryLocationDetails', 'deliveryOptions']) get(id).hidden = isParcel();
+    get('deliveryConfirmed').closest('label').hidden = isParcel();
+    get('deliveryPackage').closest('label').hidden = isParcel();
     for (const radio of choices.querySelectorAll('input')) radio.checked = radio.value === shipping.value;
     get('deliveryScheduleLabel').hidden = shipping.value !== 'Lalamove Biasa';
     const cash = get('payment').querySelector('option[value="Cash Pickup"]');
@@ -133,17 +143,37 @@
     try {
       if (!checkoutProduct || !checkoutItem) throw new Error(t('Pilih produk dahulu.', 'Select a product first.'));
       const route = fields();
-      if (!route.coordinates.lat || !route.coordinates.lng) {
+      if (!isParcel() && (!route.coordinates.lat || !route.coordinates.lng)) {
         get('deliveryLocationDetails').open = true;
         throw new Error(t('Pilih lokasi penerima dahulu.', 'Choose the recipient location first.'));
       }
-      if (!address.value.trim() || !route.location_confirmed || !route.package_confirmed)
+      if (!address.value.trim() || (!isParcel() && (!route.location_confirmed || !route.package_confirmed)))
         throw new Error(t('Sahkan alamat, koordinat dan saiz bungkusan.', 'Confirm the address, coordinates and package size.'));
       status(t('Mendapatkan sebut harga...', 'Getting quotation...'));
       const response = await baseApi('/api/delivery/quotation', {method: 'POST', body: JSON.stringify({
         product_id: checkoutItem.product_id, quantity: checkoutItem.quantity, variant: checkoutItem.variant || '',
         address: address.value.trim(), buyer_phone: get('buyerPhone').value.trim(), logistics_method: shipping.value, ...route})});
       if (version !== revision) return;
+      get('result').textContent = '';
+      if (isParcel()) {
+        quote = null;
+        const offers = get('parcelOffers');
+        offers.querySelectorAll('label').forEach(label => label.remove());
+        offers.hidden = false;
+        for (const offer of response.offers || []) {
+          const label = document.createElement('label'); label.className = 'delivery-check';
+          const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'parcelCourier';
+          const text = document.createElement('span');
+          text.textContent = `${offer.service_name} - ${money(offer.fee)}${offer.delivery_duration ? ' | ' + offer.delivery_duration : ''}`;
+          radio.addEventListener('change', () => {
+            if (version !== revision || offer.expires_at * 1000 <= Date.now()) return;
+            quote = offer; status(`${money(quote.fee)} | ${t('Sah sehingga', 'Valid until')} ${new Date(quote.expires_at*1000).toLocaleTimeString()}`); renderSummary();
+          });
+          label.append(radio, text); offers.append(label);
+        }
+        status(t('Pilih kurier untuk meneruskan.', 'Choose a courier to continue.'));
+        renderSummary(); return;
+      }
       quote = response;
       get('result').textContent = '';
       status(`${money(quote.fee)} | ${t('Sah sehingga', 'Valid until')} ${new Date(quote.expires_at*1000).toLocaleTimeString()}`);

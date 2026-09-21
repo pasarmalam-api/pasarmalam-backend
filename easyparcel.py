@@ -1,10 +1,11 @@
-"""Admin OAuth connection only. No shipment or payment endpoints are enabled."""
+"""Admin OAuth connection and token renewal. Shipment booking is separate."""
 import base64
 import hashlib
 import json
 import os
 import secrets
 import time
+import threading
 import urllib.parse
 import urllib.request
 from http.cookies import SimpleCookie
@@ -14,6 +15,40 @@ PREFIX = '/api/integrations/easyparcel'
 COOKIE = '__Host-pm_easyparcel'
 LOGIN = 'https://api.easyparcel.com/oauth/login'
 TOKEN = 'https://api.easyparcel.com/oauth/token'
+REFRESH_LOCK = threading.Lock()
+
+
+def refresh_if_needed(connect):
+    # Complete token rotation in its own transaction, even if a later quote fails.
+    with REFRESH_LOCK, connect() as con:
+        migrate(con)
+        row = con.execute("SELECT * FROM easyparcel_connection WHERE id='platform'").fetchone()
+        if not row:
+            raise ConnectionError('Connect EasyParcel in Admin Settings first.')
+        if row['expires_at'] > time.time() + 60:
+            return
+        # Serialize rotating refresh tokens across server processes as well.
+        con.execute("UPDATE easyparcel_connection SET expires_at=expires_at WHERE id='platform'")
+        row = con.execute("SELECT * FROM easyparcel_connection WHERE id='platform'").fetchone()
+        if row['expires_at'] > time.time() + 60:
+            return
+        try:
+            tokens = json.loads(cipher().decrypt(row['encrypted_tokens'].encode()))
+            client, secret, redirect = config()
+            request = urllib.request.Request(TOKEN, method='POST', data=urllib.parse.urlencode({
+                'grant_type': 'refresh_token', 'refresh_token': tokens['refresh_token'],
+                'redirect_uri': redirect}).encode(), headers={
+                    'Authorization': 'Basic ' + base64.b64encode((client + ':' + secret).encode()).decode(),
+                    'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json'})
+            with urllib.request.build_opener(NoRedirect).open(request, timeout=20) as response:
+                fresh = json.loads(response.read(65536))
+            if not fresh.get('access_token') or int(fresh.get('expires_in', 0)) <= 60 or str(fresh.get('token_type', '')).lower() != 'bearer':
+                raise ValueError()
+            tokens.update({k: fresh[k] for k in ('access_token', 'refresh_token', 'expires_in', 'refresh_token_expires_in') if k in fresh})
+            con.execute("UPDATE easyparcel_connection SET encrypted_tokens=?,expires_at=? WHERE id='platform'",
+                (cipher().encrypt(json.dumps(tokens).encode()).decode(), int(time.time()) + int(fresh['expires_in'])))
+        except Exception:
+            raise ConnectionError('EasyParcel authorization expired. Reconnect in Admin Settings.') from None
 
 
 class ConnectionError(ValueError):

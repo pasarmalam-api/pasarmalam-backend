@@ -24,6 +24,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    if(endpoint==='/api/profile')return route.fulfill({json:{user:{address:'Test delivery'}}});
    if(endpoint==='/api/delivery/services')return route.fulfill({json:{cities:[{name:'Kuala Lumpur',locode:'MY KUL',services:[{key:'MOTORCYCLE',load:{value:'10',unit:'kg'},dimensions:{length:{value:'0.4',unit:'m'}}}]}]}});
    if(endpoint==='/api/delivery/quotation'){
+    if(req.postDataJSON().logistics_method==='EasyParcel')return route.fulfill({json:{offers:[{quote_id:'parcel-quote',service_name:'Test courier pickup',fee:5.4,courier_fee:5,admin_fee:.4,expires_at:Math.floor(Date.now()/1000)+300}]}});
     if(delayQuote)await new Promise(r=>{pendingQuote=r;});
     return route.fulfill({status:quoteFailure?400:200,json:quoteFailure?{error:'Seller pickup missing'}:{quote_id:'server-quote',fee:9.4,courier_fee:9,admin_fee:0.4,fee_version:1,currency:'MYR',expires_at:Math.floor(Date.now()/1000)+300}});
    }
@@ -108,6 +109,23 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    assert.equal(writes.at(-1).body.payment_method,'Pay on Arrival');
    assert.equal(writes.at(-1).body.logistics_method,'PM Express');
    assert.equal(writes.at(-1).body.quote_id,'server-quote');
+   writes.length=0;
+   await page.locator('input[name="deliveryChoice"][value="EasyParcel"]').check();
+   assert.equal(await page.locator('#payment').inputValue(),'Billplz');
+   assert.equal(await page.locator('#deliveryOptions').isVisible(),false);
+   assert.equal(await page.locator('#deliveryConfirmed').isVisible(),false);
+   await page.locator('#deliveryQuote').click();
+   await page.locator('input[name="parcelCourier"]').check();
+   assert.equal(await page.evaluate(()=>window.pmDeliveryFee()),5.4);
+   assert.equal(await page.locator('#payment option[value="Pay on Arrival"]').evaluate(o=>o.disabled),true);
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+   await page.screenshot({path:path.resolve('../outputs/easyparcel-checkout-'+width+'.png'),fullPage:true});
+   await page.locator('#pay').click();await page.waitForFunction(()=>document.getElementById('result').textContent.includes('mocked'));
+   assert.equal(writes.at(-1).body.quote_id,'parcel-quote');
+   assert.equal(writes.at(-1).body.logistics_method,'EasyParcel');
+   await page.locator('#buyerPhone').fill('01123456781');
+   assert.equal(await page.evaluate(()=>Number.isNaN(window.pmDeliveryFee())),true);
+   assert.equal(await page.locator('#parcelOffers').isVisible(),false);
    writes.length=0;
    await page.locator('input[name="deliveryChoice"][value="Lalamove Segera"]').check();
    assert.equal(await page.locator('#payment').inputValue(),'Billplz');
