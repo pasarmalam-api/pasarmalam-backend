@@ -70,7 +70,8 @@
   window.pmDeliveryCourierFee = () => isPickup() ? 0 : valid() ? Number(quote.courier_fee ?? quote.fee) : NaN;
   function fields() {
     return {...(window.pmBranchFields ? window.pmBranchFields() : {}), simple_checkout: true, fee_version: 1, coordinates: {lat: get('deliveryLat').value, lng: get('deliveryLng').value},
-      city: get('deliveryCity').value, service_type: get('deliveryVehicle').value,
+      service_options: shipping.value === 'Lalamove Segera',
+      city: get('deliveryCity').value, service_type: quote?.service_type || '',
       location_confirmed: get('deliveryConfirmed').checked, package_confirmed: get('deliveryPackage').checked,
       schedule_at: shipping.value === 'Lalamove Biasa' && get('deliverySchedule').value
         ? new Date(get('deliverySchedule').value).toISOString() : ''};
@@ -154,7 +155,7 @@
         address: address.value.trim(), buyer_phone: get('buyerPhone').value.trim(), logistics_method: shipping.value, ...route})});
       if (version !== revision) return;
       get('result').textContent = '';
-      if (isParcel()) {
+      if (response.offers) {
         quote = null;
         const offers = get('parcelOffers');
         offers.querySelectorAll('label,select').forEach(label => label.remove());

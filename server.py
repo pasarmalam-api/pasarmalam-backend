@@ -1845,7 +1845,7 @@ class Handler(BaseHTTPRequestHandler):
         user = self.current_user()
         if not user or user["role"] not in ("seller", "admin"):
             raise PermissionError("Seller or admin login is required to create products")
-        required = ["name", "shop", "category", "price", "stock", "condition", "price_mode"]
+        required = ["name", "shop", "category", "price", "stock", "condition", "price_mode", "weight_kg"]
         for key in required:
             if key not in data:
                 raise ValueError(f"Missing {key}")

@@ -19,7 +19,8 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    if(endpoint==='/api/delivery/quotation'){
     if(failed)return route.fulfill({status:400,json:{error:'Local delivery is not set up by this seller yet. Choose another delivery option.'}});
     const q={quote_id:'test-quote',fee:6.99,courier_fee:6.59,admin_fee:.4,expires_at:Math.floor(Date.now()/1000)+300,service_name:'SPX Xpress'};
-    return route.fulfill({json:req.postDataJSON().logistics_method==='EasyParcel'?{offers:[q]}:q});
+    const method=req.postDataJSON().logistics_method;
+    return route.fulfill({json:method==='EasyParcel'?{offers:[q]}:method==='Lalamove Segera'?{offers:[{...q,service_type:'MOTORCYCLE',service_name:'Motorcycle'},{...q,quote_id:'car-quote',service_type:'CAR',service_name:'Car',fee:12.4}]}:q});
    }
    if(endpoint==='/api/payments/billplz/create')return route.fulfill({json:{message:'Test payment intercepted'}});
    return route.fulfill({json:{products:[{id:1,seller_id:2,name:'Cable',category:'Chargers',price:20,stock:5,shop:'Test Shop'}],cart:[],notifications:[],campaigns:[]}});
@@ -47,7 +48,13 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    assert.equal(request.simple_checkout,true);assert.equal(request.location_confirmed,true);assert.equal(request.service_type,'');
    await page.locator('#payment').selectOption('Pay on Arrival');
    await page.locator('input[name="deliveryChoice"][value="EasyParcel"]').check();assert.equal(await page.locator('#payment').inputValue(),'Billplz');
-   failed=true;await page.locator('input[name="deliveryChoice"][value="Lalamove Segera"]').check();await page.getByText('Local delivery is not set up by this seller yet. Choose another delivery option.').waitFor();
+   await page.locator('input[name="deliveryChoice"][value="Lalamove Segera"]').check();
+   await page.locator('#parcelService').waitFor();await page.locator('#parcelService').selectOption('car-quote');
+   assert.equal(await page.evaluate(()=>pmDeliveryFee()),12.4);
+   await page.locator('#pay').click();await page.getByText('Test payment intercepted').waitFor();
+   assert.equal(calls.at(-1).data.service_type,'CAR');
+   assert.equal(calls.at(-1).data.service_options,true);
+   failed=true;await page.evaluate(()=>pmDeliveryInvalidate());await page.getByText('Local delivery is not set up by this seller yet. Choose another delivery option.').waitFor();
    assert.equal(await page.locator('#deliveryVehicle').isVisible(),false);failed=false;
    await page.locator('input[name="deliveryChoice"][value="Ambil Sendiri"]').check();assert.equal(await page.evaluate(()=>pmDeliveryFee()),0);
   }

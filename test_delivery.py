@@ -56,6 +56,22 @@ class DeliveryTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'seller'):
             self.quoted()
 
+    def test_service_options_use_weight_and_bind_selected_service(self):
+        with server.connect() as con:
+            delivery.save_pickup(con, 2, {**self.point, 'city': 'MY KUL', 'service_type': 'MOTORCYCLE'})
+            self.client.cities.return_value[0]['services'].extend([
+                {'key': 'CAR', 'load': {'value': 40, 'unit': 'kg'}},
+                {'key': 'SMALL', 'load': {'value': .1, 'unit': 'kg'}}])
+            data = {**self.data, 'simple_checkout': True, 'service_options': True, 'service_type': ''}
+            offers = delivery.create_quote(con, self.user, self.product, 2, data, self.client)['offers']
+            self.assertEqual([o['service_type'] for o in offers], ['MOTORCYCLE', 'CAR'])
+            selected = {**data, 'service_type': 'CAR', 'quote_id': offers[1]['quote_id']}
+            with self.assertRaisesRegex(ValueError, 'changed'):
+                delivery.consume(con, self.user, self.product, 2, {**selected, 'service_type': 'MOTORCYCLE'})
+            self.assertEqual(delivery.consume(con, self.user, self.product, 2, selected)[0], 9.4)
+            pm = delivery.create_quote(con, self.user, self.product, 1, {**data, 'logistics_method': 'PM Express'}, self.client)
+            self.assertNotIn('offers', pm)
+
     def test_maps_config_exposes_only_browser_key_to_buyer(self):
         with patch.dict(os.environ, {'GOOGLE_MAPS_BROWSER_KEY':'restricted-browser-key','OPENAI_API_KEY':'private-secret'}), patch.object(server,'send_json') as send:
             self.handler.maps_config()

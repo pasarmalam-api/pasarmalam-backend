@@ -6,7 +6,7 @@ import math
 import secrets
 import time
 
-from lalamove import Client, waypoint
+from lalamove import Client, LalamoveError, waypoint
 import branches
 
 
@@ -67,7 +67,8 @@ def context(con, user, product, qty, data):
         settings = pickup(con, product['seller_id']) or {}
         if not settings.get('city') or not settings.get('service_type'):
             raise ValueError('Local delivery is not set up by this seller yet. Choose another delivery option.')
-        data = {**data, 'city': settings['city'], 'service_type': settings['service_type'], 'package_confirmed': True}
+        selected = data.get('service_type') if data.get('service_options') is True and method != 'pm_express' else None
+        data = {**data, 'city': settings['city'], 'service_type': selected or settings['service_type'], 'package_confirmed': True}
     if data.get('location_confirmed') is not True:
         raise ValueError('Confirm the delivery coordinates match your address.')
     destination = waypoint({'address': data.get('address'), 'coordinates': data.get('coordinates')})
@@ -91,6 +92,20 @@ def create_quote(con, user, product, qty, data, client=None):
     client = client or Client()
     cities = client.cities()
     city = next((c for c in cities if c['locode'] == ctx['city']), None)
+    if data.get('service_options') is True and not data.get('service_type') and ctx['mode'] != 'pm_express':
+        offers = []
+        for candidate in (city or {}).get('services', []):
+            load = candidate.get('load', {})
+            if load.get('unit') != 'kg' or float(load.get('value') or 0) < float(product['weight_kg']) * qty:
+                continue
+            try:
+                offer = create_quote(con, user, product, qty, {**data, 'service_type': candidate['key']}, client)
+            except LalamoveError:
+                continue
+            offers.append({**offer, 'service_type': candidate['key'], 'service_name': candidate['key'].replace('_', ' ').title()})
+        if not offers:
+            raise ValueError('No Lalamove service is available for this package weight.')
+        return {'offers': sorted(offers, key=lambda item: item['fee'])}
     service = next((s for s in (city or {}).get('services', []) if s['key'] == ctx['service_type']), None)
     if not service:
         raise ValueError('Select an available city and vehicle.')
