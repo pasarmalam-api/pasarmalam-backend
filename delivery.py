@@ -37,6 +37,12 @@ def save_pickup(con, seller_id, data):
     if data.get('confirmed') is not True:
         raise ValueError('Confirm the coordinates match your pickup address.')
     point = waypoint(data)
+    for key in ('city', 'service_type'):
+        value = str(data.get(key) or '').strip()
+        if len(value) > 100:
+            raise ValueError('Invalid seller delivery setting.')
+        if value:
+            point[key] = value
     con.execute('''INSERT INTO delivery_pickups (id,payload,updated_at) VALUES (?,?,?)
         ON CONFLICT(id) DO UPDATE SET payload=excluded.payload, updated_at=excluded.updated_at''',
         (seller_id, json.dumps(point, sort_keys=True), int(time.time())))
@@ -57,6 +63,11 @@ def context(con, user, product, qty, data):
     origin = branch['pickup'] if branch else pickup(con, product['seller_id'])
     if not origin:
         raise ValueError('The seller must confirm their pickup location before Lalamove delivery is available.')
+    if data.get('simple_checkout') is True:
+        settings = pickup(con, product['seller_id']) or {}
+        if not settings.get('city') or not settings.get('service_type'):
+            raise ValueError('Local delivery is not set up by this seller yet. Choose another delivery option.')
+        data = {**data, 'city': settings['city'], 'service_type': settings['service_type'], 'package_confirmed': True}
     if data.get('location_confirmed') is not True:
         raise ValueError('Confirm the delivery coordinates match your address.')
     destination = waypoint({'address': data.get('address'), 'coordinates': data.get('coordinates')})

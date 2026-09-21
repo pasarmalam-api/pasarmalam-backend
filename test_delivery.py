@@ -40,6 +40,22 @@ class DeliveryTest(unittest.TestCase):
             q = delivery.create_quote(con, self.user, self.product, 1, self.data, self.client)
         return {**self.data, 'quote_id': q['quote_id']}
 
+    def test_simple_checkout_uses_seller_settings(self):
+        with server.connect() as con:
+            delivery.save_pickup(con, 2, {**self.point, 'city': 'MY KUL', 'service_type': 'MOTORCYCLE'})
+        self.data.update(simple_checkout=True, city='buyer-tampered', service_type='VAN', package_confirmed=False)
+        data = self.quoted()
+        self.assertEqual(self.client.quote.call_args.args[0]['service_type'], 'MOTORCYCLE')
+        with server.connect() as con:
+            fee, details = delivery.consume(con, self.user, self.product, 1, data)
+        self.assertEqual(fee, 9.4)
+        self.assertEqual(details['context']['city'], 'MY KUL')
+
+    def test_simple_checkout_missing_seller_configuration(self):
+        self.data['simple_checkout'] = True
+        with self.assertRaisesRegex(ValueError, 'seller'):
+            self.quoted()
+
     def test_maps_config_exposes_only_browser_key_to_buyer(self):
         with patch.dict(os.environ, {'GOOGLE_MAPS_BROWSER_KEY':'restricted-browser-key','OPENAI_API_KEY':'private-secret'}), patch.object(server,'send_json') as send:
             self.handler.maps_config()

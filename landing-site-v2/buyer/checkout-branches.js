@@ -14,6 +14,7 @@
   function choose(){
     selected=rows.find(row=>row.id===select.value)||null;
     if(!selected)return;
+    section.hidden=rows.length===1;
     checkoutProduct={...original,price:selected.price,shop_open:original.shop_open!==false&&selected.is_open};
     section.querySelector('#branchAddress').textContent=selected.address||t('Alamat pengambilan belum disediakan.','Pickup address not configured.');
     status.textContent=`${money(selected.price)} / ${t('unit','unit')}`;

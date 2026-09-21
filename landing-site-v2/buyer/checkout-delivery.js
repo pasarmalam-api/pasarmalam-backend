@@ -15,10 +15,9 @@
     ['Ambil Sendiri', t('Ambil sendiri', 'Self pickup')],
     ['PM Express', 'Pasar Malam Express'],
     ['EasyParcel', t('EasyParcel - kurier standard', 'EasyParcel - standard courier')],
-    ['Lalamove Segera', t('Lalamove - pengambilan segera', 'Lalamove - immediate pickup')],
-    ['Lalamove Biasa', t('Lalamove - pengambilan berjadual', 'Lalamove - scheduled pickup')]
+    ['Lalamove Segera', t('Penghantaran segera - Lalamove', 'Express delivery - Lalamove')]
   ].map(([value, label]) => new Option(label, value)));
-  shipping.value = 'Lalamove Segera';
+  shipping.value = 'EasyParcel';
   shipping.removeAttribute('onchange');
   const choices = document.createElement('fieldset');
   choices.className = 'delivery-choices';
@@ -57,7 +56,10 @@
     <fieldset id="parcelOffers" hidden><legend>${t('Pilih kurier', 'Choose courier')}</legend></fieldset>
     <p id="deliveryStatus" role="status" class="muted"></p>`;
   choices.after(box);
+  // Legacy coordinate fields remain internal inputs for the shared address resolver.
+  for (const child of [...box.children]) child.hidden = !['parcelOffers','deliveryStatus'].includes(child.id);
   let cities = [], quote = null, revision = 0, requesting = false;
+  let refreshTimer;
   const baseApi = api, baseReady = requireCheckoutReady;
   const isPickup = () => shipping.value === 'Ambil Sendiri';
   const isParcel = () => shipping.value === 'EasyParcel';
@@ -67,7 +69,7 @@
   window.pmDeliveryAdminFee = () => isPickup() ? 0 : valid() ? Number(quote.admin_fee || 0) : NaN;
   window.pmDeliveryCourierFee = () => isPickup() ? 0 : valid() ? Number(quote.courier_fee ?? quote.fee) : NaN;
   function fields() {
-    return {...(window.pmBranchFields ? window.pmBranchFields() : {}), fee_version: 1, coordinates: {lat: get('deliveryLat').value, lng: get('deliveryLng').value},
+    return {...(window.pmBranchFields ? window.pmBranchFields() : {}), simple_checkout: true, fee_version: 1, coordinates: {lat: get('deliveryLat').value, lng: get('deliveryLng').value},
       city: get('deliveryCity').value, service_type: get('deliveryVehicle').value,
       location_confirmed: get('deliveryConfirmed').checked, package_confirmed: get('deliveryPackage').checked,
       schedule_at: shipping.value === 'Lalamove Biasa' && get('deliverySchedule').value
@@ -76,13 +78,10 @@
   function reset() {
     revision++; quote = null;
     get('result').textContent = '';
-    box.querySelector('h3').textContent = isParcel() ? t('Kurier standard', 'Standard courier') : t('Lokasi penerima', 'Recipient location');
     get('parcelOffers').hidden = true;
-    get('parcelOffers').querySelectorAll('label').forEach(label => label.remove());
+    get('parcelOffers').querySelectorAll('label,select').forEach(label => label.remove());
     box.hidden = isPickup();
-    for (const id of ['deliveryLocate', 'deliveryLocationStatus', 'deliveryLocationDetails', 'deliveryOptions']) get(id).hidden = isParcel();
-    get('deliveryConfirmed').closest('label').hidden = isParcel();
-    get('deliveryPackage').closest('label').hidden = isParcel();
+    get('deliveryQuote').hidden = true;
     for (const radio of choices.querySelectorAll('input')) radio.checked = radio.value === shipping.value;
     get('deliveryScheduleLabel').hidden = shipping.value !== 'Lalamove Biasa';
     const cash = get('payment').querySelector('option[value="Cash Pickup"]');
@@ -93,6 +92,8 @@
     arrival.disabled = arrival.hidden = shipping.value !== 'PM Express';
     if (arrival.disabled && payment.value === 'Pay on Arrival') payment.value = 'Billplz';
     status(''); renderSummary();
+    clearTimeout(refreshTimer);
+    if (!isPickup()) refreshTimer = setTimeout(() => window.pmLoadDelivery?.(), 600);
   }
   function vehicles() {
     const services = cities.find(c => c.locode === get('deliveryCity').value)?.services || [];
@@ -136,19 +137,17 @@
     },
     {enableHighAccuracy: true, timeout: 15000, maximumAge: 0});
   };
-  get('deliveryQuote').onclick = async () => {
+  get('deliveryQuote').textContent = t('Cuba lagi', 'Retry');
+  window.pmLoadDelivery = get('deliveryQuote').onclick = async () => {
+    if (isPickup() || !checkoutProduct || !checkoutItem || !address.value.trim() || window.pmAddressEditing) return;
     if (requesting) return;
     requesting = true; get('deliveryQuote').disabled = true;
     const version = revision;
     try {
       if (!checkoutProduct || !checkoutItem) throw new Error(t('Pilih produk dahulu.', 'Select a product first.'));
       const route = fields();
-      if (!isParcel() && (!route.coordinates.lat || !route.coordinates.lng)) {
-        get('deliveryLocationDetails').open = true;
-        throw new Error(t('Pilih lokasi penerima dahulu.', 'Choose the recipient location first.'));
-      }
-      if (!address.value.trim() || (!isParcel() && (!route.location_confirmed || !route.package_confirmed)))
-        throw new Error(t('Sahkan alamat, koordinat dan saiz bungkusan.', 'Confirm the address, coordinates and package size.'));
+      if (!isParcel() && (!route.coordinates.lat || !route.coordinates.lng || !route.location_confirmed))
+        throw new Error(t('Tukar alamat dan pilih alamat tepat melalui carian.', 'Change your address and select a precise search result.'));
       status(t('Mendapatkan sebut harga...', 'Getting quotation...'));
       const response = await baseApi('/api/delivery/quotation', {method: 'POST', body: JSON.stringify({
         product_id: checkoutItem.product_id, quantity: checkoutItem.quantity, variant: checkoutItem.variant || '',
@@ -158,28 +157,22 @@
       if (isParcel()) {
         quote = null;
         const offers = get('parcelOffers');
-        offers.querySelectorAll('label').forEach(label => label.remove());
+        offers.querySelectorAll('label,select').forEach(label => label.remove());
         offers.hidden = false;
+        const courierSelect=document.createElement('select');courierSelect.id='parcelService';courierSelect.setAttribute('aria-label',t('Kurier','Courier'));
         for (const offer of response.offers || []) {
-          const label = document.createElement('label'); label.className = 'delivery-check';
-          const radio = document.createElement('input'); radio.type = 'radio'; radio.name = 'parcelCourier';
-          const text = document.createElement('span');
-          text.textContent = `${offer.service_name} - ${money(offer.fee)}${offer.delivery_duration ? ' | ' + offer.delivery_duration : ''}`;
-          radio.addEventListener('change', () => {
-            if (version !== revision || offer.expires_at * 1000 <= Date.now()) return;
-            quote = offer; status(`${money(quote.fee)} | ${t('Sah sehingga', 'Valid until')} ${new Date(quote.expires_at*1000).toLocaleTimeString()}`); renderSummary();
-          });
-          label.append(radio, text); offers.append(label);
+          courierSelect.add(new Option(`${offer.service_name} - ${money(offer.fee)}`,offer.quote_id));
         }
-        status(t('Pilih kurier untuk meneruskan.', 'Choose a courier to continue.'));
+        const chooseCourier=()=>{const offer=response.offers.find(o=>o.quote_id===courierSelect.value);if(version!==revision||!offer||offer.expires_at*1000<=Date.now())return;quote=offer;status('');renderSummary();};
+        courierSelect.addEventListener('change',chooseCourier);offers.append(courierSelect);chooseCourier();
         renderSummary(); return;
       }
       quote = response;
       get('result').textContent = '';
-      status(`${money(quote.fee)} | ${t('Sah sehingga', 'Valid until')} ${new Date(quote.expires_at*1000).toLocaleTimeString()}`);
+      status(money(quote.fee));
       renderSummary();
-    } catch (e) { if (version === revision) { quote = null; status(e.message); renderSummary(); } }
-    finally { requesting = false; get('deliveryQuote').disabled = false; }
+    } catch (e) { if (version === revision) { quote = null; status(e.message); get('deliveryQuote').hidden = false; renderSummary(); } }
+    finally { requesting = false; get('deliveryQuote').disabled = false; if(version!==revision && !isPickup()) {clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>window.pmLoadDelivery(),600);} }
   };
   requireCheckoutReady = function() {
     baseReady();
@@ -200,13 +193,14 @@
     return baseApi(path, options);
   };
   setInterval(() => {
-    if (quote && !valid()) { quote = null; status(t('Sebutharga tamat. Dapatkan caj baharu.', 'Quote expired. Request a new delivery charge.')); renderSummary(); }
+    if (quote && !valid()) { reset(); }
   }, 1000);
   reset();
-  if (token()) baseApi('/api/delivery/services').then(data => {
-    cities = data.cities || [];
-    get('deliveryCity').replaceChildren(...cities.map(c => new Option(c.name, c.locode)));
-    if (cities.some(c => c.locode === 'MY KUL')) get('deliveryCity').value = 'MY KUL';
-    vehicles();
-  }).catch(e => status(e.message));
+  window.addEventListener('pm-checkout-loaded', () => {
+    if (['Food','Street Food','Meals','Drinks','Groceries'].includes(checkoutProduct?.category)) {
+      choices.querySelector('input[value="EasyParcel"]').closest('label').hidden = true;
+      if(isParcel())shipping.value='Lalamove Segera';
+    }
+    reset();
+  });
 })();

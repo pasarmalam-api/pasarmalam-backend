@@ -14,10 +14,20 @@
   extra.innerHTML = `<label for="addressUnit">${t('Unit / tingkat (pilihan)','Unit / floor (optional)')}</label><input id="addressUnit" autocomplete="address-line2" maxlength="120">
     <button type="button" class="soft" id="saveDefaultAddress">${t('Simpan sebagai alamat lalai','Save as default address')}</button>`;
   address.after(extra);
+  const editor=document.createElement('div');editor.id='addressEditor';
+  for(const child of [...section.children])if(child!==controls&&child.tagName!=='H2')editor.append(child);
+  editor.prepend(el('addressSearch'),el('useDefaultAddress'));
+  const done=document.createElement('button');done.type='button';done.className='primary';done.id='useAddress';done.textContent=t('Gunakan alamat ini','Use this address');editor.append(done);section.append(editor);
+  function displayAddress(editing){
+    window.pmAddressEditing=editing;editor.hidden=!editing;
+    el('savedAddress').textContent=[currentUser().name,el('buyerPhone').value,address.value].filter(Boolean).join(' | ');
+    el('changeAddress').hidden=editing;
+  }
+  displayAddress(!address.value.trim()||!el('buyerPhone').value.trim());
   let saved = currentUser().address || '', base = address.value, version = 0, loading;
   const status = value => { el('addressSearchStatus').textContent = value; };
   const drawDefault = () => {
-    el('savedAddress').textContent = saved ? `${t('Alamat lalai','Default address')}: ${saved}` : t('Tiada alamat lalai.','No default address.');
+    el('savedAddress').textContent = [currentUser().name,el('buyerPhone').value,address.value||saved].filter(Boolean).join(' | ');
     el('useDefaultAddress').hidden = !saved;
   };
   drawDefault();
@@ -51,9 +61,9 @@
     base = text; address.value = [el('addressUnit').value.trim(),text].filter(Boolean).join(', ');
     invalidate();
     el('deliveryLat').value = location.lat(); el('deliveryLng').value = location.lng();
-    el('deliveryConfirmed').checked = false;
+    el('deliveryConfirmed').checked = true;
     el('deliveryConfirmed').dispatchEvent(new Event('change'));
-    status(t('Alamat dipilih. Sahkan lokasi penerima sebelum mendapatkan caj baharu.','Address selected. Confirm the recipient location before getting a new delivery quote.'));
+    status('');
   }
   const inMalaysia = result => (result.address_components || []).some(c=>c.types.includes('country')&&c.short_name==='MY');
   async function geocode(request, expected, keepText) {
@@ -66,6 +76,7 @@
   }
   let widget;
   el('changeAddress').onclick = async () => {
+    displayAddress(true);
     address.readOnly = false; invalidate(); el('addressSearch').hidden = false;
     status(t('Memuatkan carian Google...','Loading Google search...'));
     try {
@@ -96,6 +107,16 @@
     invalidate(); const expected=version;
     try { await geocode({address:saved,componentRestrictions:{country:'MY'}},expected,saved); }
     catch(e) { if(version===expected)status(e.message); address.readOnly=false; }
+  };
+  done.onclick=async()=>{
+    if(!address.value.trim()||!el('buyerPhone').value.trim())return status(t('Lengkapkan alamat dan nombor telefon.','Enter your address and phone number.'));
+    done.disabled=true;
+    try{
+      if(el('shipping').value!=='EasyParcel'&&el('shipping').value!=='Ambil Sendiri'&&!el('deliveryConfirmed').checked){
+        await geocode({address:address.value,componentRestrictions:{country:'MY'}},version,address.value);
+      }
+      displayAddress(false);status('');window.pmDeliveryInvalidate?.();
+    }catch(e){status(e.message);}finally{done.disabled=false;}
   };
   el('addressUnit').addEventListener('input',()=>{
     address.value=[el('addressUnit').value.trim(),base].filter(Boolean).join(', ');
@@ -128,6 +149,7 @@
     saved=data.user.address||'';drawDefault();
     if(version===0){
       address.value=saved;base=saved;address.readOnly=!!saved;
+      displayAddress(!saved||!el('buyerPhone').value.trim());
       if(saved){
         const expected=version;
         try{await geocode({address:saved,componentRestrictions:{country:'MY'}},expected,saved);}

@@ -38,3 +38,9 @@
 #parcelOffers label { padding: 12px; border: 1px solid #d7e2e0; border-radius: 6px; background: #fff; }
 #parcelOffers label:has(input:checked) { border-color: #0f9f8f; background: #edf8f5; }
 #parcelOffers span { min-width: 0; overflow-wrap: anywhere; }
+.buyer-checkout .buyer-navigation,.buyer-checkout .pm-seller-switch{display:none!important}
+.buyer-checkout #parcelService{max-width:100%;min-width:0;width:100%;text-overflow:ellipsis}
+.buyer-checkout #addressEditor{margin-top:12px}
+.buyer-checkout #savedAddress{line-height:1.6;margin:0 0 10px}
+.buyer-checkout .checkout-section{padding:16px 0}
+.buyer-checkout .delivery-choices{gap:6px}

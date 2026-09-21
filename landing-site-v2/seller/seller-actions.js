@@ -2,6 +2,10 @@
   const page=location.pathname.split('/').pop();
   const byId=id=>document.getElementById(id);
   const settingsLink=document.querySelector('nav a[href="settings.html"]');
+  if(page==='settings.html'){
+    const section=document.createElement('section');section.style.padding='16px 0';
+    const link=document.createElement('a');link.href='pickup-location.html';link.textContent='Pickup address & delivery settings';section.append(link);document.querySelector('main')?.prepend(section);
+  }
   if(settingsLink&&!document.querySelector('nav a[href="branches.html"]')){
     const link=document.createElement('a');link.href='branches.html';link.textContent='Branches';settingsLink.after(link);
   }

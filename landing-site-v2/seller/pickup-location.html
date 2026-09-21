@@ -10,6 +10,9 @@
 <button type="button" id="locate" class="soft">Gunakan lokasi semasa</button>
 <label for="lat">Latitud</label><input id="lat" type="number" step="any" min="-90" max="90" required>
 <label for="lng">Longitud</label><input id="lng" type="number" step="any" min="-180" max="180" required>
+<label for="deliveryCity">Kawasan penghantaran tempatan</label><select id="deliveryCity"><option value="">Pilih kawasan</option></select>
+<label for="deliveryVehicle">Kenderaan untuk bungkusan kedai</label><select id="deliveryVehicle"><option value="">Pilih kenderaan</option></select>
+<p id="vehicleLimit"></p>
 <label style="display:block;margin:16px 0"><input id="confirmed" type="checkbox" required style="width:auto"> Saya sahkan koordinat sepadan dengan alamat pengambilan.</label>
 <button id="savePickup" class="primary" type="submit">Simpan lokasi</button><p id="status" role="status"></p>
 </form></main></div></div>
@@ -23,8 +26,15 @@
     $('status').textContent='Mencari lokasi...';
     navigator.geolocation.getCurrentPosition(p=>{$('lat').value=p.coords.latitude.toFixed(6);$('lng').value=p.coords.longitude.toFixed(6);$('confirmed').checked=false;$('status').textContent='';},()=>{$('status').textContent='Lokasi tidak dibenarkan. Masukkan koordinat alamat.';},{enableHighAccuracy:true,timeout:15000,maximumAge:0});
   };
-  $('pickupForm').onsubmit=async e=>{e.preventDefault();$('savePickup').disabled=true;try{await api({method:'POST',body:JSON.stringify({address:$('pickupAddress').value.trim(),coordinates:{lat:$('lat').value,lng:$('lng').value},confirmed:$('confirmed').checked})});$('status').textContent='Lokasi pengambilan disimpan.';}catch(e){$('status').textContent=e.message;}finally{$('savePickup').disabled=false;}};
+  let cities=[],savedPickup;
+  $('deliveryCity').disabled=true;$('deliveryVehicle').disabled=true;
+  function vehicles(){const services=cities.find(c=>c.locode===$('deliveryCity').value)?.services||[];$('deliveryVehicle').replaceChildren(new Option('Pilih kenderaan',''),...services.map(s=>new Option(s.key.replaceAll('_',' '),s.key)));}
+  function limit(){const s=cities.find(c=>c.locode===$('deliveryCity').value)?.services.find(s=>s.key===$('deliveryVehicle').value);$('vehicleLimit').textContent=s?`${s.load?.value||''} ${s.load?.unit||''} | ${Object.values(s.dimensions||{}).map(d=>d.value+' '+d.unit).join(' x ')}`:'';}
+  $('deliveryCity').onchange=()=>{vehicles();limit();};$('deliveryVehicle').onchange=limit;
+  $('pickupForm').onsubmit=async e=>{e.preventDefault();$('savePickup').disabled=true;try{await api({method:'POST',body:JSON.stringify({address:$('pickupAddress').value.trim(),coordinates:{lat:$('lat').value,lng:$('lng').value},confirmed:$('confirmed').checked,city:$('deliveryCity').disabled?(savedPickup?.city||''):$('deliveryCity').value,service_type:$('deliveryVehicle').disabled?(savedPickup?.service_type||''):$('deliveryVehicle').value})});$('status').textContent='Lokasi pengambilan disimpan.';}catch(e){$('status').textContent=e.message;}finally{$('savePickup').disabled=false;}};
   $('savePickup').disabled=true;
-  api().then(d=>{if(d.pickup){$('pickupAddress').value=d.pickup.address;$('lat').value=d.pickup.coordinates.lat;$('lng').value=d.pickup.coordinates.lng;}else{try{$('pickupAddress').value=JSON.parse(localStorage.getItem('pm_user')||'{}').address||'';}catch(e){}}$('savePickup').disabled=false;}).catch(e=>{$('status').textContent=e.message;});
+  api().then(async d=>{savedPickup=d.pickup;if(d.pickup){$('pickupAddress').value=d.pickup.address;$('lat').value=d.pickup.coordinates.lat;$('lng').value=d.pickup.coordinates.lng;}else{try{$('pickupAddress').value=JSON.parse(localStorage.getItem('pm_user')||'{}').address||'';}catch(e){}}$('savePickup').disabled=false;
+    try{const r=await fetch('https://pasarmalam-backend.onrender.com/api/delivery/services',{headers:{Authorization:'Bearer '+token}});const v=await r.json();if(!r.ok)throw new Error(v.error||'Delivery settings unavailable');cities=v.cities||[];$('deliveryCity').replaceChildren(new Option('Pilih kawasan',''),...cities.map(c=>new Option(c.name,c.locode)));$('deliveryCity').value=savedPickup?.city||'';vehicles();$('deliveryVehicle').value=savedPickup?.service_type||'';limit();$('deliveryCity').disabled=false;$('deliveryVehicle').disabled=false;}catch(e){$('status').textContent=e.message;}
+  }).catch(e=>{$('status').textContent=e.message;});
 })();
 </script><script src="seller-actions.js?v=branches1"></script><script src="badges.js?v=audit2"></script></body></html>

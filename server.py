@@ -1714,7 +1714,7 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 200, {'branches': rows})
 
     def delivery_services(self):
-        self.require_user("buyer")
+        self.require_user()
         try:
             send_json(self, 200, {"cities": LalamoveClient().cities(), "pooling_enabled": False})
         except LalamoveError as exc:
@@ -1741,7 +1741,7 @@ class Handler(BaseHTTPRequestHandler):
                               "logistics", "orders.html")
                 return
             notify_admins(con, f"Courier booking required for PM-{order_id}",
-                          "Check payment before manually booking Lalamove. A quotation is not a courier booking.",
+                          "Check payment before manually booking the selected courier. A quotation is not a courier booking.",
                           "logistics", "orders.html")
 
     def admin_lalamove_quotation(self, data):
