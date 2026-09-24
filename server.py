@@ -799,6 +799,8 @@ def migrate_products(con):
         "sold": "INTEGER DEFAULT 0",
         "shipping_type": "TEXT DEFAULT 'Lalamove Regular'",
         "weight_kg": "REAL DEFAULT 0.5",
+        "selling_mode": "TEXT NOT NULL DEFAULT 'retail'",
+        "minimum_order": "INTEGER NOT NULL DEFAULT 1",
     }
     for name, sql in additions.items():
         if name not in columns:
@@ -1859,8 +1861,8 @@ class Handler(BaseHTTPRequestHandler):
             cur = con.execute(
                 """
                 INSERT INTO products
-                (seller_id, name, shop, category, price, stock, condition, price_mode, description, warranty, variants, images, image_url, shipping_type, weight_kg, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (seller_id, name, shop, category, price, stock, condition, price_mode, description, warranty, variants, images, image_url, shipping_type, weight_kg, created_at, selling_mode, minimum_order)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     seller_id,
@@ -1879,11 +1881,27 @@ class Handler(BaseHTTPRequestHandler):
                     data.get("shipping_type", "Lalamove Regular"),
                     float(data.get("weight_kg", 0.5)),
                     now(),
+                    data.get("selling_mode", "retail"),
+                    int(data.get("minimum_order", 1)),
                 ),
             )
         send_json(self, 201, {"id": cur.lastrowid})
 
     def validate_product(self, data):
+        mode = data.get('selling_mode', 'retail')
+        if mode not in ('retail', 'bulk'):
+            raise ValueError('Choose retail or bulk selling')
+        raw = data.get('minimum_order', 1)
+        try:
+            minimum = float(raw)
+            if isinstance(raw, bool) or not math.isfinite(minimum) or not minimum.is_integer() or minimum < 1 or minimum > 2147483647:
+                raise ValueError()
+        except (TypeError, ValueError, OverflowError):
+            raise ValueError('Minimum order must be a positive whole number') from None
+        if mode == 'bulk' and minimum < 2:
+            raise ValueError('Bulk minimum order must be at least 2 units')
+        if mode == 'retail' and minimum != 1:
+            raise ValueError('Retail minimum order must be 1')
         for key in ("name", "category"):
             if key in data and not str(data[key]).strip():
                 raise ValueError(f"{key} is required")
@@ -1917,8 +1935,8 @@ class Handler(BaseHTTPRequestHandler):
                 con.execute("DELETE FROM products WHERE id = ?", (product_id,))
                 send_json(self, 200, {"ok": True})
                 return
-            allowed = ["name", "shop", "category", "price", "stock", "condition", "price_mode", "description", "warranty", "shipping_type", "weight_kg"]
-            self.validate_product(data)
+            allowed = ["name", "shop", "category", "price", "stock", "condition", "price_mode", "description", "warranty", "shipping_type", "weight_kg", "selling_mode", "minimum_order"]
+            self.validate_product({**dict(product), **data})
             if "category" in data:
                 self.require_product_category(con, product['seller_id'], data['category'])
             updates = {key: data[key] for key in allowed if key in data}
@@ -2379,7 +2397,7 @@ class Handler(BaseHTTPRequestHandler):
                 row_to_dict(row)
                 for row in con.execute(
                     """
-                    SELECT cart_items.*, products.name, products.price, products.shop, products.image_url, products.stock, products.category
+                    SELECT cart_items.*, products.name, products.price, products.shop, products.image_url, products.stock, products.category, products.selling_mode, products.minimum_order
                     FROM cart_items JOIN products ON products.id = cart_items.product_id
                     WHERE cart_items.buyer_id = ?
                     ORDER BY cart_items.created_at DESC
@@ -2403,14 +2421,21 @@ class Handler(BaseHTTPRequestHandler):
             product_id = int(data.get("product_id") or 0)
             if not product_id:
                 raise ValueError("Product is required")
-            product = con.execute("SELECT id, stock, seller_id FROM products WHERE id = ?", (product_id,)).fetchone()
+            product = con.execute("SELECT id, stock, seller_id, minimum_order FROM products WHERE id = ?", (product_id,)).fetchone()
             if not product:
                 raise ValueError("Product not found")
             self.require_shop_open(con, product)
             stock = int(product["stock"] or 0)
             if stock < 1:
                 raise ValueError("Out of stock")
-            quantity = int(data.get("quantity", 1))
+            raw_quantity = data.get("quantity", 1)
+            try:
+                number = float(raw_quantity)
+                if isinstance(raw_quantity, bool) or not math.isfinite(number) or not number.is_integer():
+                    raise ValueError()
+                quantity = int(number)
+            except (TypeError, ValueError, OverflowError):
+                raise ValueError('Quantity must be a whole number') from None
             if quantity < 1:
                 raise ValueError("Quantity must be at least 1")
             if quantity > stock:
@@ -2421,17 +2446,26 @@ class Handler(BaseHTTPRequestHandler):
                 (buyer_id, product_id, variant),
             ).fetchone()
             if method == "PUT":
+                if quantity < product['minimum_order']:
+                    raise ValueError(f"Minimum order is {product['minimum_order']} units")
                 item_id = int(data.get("id") or data.get("cart_item_id") or (existing["id"] if existing else 0))
                 if not item_id:
                     raise ValueError("Cart item id is required")
+                owned = con.execute('SELECT id FROM cart_items WHERE id=? AND buyer_id=? AND product_id=?', (item_id, buyer_id, product_id)).fetchone()
+                if not owned:
+                    raise ValueError('Cart item not found for this product')
                 con.execute("UPDATE cart_items SET quantity = ?, variant = ? WHERE id = ? AND buyer_id = ?", (quantity, variant, item_id, buyer_id))
                 send_json(self, 200, {"ok": True, "id": item_id, "quantity": quantity})
                 return
             if existing:
                 quantity = min(int(existing["quantity"] or 0) + quantity, stock)
+                if quantity < product['minimum_order']:
+                    raise ValueError(f"Minimum order is {product['minimum_order']} units")
                 con.execute("UPDATE cart_items SET quantity = ? WHERE id = ? AND buyer_id = ?", (quantity, existing["id"], buyer_id))
                 send_json(self, 200, {"ok": True, "id": existing["id"], "quantity": quantity})
                 return
+            if quantity < product['minimum_order']:
+                raise ValueError(f"Minimum order is {product['minimum_order']} units")
             cur = con.execute(
                 "INSERT INTO cart_items (buyer_id, product_id, quantity, variant, created_at) VALUES (?, ?, ?, ?, ?)",
                 (buyer_id, product_id, quantity, variant, now()),
@@ -2780,6 +2814,8 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("Quantity must be a whole number") from None
         if qty < 1:
             raise ValueError("Quantity must be at least 1")
+        if qty < product['minimum_order']:
+            raise ValueError(f"Minimum order is {product['minimum_order']} units")
         reserved = con.execute("""SELECT COALESCE(SUM(quantity),0) AS qty FROM orders
             WHERE product_id=? AND payment_method='Pay on Arrival' AND logistics_method='PM Express'
             AND payment_status='unpaid' AND order_status<>'cancelled'""", (product['id'],)).fetchone()['qty']

@@ -597,6 +597,11 @@ body,.app p,.app label,.app .label,.app .muted,.app th,.app td,.app .tag,.app na
 .shop-availability input[role=switch]:checked{background:#167343;border-color:#167343}
 .shop-availability input[role=switch]:checked:before{left:21px}
 .shop-availability input:focus-visible{outline:3px solid #3083dd;outline-offset:3px}
+@media(max-width:480px){
+  .app aside{grid-template-columns:1fr 1fr!important;max-height:none!important}
+  .app aside .brand{grid-column:1/-1}
+  .app aside nav{position:absolute!important;top:100%!important;bottom:auto!important;max-height:70vh!important;background:#182236!important}
+}
 .shop-availability input:disabled{opacity:.5;cursor:wait}
 .shop-availability p{flex-basis:100%;margin:0;color:#a42c38;font-size:13px}
 
