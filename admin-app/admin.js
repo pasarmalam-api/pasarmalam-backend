@@ -1,4 +1,9 @@
 const API="https://pasarmalam-backend.onrender.com";
+if (location.pathname.endsWith('/tickets.html')) {
+  const deletionScript = document.createElement('script');
+  deletionScript.src = 'account-deletions.js?v=1';
+  document.head.appendChild(deletionScript);
+}
 function token(){return localStorage.getItem("pm_admin_token")||localStorage.getItem("pm_token")||""}
 function user(){try{return JSON.parse(localStorage.getItem("pm_admin_user")||localStorage.getItem("pm_user")||"{}")}catch{return {}}}
 async function api(path,options={}){const headers={"Content-Type":"application/json",...(options.headers||{})};const t=token();if(t)headers.Authorization=`Bearer ${t}`;const r=await fetch(API+path,{...options,headers});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||"Request failed");return d}

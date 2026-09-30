@@ -70,9 +70,12 @@ class ShopAvailabilityTest(unittest.TestCase):
         self.close()
         with patch.multiple(server, BILLPLZ_API_KEY='test', BILLPLZ_COLLECTION_ID='test',
                             TOYYIBPAY_SECRET_KEY='test', TOYYIBPAY_CATEGORY_CODE='test'):
-            for method in ('create_billplz_payment', 'create_toyyibpay_payment', 'delivery_quotation'):
+            for method in ('create_billplz_payment', 'delivery_quotation'):
                 with self.subTest(method=method), self.assertRaisesRegex(ValueError, 'Shop is closed'):
                     getattr(self.handler, method)(data)
+            with patch.object(server, 'send_json') as send:
+                self.handler.create_toyyibpay_payment(data)
+                self.assertEqual(send.call_args.args[1], 503)
         with self.assertRaisesRegex(ValueError, 'Shop is closed'):
             self.handler.checkout({**data, 'logistics_method': 'Ambil Sendiri', 'payment_method': 'Cash Pickup'})
         with self.assertRaisesRegex(ValueError, 'Shop is closed'):

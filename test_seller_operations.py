@@ -33,7 +33,7 @@ class SellerOperationsTest(unittest.TestCase):
         self.assertEqual([p['id'] for p in self.data()['products']], [1])
 
     def test_create_edit_delete_product(self):
-        payload={'name':'Camera','shop':'ignored','category':'Electronics','price':50,'stock':2,'condition':'New','price_mode':'Fixed'}
+        payload={'name':'Camera','shop':'ignored','category':'Electronics','price':50,'stock':2,'condition':'New','price_mode':'Fixed','weight_kg':0.5}
         self.h.create_product(payload)
         product_id=self.data()['id']
         self.h.product_by_id('PUT',f'/api/products/{product_id}',{'name':'Camera Two','stock':3})

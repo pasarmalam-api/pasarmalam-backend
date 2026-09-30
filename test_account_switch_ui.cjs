@@ -72,7 +72,7 @@ const server=http.createServer((req,res)=>{
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
       await page.screenshot({path:'../outputs/account-switch/buyer-button-'+width+'.png'});
     }
-    await page.locator('.seller-entry').click();await page.waitForURL('**/seller/index.html');
+    await page.locator('.buyer-seller-link').click();await page.waitForURL('**/seller/index.html');
     sellerStatus='not_applicable';failure=true;
     await page.evaluate(()=>{localStorage.setItem('pm_token','token-buyer');localStorage.setItem('pm_user',JSON.stringify({id:1,role:'buyer'}))});
     await page.goto(origin+'/buyer/become-seller.html');await page.locator('#retry').waitFor({state:'visible'});

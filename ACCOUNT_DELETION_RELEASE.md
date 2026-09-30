@@ -1,20 +1,67 @@
-# Account deletion request page
+# Account deletion and payment verification release
 
-Public URL after deployment: https://www.pasarmalamapp.com/delete-account.html
+Prepared 30 September 2026. Deployment must be confirmed separately.
 
-Owner approved: complete account and associated personal-data deletion within 30 days after ownership verification, with an exception for legally required records. Necessary financial records use the applicable statutory seven-year period; the accountant must confirm the period's start and any other obligations.
+## Deletion
 
-## Manual fulfilment
+The public /delete-account.html form verifies a session or registered email and
+password, creates one durable request and shows the agreed 30-day deadline.
+Pending/suspended sellers may request deletion without contacting support.
 
-Requests go to pasahmallam@gmail.com. Monitor that inbox, verify ownership, record the verification date and 30-day deadline, fulfil the request and email confirmation. Never ask for passwords or OTPs. Review linked orders, payouts, uploads, backups and service-provider copies. Record and explain any legally retained data and its expiry; do not retain the whole profile simply because financial history exists.
+Admin > Tickets > Account deletion requests provides data review and local
+erasure. Unresolved orders, disputes, payments and payouts block erasure, not
+submission of a request. The operator verifies legacy records before selecting
+them; matching display names are not sufficient proof of ownership.
 
-This release adds a request pathway, NOT an automatic deletion engine. Existing admin deletion blocks accounts with listings/transactions; it is not sufficient for all cases. Those cases need a scoped deletion/anonymisation review and must not be treated as completed merely by suspending the account.
+Local erasure removes credentials/profile, branches, eligible listings, cart,
+wishlist, owned messages/reviews, support data and stored document references.
+Historical transactions are redacted without pretending they were refunded.
+Selected legally required identity/invoice fields require a reason and expiry.
+The worker clears retained identity after expiry. Deleted-order tombstones
+prevent later payment callbacks from restoring deleted information.
+
+After local erasure, the request remains in external_cleanup. The inventory
+identifies provider/upload URLs and checks for Cloudinary, AI, email, couriers,
+payment providers, logs and backups. These are manual operator obligations,
+not claims of automatic remote deletion. Check shared assets before deletion.
+Review unlinked legacy content and backup restoration procedures.
+
+Completion requires associated-data removal, lawful retention review and the
+completion email. It is blocked while the account still exists. The system
+does not automatically send that email. The request email and cleanup inventory
+are cleared when completion is recorded.
+
+## Operator procedure
+
+1. Review the request, deadline and buyer/seller records.
+2. Resolve pending obligations and verify legacy record ownership.
+3. Record minimum lawful retention, reason and expiry. Confirm statutory periods
+   with the accountant; do not retain a whole profile by default.
+4. Type the account email, confirm irreversible local erasure, and execute it.
+5. Complete provider/upload/log/backup cleanup and document exceptions.
+6. Email completion and retained-information details, then complete the queue record.
+
+Do not use the older Admin > Users delete action as this fulfilment workflow.
+Do not erase a production customer's account merely to test the implementation.
+
+## Payment security
+
+Billplz callbacks and returns retrieve the stored bill from Billplz and validate
+ID, collection, amount and paid amount. Configured signatures are mandatory.
+Payment status requires the order owner or admin. Repeated callbacks cannot
+reopen terminal orders or replenish erased data. Unused legacy ToyyibPay endpoints
+return 503 to prevent bypassing verification. Query parameters are not proof of payment.
 
 ## Release checks
 
-- Run node test_deletion_page.cjs.
-- Deploy landing-site-v2 to Render and verify the public URL returns HTTP 200 without login.
-- Update buyer/seller Tiiny packages for the new account-page links; links deliberately target the main domain.
-- Test an actual support-email delivery without sending a real deletion request.
-- Verify the installed Android app exposes Buyer Profile or Seller Settings and can open the public link. If bundled pages or WebView navigation prevent this, update the Android build.
-- In Play Console, set the Data safety account-deletion URL to the public URL above, review declarations for accuracy, and submit the changes for review. Do not claim Google approval before their review.
+- Run Python unittest discovery and the deletion/admin browser suites.
+- Deploy backend/schema, landing-site-v2 and admin-app assets together.
+- Verify public /privacy.html and /delete-account.html without login.
+- Verify protected status routes reject anonymous access.
+- Update Tiiny admin assets if that separate host remains in use.
+- Confirm privacy declarations against actual provider/retention practices.
+- Run Xcode, real iPhone features and approved payment tests.
+
+Tests use temporary databases and mocked services. They do not prove live email
+delivery, remote data deletion, iPhone behaviour, settlement or App Store approval.
+No real payment or courier booking is authorised by this test plan.

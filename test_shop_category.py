@@ -80,7 +80,7 @@ class ShopCategoryTest(unittest.TestCase):
     def test_listing_cannot_override_category(self):
         self.seller()
         payload = dict(name='Test', shop='Test', category='Food', price=10,
-                       stock=2, condition='New', price_mode='Fixed')
+                       stock=2, condition='New', price_mode='Fixed', weight_kg=0.5)
         with self.assertRaises(ValueError):
             self.handler.create_product(payload)
         self.change('Food')

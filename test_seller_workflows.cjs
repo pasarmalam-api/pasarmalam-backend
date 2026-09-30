@@ -3,7 +3,7 @@ const http=require('http'),fs=require('fs'),path=require('path'),assert=require(
 const root=path.resolve('landing-site-v2/seller');
 const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req.url,'http://localhost').pathname);if(!file.startsWith(root)||!fs.existsSync(file)){res.writeHead(404);return res.end()}res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file))});
 const user={id:17,role:'seller',name:'Seller',shop_name:'Shop',email:'seller@example.test',identity_type:'Passport',identity_number:'TEST',bank_name:'Bank',bank_account_name:'Seller',bank_account_number:'123',business_type:'Sole Proprietor',ssm_number:'123'};
-const product={id:101,seller_id:17,name:'Camera',shop:'Shop',category:'Electronics',condition:'New',price_mode:'Fixed',price:50,stock:3,variants:[],images:[]};
+const product={id:101,seller_id:17,name:'Camera',shop:'Shop',category:'Electronics',condition:'New',price_mode:'Fixed',price:50,stock:3,weight_kg:0.5,variants:[],images:[]};
 const order={id:201,product_id:101,buyer_name:'Buyer A',payment_status:'paid',order_status:'to_pack',escrow_status:'holding',total:50};
 const data={user,is_open:true,eligible:false,shop_category:'Chargers',products:[product],orders:[order],returns:[{id:301,order_id:201,status:'requested',dispute_status:'open',request_type:'Refund',reason:'Wrong size'}],reviews:[{id:401,rating:4,title:'Review',body:'Good',buyer_name:'Buyer A'}],messages:[{id:1,product_id:101,buyer_name:'Buyer A',seller_name:'Shop',sender_role:'buyer',body:'Hello'}],campaigns:[],notifications:[{id:501,title:'Order',body:'New order',target_url:'orders.html',read_at:0}],rates:[],wallet:[],summary:{},tickets:[],unread:1};
 (async()=>{
@@ -56,11 +56,11 @@ const data={user,is_open:true,eligible:false,shop_category:'Chargers',products:[
  await page.locator('#category option[value="Chargers"]').waitFor({state:'attached'});assert.equal(await page.locator('#category').isDisabled(),true);assert.equal(await page.locator('#category').inputValue(),'Chargers');
  await visit('edit-product.html?id=101');
  await page.locator('#category option[value="Chargers"]').waitFor({state:'attached'});assert.equal(await page.locator('#category').isDisabled(),true);assert.equal(await page.locator('#category').inputValue(),'Chargers');
- await action('add-product.html',{name:'Camera',price:'50',stock:'3'},'save()','/api/products');assert.equal(writes.at(-1).body.name,'Camera');
+ await action('add-product.html',{name:'Camera',price:'50',stock:'3',weight:'500'},'save()','/api/products');assert.equal(writes.at(-1).body.name,'Camera');assert.equal(writes.at(-1).body.weight_kg,0.5);
  await page.waitForURL('**/product-published.html');
  await page.getByRole('link',{name:'List Another Product',exact:true}).click();
  await page.waitForURL('**/add-product.html');assert.equal(await page.locator('#name').inputValue(),'');
- fail=true;await action('add-product.html',{name:'Keep my draft',price:'50',stock:'3'},'save()','/api/products');
+ fail=true;await action('add-product.html',{name:'Keep my draft',price:'50',stock:'3',weight:'500'},'save()','/api/products');
  assert.ok(page.url().endsWith('/add-product.html'));assert.equal(await page.locator('#name').inputValue(),'Keep my draft');assert.match(await page.locator('#out').textContent(),/Simulated validation failure/);fail=false;
  await visit('product-published.html');await page.getByRole('link',{name:'View Products',exact:true}).click();await page.waitForURL('**/products.html');
  product.images=['https://example.test/one.png','https://example.test/two.png'];
@@ -95,7 +95,7 @@ const data={user,is_open:true,eligible:false,shop_category:'Chargers',products:[
  await page.getByRole('button',{name:'Remove photo 1',exact:true}).click();assert.equal(await page.locator('#previewGrid .preview').count(),0);
  await page.locator('#productImage').setInputFiles([]);
  await page.locator('#productImage').setInputFiles({name:'test.png',mimeType:'image/png',buffer:png});await page.locator('#previewGrid .preview').waitFor();
- await fill({name:'Photo product',price:'5',stock:'2'});await page.locator('button[onclick="save()"]').click();await page.waitForTimeout(200);assert.deepEqual(writes.at(-1).body.images,['https://example.test/image.jpg']);
+ await fill({name:'Photo product',price:'5',stock:'2',weight:'350'});await page.locator('button[onclick="save()"]').click();await page.waitForTimeout(200);assert.deepEqual(writes.at(-1).body.images,['https://example.test/image.jpg']);
  await visit('business-verification.html');await page.locator('#businessType').selectOption({index:1});await fill({ssmNumber:'SSM123'});await page.locator('#docInput').setInputFiles({name:'test.png',mimeType:'image/png',buffer:png});await page.waitForFunction(()=>document.getElementById('uploadStatus').textContent.includes('uploaded'));await page.locator('button[onclick="submitVerification()"]').click();await page.waitForTimeout(200);assert.equal(writes.at(-1).body.ssm_document_url,'https://example.test/image.jpg');
  await action('login.html',{currentPassword:'old-password',newPassword:'new-password'},'changePassword()','/api/auth/change-password');
  await action('order-detail.html?id=201',{tracking:'TRACK-1'},'update()','/api/orders/status');

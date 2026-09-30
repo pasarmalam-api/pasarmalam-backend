@@ -79,6 +79,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
     await page.getByRole('button',{name:'Delete permanently',exact:true}).click();
     await page.getByText('Account deleted.',{exact:true}).waitFor();
     assert.equal(writes.at(-1).endpoint,'/api/admin/user-delete');
+    await page.getByRole('button',{name:'Delete account',exact:true}).waitFor({state:'detached'});
     assert.equal(await page.getByRole('button',{name:'Delete account',exact:true}).count(),0);
     assert.deepEqual(errors,[]);
     console.log('PASS: '+pages.length+' pages, all navigation targets, approval/rejection, cancel/back, desktop/mobile layout');

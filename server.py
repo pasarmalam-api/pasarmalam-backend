@@ -7,6 +7,7 @@ import branches
 import seller_ai
 import chat
 import easyparcel
+import account_deletion
 import hashlib
 import hmac
 import json
@@ -460,6 +461,7 @@ def init_db():
         migrate_notifications(con)
         migrate_support_tickets(con)
         migrate_seller_email_queue(con)
+        account_deletion.migrate(con, USE_POSTGRES)
 
 
 def migrate_seller_email_queue(con):
@@ -519,6 +521,8 @@ def deliver_seller_emails():
 def seller_email_worker():
     while True:
         try:
+            with connect() as con:
+                account_deletion.expire_identity(con, now())
             deliver_seller_emails()
         except Exception:
             print("Seller registration email queue could not be processed", flush=True)
@@ -1005,6 +1009,8 @@ def migrate_support_tickets(con):
 
 
 def migrate_reviews(con):
+    if 'buyer_id' not in table_columns(con, 'reviews'):
+        con.execute('ALTER TABLE reviews ADD COLUMN buyer_id INTEGER DEFAULT 0')
     columns = table_columns(con, "reviews")
     if "seller_id" not in columns:
         con.execute("ALTER TABLE reviews ADD COLUMN seller_id INTEGER DEFAULT 1")
@@ -1460,6 +1466,8 @@ class Handler(BaseHTTPRequestHandler):
                 "/": lambda: send_html(self, 200, backend_homepage()),
                 "/api/health": lambda: send_json(self, 200, {"ok": True, "service": "PasarMalam API", "features": "marketplace", "version": "admin-ops-2026-06-05"}),
                 "/api/profile": self.get_buyer_profile,
+                "/api/account/deletion": self.account_deletion_status,
+                "/api/admin/account-deletions": self.admin_account_deletions,
                 "/api/integrations/easyparcel/callback": self.easyparcel_callback,
                 "/api/integrations/easyparcel/authorize": self.easyparcel_authorize,
                 "/api/admin/easyparcel/status": self.easyparcel_admin,
@@ -1530,6 +1538,10 @@ class Handler(BaseHTTPRequestHandler):
             data = read_json(self)
             if parsed.path == "/api/admin/easyparcel/connect" and method == "POST":
                 self.easyparcel_admin(start=True)
+            elif parsed.path == "/api/account/deletion" and method == "POST":
+                self.request_account_deletion(data)
+            elif parsed.path == "/api/admin/account-deletions" and method == "POST":
+                self.admin_account_deletions(data)
             elif parsed.path == "/api/auth/signup":
                 self.signup(data)
             elif parsed.path == "/api/auth/login":
@@ -1987,8 +1999,8 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("Product not found")
             seller_id = int(product["seller_id"] or data.get("seller_id") or 1)
             cur = con.execute(
-                "INSERT INTO reviews (product_id, seller_id, buyer_name, rating, title, body, seller_reply, created_at) VALUES (?, ?, ?, ?, ?, ?, '', ?)",
-                (product_id, seller_id, buyer_name, rating, title, body, now()),
+                "INSERT INTO reviews (product_id, seller_id, buyer_id, buyer_name, rating, title, body, seller_reply, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, '', ?)",
+                (product_id, seller_id, user['id'], buyer_name, rating, title, body, now()),
             )
             avg = con.execute("SELECT COALESCE(AVG(rating), 0) AS rating FROM reviews WHERE product_id = ?", (product_id,)).fetchone()
             con.execute("UPDATE products SET rating = ? WHERE id = ?", (round(as_float(avg["rating"]), 1), product_id))
@@ -2529,6 +2541,57 @@ class Handler(BaseHTTPRequestHandler):
                 rows = []
         send_json(self, 200, {"tickets": rows})
 
+    def account_deletion_status(self):
+        user = self.require_user()
+        if user['role'] not in ('buyer', 'seller'):
+            raise PermissionError('Buyer or seller account required')
+        with connect() as con:
+            row = con.execute('SELECT * FROM account_deletion_requests WHERE user_id=?', (user['id'],)).fetchone()
+        send_json(self, 200, {'request': account_deletion.public(row) if row else None})
+
+    def request_account_deletion(self, data):
+        user = self.current_user()
+        if not user:
+            # Suspended/pending sellers must still be able to request deletion.
+            with connect() as con:
+                row = con.execute('SELECT * FROM users WHERE LOWER(email)=?',
+                                  (str(data.get('email', '')).strip().lower(),)).fetchone()
+            if not row or not verify_password(str(data.get('password', '')), row['password']):
+                raise PermissionError('Sign in or enter your registered email and password')
+            user = dict(row)
+        if user['role'] not in ('buyer', 'seller'):
+            raise PermissionError('Buyer or seller account required')
+        if data.get('confirm') is not True:
+            raise ValueError('Confirm deletion of the entire buyer and seller account')
+        with connect() as con:
+            row = account_deletion.submit(con, user, now())
+            # Do not duplicate admin notifications on network retries.
+            target = 'tickets.html#account-deletions'
+            title = f"Account deletion request #{row['id']}"
+            if not con.execute('SELECT id FROM notifications WHERE role=? AND title=? AND target_url=?', ('admin', title, target)).fetchone():
+                notify_admins(con, title, 'Verified request. Complete within 30 days; review the deletion queue.', 'privacy', target)
+        send_json(self, 200, {'ok': True, 'request': account_deletion.public(row)})
+
+    def admin_account_deletions(self, data=None):
+        admin = self.require_user('admin')
+        with connect() as con:
+            if data and data.get('action') == 'preview':
+                request = con.execute('SELECT user_id FROM account_deletion_requests WHERE id=?', (int(data.get('id') or 0),)).fetchone()
+                if not request:
+                    raise ValueError('Deletion request not found')
+                return send_json(self, 200, {'preview': account_deletion.preview(con, request['user_id'])})
+            if data and data.get('action') == 'purge':
+                account_deletion.purge(con, admin, data, now(), USE_POSTGRES)
+            elif data is not None:
+                account_deletion.update(con, admin, data, now())
+            account_deletion.expire_identity(con, now())
+            rows = [dict(r) for r in con.execute('SELECT * FROM account_deletion_requests ORDER BY completed_at, due_at, id')]
+            for row in rows:
+                cleanup = con.execute('SELECT inventory,retention_until,retention_reason FROM deletion_cleanup WHERE request_id=?', (row['id'],)).fetchone()
+                if cleanup:
+                    row['cleanup'] = {**dict(cleanup), 'inventory': json.loads(cleanup['inventory'])}
+        send_json(self, 200, {'requests': rows})
+
     def create_support_ticket(self, data):
         user = self.current_user()
         role = user["role"] if user and user.get("role") in ("buyer", "seller") else data.get("role", "buyer")
@@ -2834,64 +2897,7 @@ class Handler(BaseHTTPRequestHandler):
         return product, qty, address, payment_method, buyer_phone
 
     def create_toyyibpay_payment(self, data):
-        if not TOYYIBPAY_SECRET_KEY or not TOYYIBPAY_CATEGORY_CODE:
-            raise PermissionError("Set TOYYIBPAY_SECRET_KEY and TOYYIBPAY_CATEGORY_CODE in Render before accepting live payments.")
-        user = self.require_user("buyer")
-        buyer_id = user["id"]
-        buyer_name = user["name"]
-        buyer_email = data.get("buyer_email") or user.get("email", "")
-        with connect() as con:
-            product, qty, address, payment_method, buyer_phone = self.validate_checkout_payload(con, data, user)
-            fee, delivery_details = delivery.consume(con, user, product, qty, data)
-            subtotal = float(product["price"]) * qty
-            discount, voucher_code = campaign_discount(con, product["seller_id"], data.get("voucher_code", ""), subtotal)
-            total = max(subtotal + fee - discount, 0)
-            tracking = f"PM{now()}{product['id']}"
-            awb = f"AWB-{tracking}-{data.get('logistics_method', product['shipping_type']).replace(' ', '-')}"
-            cur = con.execute(
-                """
-                INSERT INTO orders
-                (buyer_id, buyer_name, product_id, quantity, variant, address, total, logistics_method, logistics_fee, payment_method, payment_status, payment_reference, payment_url, order_status, escrow_status, tracking_no, awb_label, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'ToyyibPay', 'unpaid', '', '', 'pending_payment', 'pending', ?, ?, ?)
-                """,
-                (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), address, total, data.get("logistics_method", product["shipping_type"]), fee, tracking, awb, now()),
-            )
-            order_id = cur.lastrowid
-            self.attach_delivery(con, order_id, delivery_details)
-
-        bill_name = clean_toyyib_text(f"PasarMalam Order {order_id}", 30)
-        bill_description = clean_toyyib_text(f"Payment for order {order_id}", 100)
-        payload = {
-            "userSecretKey": TOYYIBPAY_SECRET_KEY,
-            "categoryCode": TOYYIBPAY_CATEGORY_CODE,
-            "billName": bill_name,
-            "billDescription": bill_description,
-            "billPriceSetting": "1",
-            "billPayorInfo": "1",
-            "billAmount": str(int(round(total * 100))),
-            "billReturnUrl": f"{BUYER_APP_URL}/payment.html",
-            "billCallbackUrl": f"{PUBLIC_BASE_URL}/api/payments/toyyibpay/callback",
-            "billExternalReferenceNo": str(order_id),
-            "billTo": clean_toyyib_text(buyer_name, 30),
-            "billEmail": buyer_email,
-            "billPhone": buyer_phone,
-            "billPaymentChannel": "0",
-            "billContentEmail": "Thank you for buying with PasarMalam",
-            "billChargeToCustomer": "1",
-            "billExpiryDays": "3",
-        }
-        response = post_toyyibpay("/index.php/api/createBill", payload)
-        bill_code = response[0].get("BillCode") if isinstance(response, list) and response else ""
-        if not bill_code:
-            raise ValueError(f"ToyyibPay did not return BillCode: {response}")
-        checkout_url = f"{TOYYIBPAY_BASE_URL}/{bill_code}"
-        with connect() as con:
-            con.execute("UPDATE orders SET payment_reference = ?, payment_url = ? WHERE id = ?", (bill_code, checkout_url, order_id))
-            con.execute(
-                "INSERT INTO payments (order_id, provider, bill_code, amount, status, checkout_url, raw_response, created_at, updated_at) VALUES (?, 'ToyyibPay', ?, ?, 'pending', ?, ?, ?, ?)",
-                (order_id, bill_code, total, checkout_url, json.dumps(response), now(), now()),
-            )
-        send_json(self, 201, {"ok": True, "order_id": order_id, "bill_code": bill_code, "checkout_url": checkout_url, "total": total, "discount": discount, "voucher_code": voucher_code})
+        return send_json(self, 503, {'error': 'Legacy ToyyibPay payments are disabled. Use the configured Billplz checkout.'})
 
     def create_billplz_payment(self, data):
         if not BILLPLZ_API_KEY or not BILLPLZ_COLLECTION_ID:
@@ -2945,44 +2951,13 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 201, {"ok": True, "order_id": order_id, "bill_code": bill_id, "checkout_url": checkout_url, "total": total, "discount": discount, "voucher_code": voucher_code})
 
     def toyyibpay_callback(self, data):
-        bill_code = str(data.get("billcode", data.get("billCode", "")))
-        order_id = self.resolve_payment_order_id(data.get("order_id") or data.get("billExternalReferenceNo"), bill_code)
-        status = str(data.get("status", data.get("status_id", "")))
-        refno = str(data.get("refno", data.get("transaction_id", "")))
-        received_hash = str(data.get("hash", ""))
-        if TOYYIBPAY_SECRET_KEY:
-            expected = hashlib.md5(f"{TOYYIBPAY_SECRET_KEY}{status}{order_id}{refno}ok".encode("utf-8")).hexdigest()
-            if received_hash and received_hash != expected:
-                raise PermissionError("Invalid ToyyibPay callback hash")
-        self.apply_payment_status(order_id, status, bill_code, refno, data)
-        send_json(self, 200, {"ok": True})
+        return send_json(self, 503, {'error': 'Legacy ToyyibPay payments are disabled. Use the configured Billplz checkout.'})
 
     def toyyibpay_return(self, query):
-        bill_code = (query.get("billcode") or [""])[0]
-        order_id = self.resolve_payment_order_id((query.get("order_id") or [""])[0], bill_code)
-        status = (query.get("status_id") or ["2"])[0]
-        if order_id:
-            self.apply_payment_status(order_id, status, bill_code, "", {"source": "return_url"})
-        send_json(self, 200, {"ok": True, "order_id": order_id, "status": payment_status_label(status)})
+        return send_json(self, 503, {'error': 'Legacy ToyyibPay payments are disabled. Use the configured Billplz checkout.'})
 
     def toyyibpay_status(self, query):
-        bill_code = (query.get("billcode") or query.get("billCode") or [""])[0]
-        order_id = self.resolve_payment_order_id((query.get("order_id") or [""])[0], bill_code)
-        if not order_id:
-            raise ValueError("Payment/order not found")
-        status = ""
-        raw = {"source": "local"}
-        if bill_code and TOYYIBPAY_SECRET_KEY:
-            raw = post_toyyibpay("/index.php/api/getBillTransactions", {"billCode": bill_code})
-            if isinstance(raw, list) and raw:
-                status = str(raw[0].get("billpaymentStatus") or raw[0].get("billStatus") or "")
-        if status:
-            self.apply_payment_status(order_id, status, bill_code, "", raw)
-        with connect() as con:
-            order = con.execute("SELECT id, payment_status, order_status, escrow_status, payment_reference, payment_url FROM orders WHERE id = ?", (order_id,)).fetchone()
-        if not order:
-            raise ValueError("Order not found")
-        send_json(self, 200, {"ok": True, "order": row_to_dict(order), "gateway": raw})
+        return send_json(self, 503, {'error': 'Legacy ToyyibPay payments are disabled. Use the configured Billplz checkout.'})
 
     def resolve_payment_order_id(self, external_order_id="", bill_code=""):
         try:
@@ -3002,10 +2977,24 @@ class Handler(BaseHTTPRequestHandler):
         order_status = "placed" if label == "paid" else "pending_payment"
         escrow_status = "holding" if label == "paid" else "pending"
         with connect() as con:
-            order = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+            if not USE_POSTGRES:
+                con.execute('BEGIN IMMEDIATE')
+            order = con.execute("SELECT * FROM orders WHERE id = ?" + (' FOR UPDATE' if USE_POSTGRES else ''), (order_id,)).fetchone()
             if not order:
                 raise ValueError("Order not found")
+            if con.execute('SELECT id FROM redacted_orders WHERE id=?', (order_id,)).fetchone():
+                # Late callbacks must not restore deleted personal data or reopen escrow.
+                if label != order['payment_status']:
+                    notify_admins(con, f'Financial review required for PM-{order_id}',
+                                  'Gateway status changed after account-data erasure. Review the provider; no personal payload was retained.',
+                                  'payment', 'payments.html')
+                return
             was_paid = order["payment_status"] == "paid"
+            if was_paid or order['order_status'] in ('cancelled', 'completed'):
+                if label == 'paid' and not was_paid:
+                    notify_admins(con, f'Late payment review for PM-{order_id}',
+                                  'Gateway reports a payment on a closed order. Review and refund or reconcile manually; fulfilment was not reopened.', 'payment', 'payments.html')
+                return
             con.execute("UPDATE orders SET payment_status = ?, order_status = ?, escrow_status = ?, payment_reference = ?, status_updated_at = ? WHERE id = ?", (label, order_status, escrow_status, bill_code or order["payment_reference"], now(), order_id))
             con.execute("UPDATE payments SET status = ?, bill_code = ?, raw_response = ?, updated_at = ? WHERE order_id = ?", (label, bill_code, json.dumps(raw), now(), order_id))
             if label == "paid" and not was_paid:
@@ -3022,35 +3011,50 @@ class Handler(BaseHTTPRequestHandler):
 
     def billplz_callback(self, data):
         bill_id = str(data.get("id", data.get("billplz[id]", "")))
-        order_id = self.resolve_payment_order_id("", bill_id)
-        if not order_id:
-            order_id = int(data.get("reference_1", "0") or "0")
-        if BILLPLZ_X_SIGNATURE_KEY and data.get("x_signature"):
+        if BILLPLZ_X_SIGNATURE_KEY:
             if not verify_billplz_signature(data, BILLPLZ_X_SIGNATURE_KEY):
                 raise PermissionError("Invalid Billplz callback signature")
-        paid = str(data.get("paid", "")).lower() == "true" or data.get("state") == "paid"
-        status = "1" if paid else "3"
-        self.apply_payment_status(order_id, status, bill_id, str(data.get("transaction_id", "")), data)
+        self.verify_billplz_bill(bill_id)
         send_json(self, 200, {"ok": True})
+
+    def verify_billplz_bill(self, bill_id, user=None, requested_order_id=0):
+        if not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', str(bill_id)):
+            raise ValueError('Invalid bill reference')
+        with connect() as con:
+            row = con.execute("SELECT o.* FROM payments p JOIN orders o ON o.id=p.order_id WHERE p.provider='Billplz' AND p.bill_code=?", (bill_id,)).fetchone()
+        if not row or (requested_order_id and int(row['id']) != int(requested_order_id)):
+            raise ValueError('Bill does not match the order')
+        if user and user['role'] != 'admin' and (user['role'] != 'buyer' or row['buyer_id'] != user['id']):
+            raise PermissionError('This payment belongs to another account')
+        if not BILLPLZ_API_KEY or not BILLPLZ_COLLECTION_ID:
+            raise ValueError('Payment verification is temporarily unavailable')
+        result = get_billplz('/api/v3/bills/' + urllib.parse.quote(bill_id))
+        expected = (Decimal(str(row['total'])) * 100).quantize(Decimal('1'))
+        if str(result.get('id')) != bill_id or str(result.get('collection_id')) != BILLPLZ_COLLECTION_ID:
+            raise ValueError('Provider bill identity does not match')
+        if Decimal(str(result.get('amount', -1))) != expected:
+            raise ValueError('Provider bill amount does not match the order')
+        paid = result.get('paid') is True or str(result.get('paid')).lower() == 'true'
+        if paid and Decimal(str(result.get('paid_amount', -1))) != expected:
+            raise ValueError('Provider paid amount does not match the order')
+        safe = {k: result.get(k) for k in ('id', 'collection_id', 'paid', 'state', 'amount', 'paid_amount')}
+        self.apply_payment_status(row['id'], '1' if paid else '2', bill_id, '', safe)
+        return row['id'], safe
 
     def billplz_return(self, query):
         bill_id = (query.get("billplz[id]") or query.get("id") or [""])[0]
-        order_id = self.resolve_payment_order_id("", bill_id)
-        paid = (query.get("billplz[paid]") or query.get("paid") or ["false"])[0].lower() == "true"
-        if order_id:
-            self.apply_payment_status(order_id, "1" if paid else "3", bill_id, "", {"source": "billplz_return"})
-        send_json(self, 200, {"ok": True, "order_id": order_id, "status": "paid" if paid else "failed"})
+        order_id, result = self.verify_billplz_bill(bill_id)
+        send_json(self, 200, {"ok": True, "order_id": order_id, "status": "paid" if result['paid'] is True or str(result['paid']).lower() == 'true' else 'pending'})
 
     def billplz_status(self, query):
+        user = self.require_user()
         bill_id = (query.get("billplz[id]") or query.get("id") or query.get("billcode") or [""])[0]
-        order_id = self.resolve_payment_order_id((query.get("order_id") or [""])[0], bill_id)
-        if not order_id:
-            raise ValueError("Payment/order not found")
-        raw = {"source": "local"}
-        if bill_id and BILLPLZ_API_KEY:
-            raw = get_billplz(f"/api/v3/bills/{urllib.parse.quote(bill_id)}")
-            paid = bool(raw.get("paid"))
-            self.apply_payment_status(order_id, "1" if paid else "2", bill_id, "", raw)
+        requested_id = int((query.get('order_id') or ['0'])[0] or 0)
+        if not bill_id:
+            with connect() as con:
+                payment = con.execute("SELECT bill_code FROM payments WHERE order_id=? AND provider='Billplz' ORDER BY id DESC LIMIT 1", (requested_id,)).fetchone()
+            bill_id = payment['bill_code'] if payment else ''
+        order_id, raw = self.verify_billplz_bill(bill_id, user, requested_id)
         with connect() as con:
             order = con.execute("SELECT id, payment_status, order_status, escrow_status, payment_reference, payment_url FROM orders WHERE id = ?", (order_id,)).fetchone()
         if not order:
@@ -4006,16 +4010,16 @@ def get_billplz(path):
 def verify_billplz_signature(data, key):
     source = []
     for raw_key, value in data.items():
-        if raw_key == "x_signature":
+        if raw_key in ("x_signature", "billplz[x_signature]"):
             continue
         normalized = raw_key
         if normalized.startswith("billplz[") and normalized.endswith("]"):
             normalized = "billplz" + normalized[8:-1]
-        source.append((normalized.lower(), f"{normalized}{value}"))
-    source.sort(key=lambda item: item[0])
-    text = "|".join(item[1] for item in source)
+        value = '' if value is None else str(value).lower() if isinstance(value, bool) else str(value)
+        source.append(f"{normalized}{value}")
+    text = "|".join(sorted(source, key=str.lower))
     expected = hmac.new(key.encode("utf-8"), text.encode("utf-8"), hashlib.sha256).hexdigest()
-    return hmac.compare_digest(expected, str(data.get("x_signature", "")))
+    return hmac.compare_digest(expected, str(data.get("x_signature", data.get('billplz[x_signature]', ''))))
 
 
 def make_admin_reset_token(email):

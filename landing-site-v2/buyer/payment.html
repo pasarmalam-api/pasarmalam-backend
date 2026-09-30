@@ -30,12 +30,12 @@
     async function check(){
       const orderId=orderIdFromQuery(),billcode=billCodeFromQuery(),paidFlag=String(qp("paid")||"").toLowerCase();
       setSteps("gateway");
-      if(paidFlag==="true")title.innerHTML="<span class='paid'>Payment received</span>";
-      else if(paidFlag==="false")title.innerHTML="<span class='failed'>Payment not completed</span>";
+      title.textContent="Checking payment...";
       try{
         if(orderId||billcode){
-          const r=await fetch(`${API_BASE}/api/payments/billplz/status?order_id=${encodeURIComponent(orderId)}&billcode=${encodeURIComponent(billcode)}`);
+          const r=await fetch(`${API_BASE}/api/payments/billplz/status?order_id=${encodeURIComponent(orderId)}&billcode=${encodeURIComponent(billcode)}`,{headers:{Authorization:`Bearer ${localStorage.getItem('pm_token')||''}`}});
           const data=await r.json();
+          if(r.status===401){title.textContent='Sign in to check payment';details.textContent='Your payment is confirmed by the server, not by the return link.';actions.innerHTML='<a class="primary" id="paymentLogin">Sign In</a>';document.getElementById('paymentLogin').href='login.html?next='+encodeURIComponent('payment.html'+location.search);return;}
           if(!r.ok) throw new Error(data.error||"Status check failed");
           const o=data.order;
           localStorage.setItem("pm_last_checkout",JSON.stringify({...lastCheckout(),order_id:o.id,bill_code:o.payment_reference,payment_status:o.payment_status,created_at:Date.now()}));
