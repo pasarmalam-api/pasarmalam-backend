@@ -37,4 +37,4 @@
     try{const r=await fetch('https://pasarmalam-backend.onrender.com/api/delivery/services',{headers:{Authorization:'Bearer '+token}});const v=await r.json();if(!r.ok)throw new Error(v.error||'Delivery settings unavailable');cities=v.cities||[];$('deliveryCity').replaceChildren(new Option('Pilih kawasan',''),...cities.map(c=>new Option(c.name,c.locode)));$('deliveryCity').value=savedPickup?.city||'';vehicles();$('deliveryVehicle').value=savedPickup?.service_type||'';limit();$('deliveryCity').disabled=false;$('deliveryVehicle').disabled=false;}catch(e){$('status').textContent=e.message;}
   }).catch(e=>{$('status').textContent=e.message;});
 })();
-</script><script src="seller-actions.js?v=branches1"></script><script src="badges.js?v=audit2"></script></body></html>
+</script><script src="seller-actions.js?v=branches1"></script><script src="badges.js?v=20261001b"></script></body></html>
