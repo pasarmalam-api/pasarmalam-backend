@@ -2068,6 +2068,7 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 201, {"id": cur.lastrowid, "ok": True})
 
     def signup(self, data):
+        from buyer_address import registration_address
         data = dict(data)
         data['email'] = str(data.get('email', '')).strip().lower()
         if not re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", data['email']):
@@ -2083,6 +2084,8 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("Signup role must be buyer or seller")
         if not data.get("phone", "").strip():
             raise ValueError("Phone number is required")
+        if role == 'buyer':
+            data['address'] = registration_address(data)
         if role in ("buyer", "seller"):
             email_otp_token = data.get("email_otp_token", "")
             if not verify_email_otp_token(data["email"], email_otp_token, f"{role}_signup"):

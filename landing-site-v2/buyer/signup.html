@@ -24,12 +24,17 @@
     <label for="email">Email</label><div class="field"><input id="email" type="email" autocomplete="email" placeholder="you@example.com"><button class="outline" onclick="sendEmailOtp()" type="button">Send OTP</button></div>
     <label for="otp">Email verification code</label><div class="field"><input id="otp" autocomplete="one-time-code" inputmode="numeric" maxlength="6" placeholder="6-digit code"><button class="outline" onclick="verifyEmailOtp()" type="button">Verify</button></div>
     <label for="password">Password</label><div class="field"><input id="password" type="password" autocomplete="new-password" placeholder="Minimum 8 characters"><button class="outline" onclick="togglePassword()" type="button" id="viewBtn">View</button></div>
-    <label for="address">Delivery address</label><textarea id="address" autocomplete="street-address" placeholder="House, street, city, postcode"></textarea>
+    <label for="address">Delivery address</label><textarea id="address" autocomplete="address-line1" maxlength="300" required placeholder="House number, street or building"></textarea>
+    <label for="addressUnit">Unit / floor (optional)</label><input id="addressUnit" autocomplete="address-line2" maxlength="120">
+    <label for="addressPostcode">Postcode</label><input id="addressPostcode" autocomplete="postal-code" inputmode="numeric" maxlength="5" pattern="[0-9]{5}" required>
+    <label for="addressCity">City</label><input id="addressCity" autocomplete="address-level2" maxlength="100" required>
+    <label for="addressState">State</label><select id="addressState" autocomplete="address-level1" required style="width:100%;min-height:44px;font:inherit;border:1px solid var(--line);border-radius:6px;padding:12px;background:white"></select>
     <label class="terms"><input id="agree" type="checkbox"><span>I agree to PasarMalam <a href="policies.html" target="_blank">Terms, Privacy Policy, Buyer Protection, Return/Refund Policy, and Marketplace Rules</a>.</span></label>
     <button class="primary" onclick="signup()">Create Account</button>
     <div id="status" class="status muted" role="status" aria-live="polite"></div>
   </section>
 </main>
+<script src="signup-address.js?v=20261001"></script>
 <script>
 const API="https://pasarmalam-backend.onrender.com";
 let emailOtpToken="";
@@ -49,6 +54,7 @@ async function signup(){
   const name=$("name"),phone=$("phone"),email=$("email"),password=$("password"),address=$("address"),agree=$("agree");
   if(!name.value.trim()){setStatus("Full name is required.","error");return}
   if(!phone.value.trim()){setStatus("Phone number is required.","error");return}
+  let deliveryAddress;try{deliveryAddress=window.pmRegistrationAddress();}catch(e){setStatus(e.message,"error");return}
   if(!email.value.trim()){setStatus("Email is required.","error");return}
   if(!emailOtpToken){setStatus("Please verify your email OTP first.","error");return}
   if(password.value.length<8){setStatus("Password must be at least 8 characters.","error");return}
@@ -56,7 +62,7 @@ async function signup(){
   setStatus("Creating account...");
   if(signup.busy)return;signup.busy=true;
   try{
-  const r=await fetch(API+"/api/auth/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name.value.trim(),email:email.value.trim(),password:password.value,phone:phone.value.trim(),address:address.value.trim(),role:"buyer",email_otp_token:emailOtpToken})});
+  const r=await fetch(API+"/api/auth/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name.value.trim(),email:email.value.trim(),password:password.value,phone:phone.value.trim(),...deliveryAddress,role:"buyer",email_otp_token:emailOtpToken})});
   const d=await r.json().catch(()=>({}));
   if(d.token){localStorage.setItem("pm_token",d.token);localStorage.setItem("pm_user",JSON.stringify(d.user));setStatus("Account created. Redirecting...","success");setTimeout(()=>location.href="index.html",800)}
   else setStatus(d.error||"Signup failed.","error");
@@ -64,5 +70,5 @@ async function signup(){
 }
 document.getElementById('email').addEventListener('input',()=>{emailOtpToken=''});
 </script>
-<script src="badges.js?v=20261001b"></script><script src="buyer-ui.js?v=3"></script></body>
+<script src="badges.js?v=20261001c"></script><script src="buyer-ui.js?v=3"></script></body>
 </html>

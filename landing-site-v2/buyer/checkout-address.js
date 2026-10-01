@@ -17,6 +17,7 @@
   const locality=document.createElement('div');locality.className='row';
   locality.innerHTML=`<label for="addressPostcode">${t('Poskod','Postcode')}<input id="addressPostcode" inputmode="numeric" autocomplete="postal-code" maxlength="5" pattern="[0-9]{5}" required></label><label for="addressCity">${t('Bandar','City')}<input id="addressCity" autocomplete="address-level2" maxlength="100" required></label><label for="addressState">${t('Negeri','State')}<select id="addressState" autocomplete="address-level1" required><option value="">${t('Pilih negeri','Select state')}</option>${regions.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></label>`;
   extra.before(locality);
+  el('addressPostcode').addEventListener('input',()=>{el('addressPostcode').value=el('addressPostcode').value.replace(/[^0-9]/g,'').slice(0,5);});
   function fillParts(text,components=[]){
     const component=type=>{const c=components.find(c=>c.types.includes(type));return c?.longText||c?.long_name||'';};
     const state=component('administrative_area_level_1')||text;
@@ -54,8 +55,14 @@
     el('changeAddress').hidden=editing;
     if(window.pmDeliveryPendingLabel)renderSummary();
   }
-  let complete=true;try{validateAddress();}catch(e){complete=false;}
-  displayAddress(!complete);
+  // Old accounts can complete their address explicitly without expanding checkout on arrival.
+  const notice=document.createElement('p');notice.className='muted';notice.id='addressNotice';controls.append(notice);
+  function showSavedAddress(){
+    let valid=true;try{validateAddress();}catch(e){valid=false;}
+    notice.textContent=valid?'':t('Lengkapkan alamat penghantaran sebelum meneruskan.','Complete your delivery address before continuing.');
+    notice.hidden=valid;displayAddress(false);
+  }
+  showSavedAddress();
   let saved = currentUser().address || '', base = address.value, version = 0, loading;
   const status = value => { el('addressSearchStatus').textContent = value; };
   const drawDefault = () => {
@@ -110,6 +117,7 @@
   }
   let widget, selectedSearch = '', selecting = false;
   el('changeAddress').onclick = async () => {
+    notice.hidden=true;
     displayAddress(true);
     address.readOnly = false; invalidate(); el('addressSearch').hidden = false;
     status(t('Memuatkan carian Google...','Loading Google search...'));
@@ -162,7 +170,7 @@
         await geocode({address:address.value,componentRestrictions:{country:'MY'}},version,address.value);
       }
       validateAddress();
-      displayAddress(false);status('');window.pmDeliveryInvalidate?.();
+      showSavedAddress();status('');window.pmDeliveryInvalidate?.();
     }catch(e){status(e.message);}finally{done.disabled=false;renderSummary();}
   };
   el('addressUnit').addEventListener('input',()=>{
@@ -197,8 +205,9 @@
     saved=data.user.address||'';drawDefault();
     if(version===0){
       address.value=saved;base=saved;address.readOnly=!!saved;
-      fillParts(saved);let valid=true;try{validateAddress();}catch(e){valid=false;}displayAddress(!valid);
-      if(saved){
+      fillParts(saved);showSavedAddress();
+      let valid=true;try{validateAddress();}catch(e){valid=false;}
+      if(saved&&valid){
         const expected=version;
         try{await geocode({address:saved,componentRestrictions:{country:'MY'}},expected,saved);}
         catch(e){if(version===expected)status(e.message);}

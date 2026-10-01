@@ -6,7 +6,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;
  const browser=await chromium.launch({channel:'msedge',headless:true});
  try{
-  const context=await browser.newContext();let calls=[],failed=false;
+  const context=await browser.newContext();let calls=[],failed=false,incompleteProfile=false;
   await context.addInitScript(()=>{localStorage.setItem('pm_token','test');localStorage.setItem('pm_user',JSON.stringify({id:1,role:'buyer',name:'Test Buyer',phone:'01123456789',email:'test@example.com',address:'Office, 50088 Kuala Lumpur, Malaysia'}));localStorage.setItem('pasarmalam-lang','en');localStorage.setItem('pasarmalam-buyer-lang-version','20260903-ms-default');});
   await context.route('**/*',async route=>{
    const req=route.request();if(req.url().startsWith(origin))return route.continue();
@@ -14,7 +14,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    const endpoint=new URL(req.url()).pathname;
    if(req.method()!=='GET')calls.push({endpoint,data:req.postDataJSON()});
    if(endpoint==='/api/maps/config')return route.fulfill({json:{browser_key:'test'}});
-   if(endpoint==='/api/profile')return route.fulfill({json:{user:{address:'Office, 50088 Kuala Lumpur, Malaysia'}}});
+   if(endpoint==='/api/profile')return route.fulfill({json:{user:{address:incompleteProfile?'present 7 putrajaya':'Office, 50088 Kuala Lumpur, Malaysia'}}});
    if(endpoint==='/api/product/branches')return route.fulfill({json:{branches:[{id:'',name:'Main shop',price:20,is_open:true,address:'Seller address'}]}});
    if(endpoint==='/api/delivery/quotation'){
     if(failed)return route.fulfill({status:400,json:{error:'Local delivery is not set up by this seller yet. Choose another delivery option.'}});
@@ -33,6 +33,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    for(const id of ['deliveryLat','deliveryLng','deliveryVehicle','deliveryCity','deliveryPackage','deliveryConfirmed','checkoutBranch'])assert.equal(await page.locator('#'+id).isVisible(),false,id);
    await page.locator('#parcelService').selectOption('test-quote');
    assert.equal(await page.evaluate(()=>pmDeliveryFee()),6.99);
+   assert.match(await page.locator('#summary').innerText(),/26\.99/);
    assert.equal(await page.locator('#pay').isEnabled(),true);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    fs.mkdirSync('release-zips/checkout-audit',{recursive:true});
@@ -105,7 +106,15 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    await page.waitForFunction(()=>pmDeliveryFee()===6.99&&!document.getElementById('pay').disabled);
    await page.locator('input[name="deliveryChoice"][value="Ambil Sendiri"]').check();assert.equal(await page.evaluate(()=>pmDeliveryFee()),0);
   }
-  assert.deepEqual(errors,[]);console.log('PASS simple checkout: three widths, automatic quotes, compact address, edit invalidation, server-owned vehicle, payment restrictions and errors');
+  incompleteProfile=true;calls=[];
+  await page.goto(origin+'/buyer/checkout.html?product_id=1');
+  await page.locator('#addressNotice').filter({hasText:'Complete your delivery address'}).waitFor();
+  assert.equal(await page.locator('#addressEditor').isVisible(),false);
+  assert.equal(await page.locator('#pay').isEnabled(),false);
+  await page.locator('#changeAddress').click();
+  assert.equal(await page.locator('#addressEditor').isVisible(),true);
+  assert.equal(calls.filter(c=>c.endpoint==='/api/payments/billplz/create').length,0);
+  assert.deepEqual(errors,[]);console.log('PASS simple checkout: three widths, automatic quotes and totals, compact old/new addresses, edit invalidation, server-owned vehicle, payment restrictions and errors');
   const seller=await browser.newContext();let saved,servicesFail=false;
   await seller.addInitScript(()=>{localStorage.setItem('pm_token','test');localStorage.setItem('pm_user',JSON.stringify({id:2,role:'seller',seller_status:'approved'}));});
   await seller.route('**/*',async route=>{

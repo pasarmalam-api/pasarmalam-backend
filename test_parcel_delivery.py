@@ -39,6 +39,15 @@ class ParcelDeliveryTest(unittest.TestCase):
         with server.connect() as con, self.assertRaises(ValueError):
             delivery.consume(con, self.user, self.product, 1, data)
 
+    def test_rates_use_listing_weight_times_quantity_not_buyer_weight(self):
+        data = {**self.data, 'weight_kg': 0.01, 'logistics_fee': 0}
+        with server.connect() as con, patch.object(parcel_delivery, 'request_rates', return_value=self.rates) as request:
+            offers = delivery.create_quote(con, self.user, self.product, 3, data)['offers']
+            self.assertEqual(request.call_args.args[1]['weight'], 1.5)
+            self.assertEqual(request.call_args.args[1]['parcel_value'], float(self.product['price']) * 3)
+            fee, _ = delivery.consume(con, self.user, self.product, 3, {**data, 'quote_id': offers[0]['quote_id']})
+            self.assertEqual(fee, 5.4)
+
     def test_parcel_route_change_rejected(self):
         data = {**self.data, 'quote_id': self.offers()[0]['quote_id'], 'address': 'Other, 10150 Penang'}
         with server.connect() as con, self.assertRaises(ValueError):
