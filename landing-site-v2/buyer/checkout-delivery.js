@@ -57,13 +57,21 @@
   choices.after(box);
   // Legacy coordinate fields remain internal inputs for the shared address resolver.
   for (const child of [...box.children]) child.hidden = !['parcelOffers','deliveryStatus'].includes(child.id);
-  let cities = [], quote = null, revision = 0, requesting = false;
+  let cities = [], quote = null, revision = 0, requesting = false, paying = false, needsAddress = false;
   let refreshTimer;
   const baseApi = api, baseReady = requireCheckoutReady;
   const isPickup = () => shipping.value === 'Ambil Sendiri';
   const isParcel = () => shipping.value === 'EasyParcel';
   const status = text => { get('deliveryStatus').textContent = text; };
   const valid = () => isPickup() || (quote && quote.expires_at * 1000 > Date.now());
+  const originalSummary = renderSummary, originalPay = pay.onclick;
+  const syncPay = () => {let ready=true;try{baseReady();}catch(e){ready=false;}pay.disabled=paying||requesting||window.pmAddressEditing||!ready||!valid();};
+  window.pmDeliveryPendingLabel = () => needsAddress||window.pmAddressEditing
+    ? t('Pilih alamat penghantaran', 'Choose delivery address')
+    : requesting ? t('Mengira caj penghantaran...', 'Calculating delivery...')
+    : t('Penghantaran belum tersedia', 'Delivery unavailable');
+  renderSummary = function(){originalSummary();syncPay();};
+  pay.onclick = async function(event){paying=true;syncPay();try{await originalPay.call(this,event);}finally{paying=false;syncPay();}};
   window.pmDeliveryFee = () => isPickup() ? 0 : valid() ? Number(quote.fee) : NaN;
   window.pmDeliveryAdminFee = () => isPickup() ? 0 : valid() ? Number(quote.admin_fee || 0) : NaN;
   window.pmDeliveryCourierFee = () => isPickup() ? 0 : valid() ? Number(quote.courier_fee ?? quote.fee) : NaN;
@@ -76,12 +84,13 @@
         ? new Date(get('deliverySchedule').value).toISOString() : ''};
   }
   function reset() {
-    revision++; quote = null;
+    revision++; quote = null; needsAddress=false;
     get('result').textContent = '';
     get('parcelOffers').hidden = true;
     get('parcelOffers').querySelectorAll('label,select').forEach(label => label.remove());
     box.hidden = isPickup();
     get('deliveryQuote').hidden = true;
+    get('deliveryQuote').textContent = t('Cuba lagi', 'Retry');
     for (const radio of choices.querySelectorAll('input')) radio.checked = radio.value === shipping.value;
     get('deliveryScheduleLabel').hidden = shipping.value !== 'Lalamove Biasa';
     const cash = get('payment').querySelector('option[value="Cash Pickup"]');
@@ -138,16 +147,23 @@
     {enableHighAccuracy: true, timeout: 15000, maximumAge: 0});
   };
   get('deliveryQuote').textContent = t('Cuba lagi', 'Retry');
-  window.pmLoadDelivery = get('deliveryQuote').onclick = async () => {
+  get('deliveryQuote').onclick = () => {
+    if(needsAddress){get('changeAddress')?.click();get('addressEditor')?.scrollIntoView({block:'start',behavior:'smooth'});return;}
+    window.pmLoadDelivery();
+  };
+  window.pmLoadDelivery = async () => {
     if (isPickup() || !checkoutProduct || !checkoutItem || !address.value.trim() || window.pmAddressEditing) return;
     if (requesting) return;
-    requesting = true; get('deliveryQuote').disabled = true;
+    requesting = true; get('deliveryQuote').disabled = true;syncPay();
     const version = revision;
     try {
       if (!checkoutProduct || !checkoutItem) throw new Error(t('Pilih produk dahulu.', 'Select a product first.'));
       const route = fields();
-      if (!isParcel() && (!route.coordinates.lat || !route.coordinates.lng || !route.location_confirmed))
-        throw new Error(t('Tukar alamat dan pilih alamat tepat melalui carian.', 'Change your address and select a precise search result.'));
+      if (!isParcel() && (!route.coordinates.lat || !route.coordinates.lng || !route.location_confirmed)) {
+        needsAddress=true;
+        get('deliveryQuote').textContent=t('Pilih alamat penghantaran','Choose delivery address');
+        throw new Error(t('Pilih alamat daripada cadangan untuk mengira caj penghantaran.', 'Select an address suggestion to calculate delivery.'));
+      }
       status(t('Mendapatkan sebut harga...', 'Getting quotation...'));
       const response = await baseApi('/api/delivery/quotation', {method: 'POST', body: JSON.stringify({
         product_id: checkoutItem.product_id, quantity: checkoutItem.quantity, variant: checkoutItem.variant || '',
@@ -172,11 +188,11 @@
       status(money(quote.fee));
       renderSummary();
     } catch (e) { if (version === revision) { quote = null; status(e.message); get('deliveryQuote').hidden = false; renderSummary(); } }
-    finally { requesting = false; get('deliveryQuote').disabled = false; if(version!==revision && !isPickup()) {clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>window.pmLoadDelivery(),600);} }
+    finally { requesting = false; get('deliveryQuote').disabled = false;renderSummary(); if(version!==revision && !isPickup()) {clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>window.pmLoadDelivery(),600);} }
   };
   requireCheckoutReady = function() {
     baseReady();
-    if (!valid()) throw new Error(t('Dapatkan sebut harga penghantaran baharu.', 'Get a fresh delivery quotation.'));
+    if (!valid()) throw new Error(get('deliveryStatus').textContent||window.pmDeliveryPendingLabel());
     if (!isPickup() && get('payment').value === 'Cash Pickup') throw new Error('Cash is for self pickup only.');
     if (shipping.value !== 'PM Express' && payment.value === 'Pay on Arrival') throw new Error('Pay on Arrival is for PM Express only.');
   };

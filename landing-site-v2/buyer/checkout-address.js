@@ -23,6 +23,7 @@
     window.pmAddressEditing=editing;editor.hidden=!editing;
     el('savedAddress').textContent=[currentUser().name,el('buyerPhone').value,address.value].filter(Boolean).join(' | ');
     el('changeAddress').hidden=editing;
+    if(window.pmDeliveryPendingLabel)renderSummary();
   }
   displayAddress(!address.value.trim()||!el('buyerPhone').value.trim());
   let saved = currentUser().address || '', base = address.value, version = 0, loading;
@@ -128,7 +129,7 @@
         await geocode({address:address.value,componentRestrictions:{country:'MY'}},version,address.value);
       }
       displayAddress(false);status('');window.pmDeliveryInvalidate?.();
-    }catch(e){status(e.message);}finally{done.disabled=false;}
+    }catch(e){status(e.message);}finally{done.disabled=false;renderSummary();}
   };
   el('addressUnit').addEventListener('input',()=>{
     address.value=[el('addressUnit').value.trim(),base].filter(Boolean).join(', ');

@@ -33,6 +33,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    for(const id of ['deliveryLat','deliveryLng','deliveryVehicle','deliveryCity','deliveryPackage','deliveryConfirmed','checkoutBranch'])assert.equal(await page.locator('#'+id).isVisible(),false,id);
    await page.locator('#parcelService').selectOption('test-quote');
    assert.equal(await page.evaluate(()=>pmDeliveryFee()),6.99);
+   assert.equal(await page.locator('#pay').isEnabled(),true);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    fs.mkdirSync('release-zips/checkout-audit',{recursive:true});
    await page.screenshot({path:path.resolve('release-zips/checkout-audit/simple-checkout-'+width+'.png'),fullPage:true});
@@ -59,6 +60,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    await page.locator('#address').fill('Another office, 50450 Kuala Lumpur, Malaysia');
    const n=calls.length;await page.waitForTimeout(800);assert.equal(calls.length,n);
    assert.equal(await page.evaluate(()=>Number.isNaN(pmDeliveryFee())),true);
+   assert.equal(await page.locator('#pay').isEnabled(),false);
    await page.locator('#useAddress').click();await page.locator('#parcelService').waitFor();
    await page.locator('input[name="deliveryChoice"][value="PM Express"]').check();
    await page.locator('#changeAddress').click();await page.locator('#useAddress').click();
@@ -74,7 +76,16 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    assert.equal(calls.at(-1).data.service_type,'CAR');
    assert.equal(calls.at(-1).data.service_options,true);
    failed=true;await page.evaluate(()=>pmDeliveryInvalidate());await page.getByText('Local delivery is not set up by this seller yet. Choose another delivery option.').waitFor();
-   assert.equal(await page.locator('#deliveryVehicle').isVisible(),false);failed=false;
+   assert.equal(await page.locator('#deliveryVehicle').isVisible(),false);
+   assert.equal(await page.locator('#pay').isEnabled(),false);failed=false;
+   await page.evaluate(()=>{document.getElementById('deliveryConfirmed').checked=false;pmDeliveryInvalidate();});
+   await page.getByRole('button',{name:'Choose delivery address',exact:true}).waitFor();
+   assert.equal(await page.locator('#pay').isEnabled(),false);
+   assert(!(await page.locator('#summary').innerText()).includes('Get a quote'));
+   await page.locator('#deliveryQuote').click();
+   assert.equal(await page.locator('#addressEditor').isVisible(),true);
+   await page.locator('#useAddress').click();
+   await page.waitForFunction(()=>pmDeliveryFee()===6.99&&!document.getElementById('pay').disabled);
    await page.locator('input[name="deliveryChoice"][value="Ambil Sendiri"]').check();assert.equal(await page.evaluate(()=>pmDeliveryFee()),0);
   }
   assert.deepEqual(errors,[]);console.log('PASS simple checkout: three widths, automatic quotes, compact address, edit invalidation, server-owned vehicle, payment restrictions and errors');
