@@ -10,7 +10,8 @@ assert.deepEqual(mixShops([{id:1,shop:'A'},{id:2,shop:'A'},{id:3,shop:'B'}]).map
 (async()=>{
  const browser=await chromium.launch({channel:'msedge',headless:true});
  try{
-  const page=await browser.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+  const page=await browser.newPage(),errors=[],privateHeaders=[];page.on('pageerror',e=>errors.push(e.message));
+  await page.addInitScript(()=>localStorage.setItem('pm_token','seller-session'));
   await page.route('**/*',route=>{
    const url=new URL(route.request().url());
    if(url.hostname==='buyer.test'){
@@ -18,7 +19,11 @@ assert.deepEqual(mixShops([{id:1,shop:'A'},{id:2,shop:'A'},{id:3,shop:'B'}]).map
     return fs.existsSync(file)?route.fulfill({body:fs.readFileSync(file),contentType:file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':file.endsWith('.png')?'image/png':'text/html'}):route.fulfill({status:404,body:''});
    }
    if(url.hostname==='www.pasarmalamapp.com')return route.fulfill({body:'Seller destination'});
-   if(url.hostname==='pasarmalam-backend.onrender.com')return route.fulfill({json:{products,cart:[],orders:[],notifications:[],rates:[],reviews:[]}});
+   if(url.hostname==='pasarmalam-backend.onrender.com'){
+    const auth=route.request().headers().authorization;
+    if(url.pathname==='/api/cart')privateHeaders.push(auth);
+    return route.fulfill({json:{products:auth?products.filter(p=>p.seller_id===1):products,cart:[],orders:[],messages:[],returns:[],notifications:[],rates:[],reviews:[]}});
+   }
    return route.abort();
   });
   for(const width of [1440,1024,768,402,375]){
@@ -53,6 +58,9 @@ assert.deepEqual(mixShops([{id:1,shop:'A'},{id:2,shop:'A'},{id:3,shop:'B'}]).map
   await page.goto('http://buyer.test/buyer/category.html?category=Phones');
   await page.locator('#list .card').first().waitFor();
   assert.equal(await page.locator('#list .card').count(),2);
+  await page.goto('http://buyer.test/buyer/product.html?id=21');
+  await page.locator('#detail a[href="seller-store.html?seller_id=2"]').waitFor();
+  assert(privateHeaders.length>0&&privateHeaders.every(h=>h==='Bearer seller-session'),'Private cart calls must retain authentication');
   assert.deepEqual(errors,[]);
   console.log('PASS: banner, seller navigation, mixed shops without cutoff, category filtering and five viewport widths');
  }finally{await browser.close()}

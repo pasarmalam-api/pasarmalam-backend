@@ -37,7 +37,8 @@
     async function api(p,o={}){
       const token=localStorage.getItem("pm_token")||"";
       const headers={"Content-Type":"application/json",...(o.headers||{})};
-      if(token)headers.Authorization=`Bearer ${token}`;
+      const publicCatalogue=p.split("?")[0]==="/api/products"&&(!o.method||o.method==="GET");
+      if(token&&!publicCatalogue)headers.Authorization=`Bearer ${token}`;
       const r=await fetch(API_BASE+p,{...o,headers});
       const d=await r.json().catch(async()=>({error:await r.text()}));
       if(!r.ok||d.error)throw new Error(d.error||"Request failed");

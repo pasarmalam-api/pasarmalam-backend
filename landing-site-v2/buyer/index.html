@@ -118,7 +118,7 @@
     closeModal.onclick=()=>productModal.classList.remove("open");[minPrice,maxPrice,conditionFilter,ratingFilter,shippingFilter].forEach(el=>el.oninput=drawProducts);
     function userToken(){return localStorage.getItem("pm_token")||""}
     function requireSignIn(){alert("Sila log masuk untuk meneruskan.");location.href="login.html";return false}
-    async function api(path,options={}){const token=userToken();const headers={"Content-Type":"application/json",...(options.headers||{})};if(token)headers.Authorization=`Bearer ${token}`;const res=await fetch(API_BASE+path,{...options,headers});if(!res.ok)throw new Error(await res.text());return res.json()}
+    async function api(path,options={}){const token=userToken();const headers={"Content-Type":"application/json",...(options.headers||{})};const publicCatalogue=path.split("?")[0]==="/api/products"&&(!options.method||options.method==="GET");if(token&&!publicCatalogue)headers.Authorization=`Bearer ${token}`;const res=await fetch(API_BASE+path,{...options,headers});if(!res.ok)throw new Error(await res.text());return res.json()}
     let productRequest=0;
     async function loadProducts(){const request=++productRequest;const q=(search.value||"").trim();const params=new URLSearchParams();if(active&&active!=="All")params.set("category",active);if(q)params.set("q",q);try{const result=await api(`/api/products${params.toString()?`?${params}`:""}`);if(request!==productRequest)return;apiProducts=(result.products||[]).map(cleanProduct);drawProducts()}catch(e){console.log(e);drawProducts()}}
     let searchTimer=0;search.oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(loadProducts,250)};
