@@ -81,8 +81,11 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    assert.equal(await page.locator('#pay').isEnabled(),false);
    await page.locator('#useAddress').click();await page.locator('#parcelService').waitFor();
    await page.locator('input[name="deliveryChoice"][value="PM Express"]').check();
-   await page.locator('#changeAddress').click();await page.locator('#useAddress').click();
    await page.waitForFunction(()=>pmDeliveryFee()===6.99);
+   assert.equal(await page.locator('#addressEditor').isVisible(),false);
+   assert.equal(await page.evaluate(()=>pmDeliveryAdminFee()),0.4);
+   assert.match(await page.locator('#summary').innerText(),/26\.99/);
+   await page.screenshot({path:path.resolve('release-zips/checkout-audit/pm-express-auto-'+width+'.png'),fullPage:true});
    const request=calls.filter(c=>c.endpoint==='/api/delivery/quotation').at(-1).data;
    assert.equal(request.simple_checkout,true);assert.equal(request.location_confirmed,true);assert.equal(request.service_type,'');
    await page.locator('#payment').selectOption('Pay on Arrival');
@@ -97,9 +100,19 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    assert.equal(await page.locator('#deliveryVehicle').isVisible(),false);
    assert.equal(await page.locator('#pay').isEnabled(),false);failed=false;
    await page.evaluate(()=>{document.getElementById('deliveryConfirmed').checked=false;pmDeliveryInvalidate();});
+   await page.waitForFunction(()=>pmDeliveryFee()===6.99&&!document.getElementById('pay').disabled);
+   assert.equal(await page.locator('#addressEditor').isVisible(),false);
+   assert.equal(await page.evaluate(()=>pmDeliveryAdminFee()),0.4);
+   await page.evaluate(()=>{
+    window.originalGeocode=google.maps.Geocoder.prototype.geocode;
+    google.maps.Geocoder.prototype.geocode=async()=>{throw new Error('Address lookup unavailable.');};
+    document.getElementById('deliveryConfirmed').checked=false;pmDeliveryInvalidate();
+   });
+   await page.getByText('Address lookup unavailable.',{exact:true}).waitFor();
    await page.getByRole('button',{name:'Choose delivery address',exact:true}).waitFor();
    assert.equal(await page.locator('#pay').isEnabled(),false);
    assert(!(await page.locator('#summary').innerText()).includes('Get a quote'));
+   await page.evaluate(()=>{google.maps.Geocoder.prototype.geocode=window.originalGeocode;});
    await page.locator('#deliveryQuote').click();
    assert.equal(await page.locator('#addressEditor').isVisible(),true);
    await page.locator('#useAddress').click();

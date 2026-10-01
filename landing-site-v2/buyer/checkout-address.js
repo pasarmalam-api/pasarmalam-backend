@@ -115,6 +115,17 @@
     if (!request.location && matches.length !== 1) throw new Error(t('Beberapa alamat ditemui. Pilih melalui carian.','Several addresses matched. Please choose using search.'));
     applyLocation(keepText || matches[0].formatted_address,matches[0].geometry.location,expected,matches[0].address_components);
   }
+  let resolving;
+  window.pmResolveDeliveryAddress=async()=>{
+    validateAddress();
+    if(el('deliveryConfirmed').checked&&el('deliveryLat').value&&el('deliveryLng').value)return;
+    if(!resolving){
+      const expected=version,value=address.value.trim();
+      resolving=geocode({address:value,componentRestrictions:{country:'MY'}},expected,value)
+        .finally(()=>{resolving=null;});
+    }
+    await resolving;
+  };
   let widget, selectedSearch = '', selecting = false;
   el('changeAddress').onclick = async () => {
     notice.hidden=true;
@@ -206,12 +217,7 @@
     if(version===0){
       address.value=saved;base=saved;address.readOnly=!!saved;
       fillParts(saved);showSavedAddress();
-      let valid=true;try{validateAddress();}catch(e){valid=false;}
-      if(saved&&valid){
-        const expected=version;
-        try{await geocode({address:saved,componentRestrictions:{country:'MY'}},expected,saved);}
-        catch(e){if(version===expected)status(e.message);}
-      }
+      window.pmDeliveryInvalidate?.();
     }
   }).catch(()=>{});
 })();

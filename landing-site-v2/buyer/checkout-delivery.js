@@ -158,8 +158,15 @@
     const version = revision;
     try {
       if (!checkoutProduct || !checkoutItem) throw new Error(t('Pilih produk dahulu.', 'Select a product first.'));
-      const route = fields();
       try{window.pmValidateDeliveryAddress?.();}catch(e){needsAddress=true;get('deliveryQuote').textContent=t('Pilih alamat penghantaran','Choose delivery address');throw e;}
+      if(!isParcel()){
+        status(t('Mengesahkan alamat...', 'Confirming address...'));
+        try{await window.pmResolveDeliveryAddress?.();}
+        catch(e){needsAddress=true;get('deliveryQuote').textContent=t('Pilih alamat penghantaran','Choose delivery address');throw e;}
+        // Resolving or editing the address invalidates the old request; reset schedules the new one.
+        if(version!==revision||window.pmAddressEditing)return;
+      }
+      const route = fields();
       if (!isParcel() && (!route.coordinates.lat || !route.coordinates.lng || !route.location_confirmed)) {
         needsAddress=true;
         get('deliveryQuote').textContent=t('Pilih alamat penghantaran','Choose delivery address');
