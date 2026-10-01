@@ -121,7 +121,26 @@ class LalamoveTest(unittest.TestCase):
         with patch.object(client, '_request', return_value=CITIES) as call:
             with self.assertRaises(ValueError):
                 client.quote({**request(), 'service_type': 'NOT_AVAILABLE'})
-        self.assertEqual(call.call_count, 1)
+        self.assertEqual(call.call_count, 0)
+
+    def test_cities_reused_but_prices_always_fresh(self):
+        client = lalamove.Client(ENV)
+        with patch.object(client, '_request', side_effect=[CITIES, quote(), quote(), CITIES]) as call:
+            client.cities()
+            client.quote(request())
+            client.quote(request())
+            self.assertEqual([c.args[:2] for c in call.call_args_list], [
+                ('GET', '/v3/cities'), ('POST', '/v3/quotations'), ('POST', '/v3/quotations')])
+            client._cities_until = 0
+            client.cities()
+            self.assertEqual(call.call_count, 4)
+
+    def test_failed_city_lookup_can_be_retried(self):
+        client = lalamove.Client(ENV)
+        with patch.object(client, '_request', side_effect=[lalamove.LalamoveError('Unavailable'), CITIES]):
+            with self.assertRaises(lalamove.LalamoveError):
+                client.cities()
+            self.assertEqual(client.cities(), CITIES)
 
     def test_rejects_bad_or_expired_prices(self):
         for changes in ({'priceBreakdown': {'total':'NaN','currency':'MYR'}},

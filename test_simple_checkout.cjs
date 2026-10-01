@@ -6,7 +6,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;
  const browser=await chromium.launch({channel:'msedge',headless:true});
  try{
-  const context=await browser.newContext();let calls=[],failed=false,incompleteProfile=false,savedPoint=false,mapCalls=0;
+  const context=await browser.newContext();let calls=[],failed=false,incompleteProfile=false,savedPoint=false,mapCalls=0,quoteDelay=0;
   await context.addInitScript(()=>{localStorage.setItem('pm_token','test');localStorage.setItem('pm_user',JSON.stringify({id:1,role:'buyer',name:'Test Buyer',phone:'01123456789',email:'test@example.com',address:'Office, 50088 Kuala Lumpur, Malaysia'}));localStorage.setItem('pasarmalam-lang','en');localStorage.setItem('pasarmalam-buyer-lang-version','20260903-ms-default');});
   await context.route('**/*',async route=>{
    const req=route.request();if(req.url().startsWith(origin))return route.continue();
@@ -17,6 +17,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    if(endpoint==='/api/profile')return route.fulfill({json:{user:{address:incompleteProfile?'present 7 putrajaya':'Office, 50088 Kuala Lumpur, Malaysia',delivery_location:savedPoint?JSON.stringify({address:'Office, 50088 Kuala Lumpur, Malaysia',lat:3.15,lng:101.71,confirmed:true}):''}}});
    if(endpoint==='/api/product/branches')return route.fulfill({json:{branches:[{id:'',name:'Main shop',price:20,is_open:true,address:'Seller address'}]}});
    if(endpoint==='/api/delivery/quotation'){
+    if(quoteDelay)await new Promise(resolve=>setTimeout(resolve,quoteDelay));
     if(failed)return route.fulfill({status:400,json:{error:'Local delivery is not set up by this seller yet. Choose another delivery option.'}});
     const q={quote_id:'test-quote',fee:6.99,courier_fee:6.59,admin_fee:.4,expires_at:Math.floor(Date.now()/1000)+300,service_name:'SPX Xpress'};
     const method=req.postDataJSON().logistics_method;
@@ -136,6 +137,23 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
   assert.equal(await page.evaluate(()=>pmDeliveryFee()),6.99);assert.equal(mapCalls,beforeMaps);
   await page.locator('input[name="deliveryChoice"][value="PM Express"]').check();await page.waitForFunction(()=>pmDeliveryFee()===6.99);
   assert.equal(mapCalls,beforeMaps);assert.equal(await page.locator('#addressEditor').isVisible(),false);
+  quoteDelay=1200;
+  for(const method of ['EasyParcel','Lalamove Segera','PM Express','EasyParcel']){
+   await page.locator('input[name="deliveryChoice"][value="'+method+'"]').check();
+   await page.waitForFunction(()=>document.getElementById('deliveryStatus').textContent==='Getting quotation...');
+   assert.match(await page.locator('#summary').innerText(),/Calculating delivery/);
+   assert.equal(await page.locator('#pay').isEnabled(),false);
+   await page.waitForFunction(()=>pmDeliveryFee()===6.99&&!document.getElementById('pay').disabled);
+   assert.equal(await page.evaluate(()=>pmDeliveryAdminFee()),.4);
+  }
+  // Switching during a slow quotation must discard its result and quote the new provider.
+  await page.locator('input[name="deliveryChoice"][value="Lalamove Segera"]').check();
+  await page.waitForFunction(()=>document.getElementById('deliveryStatus').textContent==='Getting quotation...');
+  await page.locator('input[name="deliveryChoice"][value="PM Express"]').check();
+  await page.waitForFunction(()=>pmDeliveryFee()===6.99&&!document.getElementById('pay').disabled);
+  assert.equal(calls.filter(c=>c.endpoint==='/api/delivery/quotation').at(-1).data.logistics_method,'PM Express');
+  assert.equal(await page.locator('#parcelOffers').isVisible(),false);
+  quoteDelay=0;
   savedPoint=false;incompleteProfile=true;calls=[];
   await page.goto(origin+'/buyer/checkout.html?product_id=1');
   await page.locator('#addressNotice').filter({hasText:'Complete your delivery address'}).waitFor();

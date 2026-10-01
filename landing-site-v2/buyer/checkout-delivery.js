@@ -58,7 +58,7 @@
   // Legacy coordinate fields remain internal inputs for the shared address resolver.
   for (const child of [...box.children]) child.hidden = !['parcelOffers','deliveryStatus'].includes(child.id);
   let cities = [], quote = null, revision = 0, requesting = false, paying = false, needsAddress = false;
-  let refreshTimer;
+  let refreshTimer, queued = false;
   const baseApi = api, baseReady = requireCheckoutReady;
   const isPickup = () => shipping.value === 'Ambil Sendiri';
   const isParcel = () => shipping.value === 'EasyParcel';
@@ -68,7 +68,7 @@
   const syncPay = () => {let ready=true;try{baseReady();window.pmValidateDeliveryAddress?.();}catch(e){ready=false;}pay.disabled=paying||requesting||window.pmAddressEditing||!ready||!valid();};
   window.pmDeliveryPendingLabel = () => needsAddress||window.pmAddressEditing
     ? t('Pilih alamat penghantaran', 'Choose delivery address')
-    : requesting ? t('Mengira caj penghantaran...', 'Calculating delivery...')
+    : requesting || queued ? t('Mengira caj penghantaran...', 'Calculating delivery...')
     : t('Penghantaran belum tersedia', 'Delivery unavailable');
   renderSummary = function(){originalSummary();syncPay();};
   pay.onclick = async function(event){paying=true;syncPay();try{await originalPay.call(this,event);}finally{paying=false;syncPay();}};
@@ -100,6 +100,7 @@
     const arrival = payment.querySelector('option[value="Pay on Arrival"]');
     arrival.disabled = arrival.hidden = shipping.value !== 'PM Express';
     if (arrival.disabled && payment.value === 'Pay on Arrival') payment.value = 'Billplz';
+    queued = !isPickup();
     status(''); renderSummary();
     clearTimeout(refreshTimer);
     if (!isPickup()) refreshTimer = setTimeout(() => window.pmLoadDelivery?.(), 600);
@@ -152,9 +153,10 @@
     window.pmLoadDelivery();
   };
   window.pmLoadDelivery = async () => {
+    queued = false;
     if (isPickup() || !checkoutProduct || !checkoutItem || !address.value.trim() || window.pmAddressEditing) return;
     if (requesting) return;
-    requesting = true; get('deliveryQuote').disabled = true;syncPay();
+    requesting = true; needsAddress = false; get('deliveryQuote').disabled = true;renderSummary();
     const version = revision;
     try {
       if (!checkoutProduct || !checkoutItem) throw new Error(t('Pilih produk dahulu.', 'Select a product first.'));

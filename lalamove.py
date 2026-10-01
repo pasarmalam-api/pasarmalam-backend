@@ -95,6 +95,8 @@ class Client:
             raise LalamoveError("Lalamove credentials are missing or do not match the environment.")
         self.base_url = "https://rest.lalamove.com" if self.mode == "production" else "https://rest.sandbox.lalamove.com"
         self.opener = opener or urllib.request.build_opener(NoRedirect())
+        self._cities = None
+        self._cities_until = 0
 
     def _request(self, method, path, payload=None):
         if (method, path) not in (("GET", "/v3/cities"), ("POST", "/v3/quotations")):
@@ -126,9 +128,14 @@ class Client:
         return result["data"]
 
     def cities(self):
+        # Reuse service metadata while quoting several vehicles, never prices.
+        if self._cities is not None and time.monotonic() < self._cities_until:
+            return self._cities
         cities = self._request("GET", "/v3/cities")
         if not isinstance(cities, list):
             raise LalamoveError("Lalamove returned invalid city information.")
+        self._cities = cities
+        self._cities_until = time.monotonic() + 60
         return cities
 
     def quote(self, data):
