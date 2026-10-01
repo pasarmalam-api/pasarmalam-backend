@@ -2328,6 +2328,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def update_profile(self, data):
         user = self.require_user()
+        if user['role'] == 'buyer' and 'address_fields' in data:
+            from buyer_address import registration_address
+            data = {**data, 'address': registration_address(data)}
         allowed = {"name", "phone", "address", "shop_name"}
         seller_allowed = {"identity_type", "identity_number", "business_type", "ssm_number", "ssm_document_url", "bank_name", "bank_account_name", "bank_account_number"}
         if user["role"] == "seller":

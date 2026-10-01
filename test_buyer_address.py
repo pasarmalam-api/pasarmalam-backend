@@ -40,6 +40,13 @@ class BuyerAddressTest(unittest.TestCase):
             with server.connect() as con:
                 row = con.execute('SELECT address FROM users WHERE id=?', (user['id'],)).fetchone()
             self.assertEqual(row['address'], user['address'])
+            handler.require_user = lambda: user
+            changed = {**self.fields, 'street': '12 Jalan Baru', 'unit': '', 'postcode': '50450', 'city': 'Kuala Lumpur', 'state': 'Kuala Lumpur'}
+            with patch.object(server, 'send_json') as updated:
+                handler.update_profile({'address_fields': changed, 'address': 'ignored'})
+            self.assertEqual(updated.call_args.args[2]['user']['address'], registration_address({'address_fields': changed}))
+            with self.assertRaises(ValueError):
+                handler.update_profile({'address_fields': {**changed, 'postcode': 'wrong'}})
             with self.assertRaises(ValueError):
                 handler.signup({**payload, 'address_fields': {**self.fields, 'postcode': ''}})
 
