@@ -65,7 +65,7 @@
   const status = text => { get('deliveryStatus').textContent = text; };
   const valid = () => isPickup() || (quote && quote.expires_at * 1000 > Date.now());
   const originalSummary = renderSummary, originalPay = pay.onclick;
-  const syncPay = () => {let ready=true;try{baseReady();}catch(e){ready=false;}pay.disabled=paying||requesting||window.pmAddressEditing||!ready||!valid();};
+  const syncPay = () => {let ready=true;try{baseReady();window.pmValidateDeliveryAddress?.();}catch(e){ready=false;}pay.disabled=paying||requesting||window.pmAddressEditing||!ready||!valid();};
   window.pmDeliveryPendingLabel = () => needsAddress||window.pmAddressEditing
     ? t('Pilih alamat penghantaran', 'Choose delivery address')
     : requesting ? t('Mengira caj penghantaran...', 'Calculating delivery...')
@@ -159,6 +159,7 @@
     try {
       if (!checkoutProduct || !checkoutItem) throw new Error(t('Pilih produk dahulu.', 'Select a product first.'));
       const route = fields();
+      try{window.pmValidateDeliveryAddress?.();}catch(e){needsAddress=true;get('deliveryQuote').textContent=t('Pilih alamat penghantaran','Choose delivery address');throw e;}
       if (!isParcel() && (!route.coordinates.lat || !route.coordinates.lng || !route.location_confirmed)) {
         needsAddress=true;
         get('deliveryQuote').textContent=t('Pilih alamat penghantaran','Choose delivery address');
@@ -192,6 +193,7 @@
   };
   requireCheckoutReady = function() {
     baseReady();
+    window.pmValidateDeliveryAddress?.();
     if (!valid()) throw new Error(get('deliveryStatus').textContent||window.pmDeliveryPendingLabel());
     if (!isPickup() && get('payment').value === 'Cash Pickup') throw new Error('Cash is for self pickup only.');
     if (shipping.value !== 'PM Express' && payment.value === 'Pay on Arrival') throw new Error('Pay on Arrival is for PM Express only.');

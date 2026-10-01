@@ -47,16 +47,33 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    assert.equal(await page.locator('#address').inputValue(),'Domain 1 Cyberjaya');
    await page.evaluate(()=>{
      const w=document.querySelector('mock-address');
-     const event=new Event('gmp-select');event.placePrediction={toPlace:()=>({fetchFields:()=>new Promise(r=>setTimeout(r,100)),formattedAddress:'Domain 1, Cyberjaya, Malaysia',location:{lat:()=>2.92,lng:()=>101.65},addressComponents:[{types:['country'],shortText:'MY'}]})};
+     const event=new Event('gmp-select');event.placePrediction={toPlace:()=>({fetchFields:()=>new Promise(r=>setTimeout(r,100)),formattedAddress:'Domain 1, 63000 Cyberjaya, Selangor, Malaysia',location:{lat:()=>2.92,lng:()=>101.65},addressComponents:[{types:['country'],shortText:'MY'}]})};
      w.dispatchEvent(event);w.dispatchEvent(new Event('input'));
    });
-   await page.waitForFunction(()=>document.getElementById('address').value==='Domain 1, Cyberjaya, Malaysia');
+   await page.waitForFunction(()=>document.getElementById('address').value==='Domain 1, 63000 Cyberjaya, Selangor, Malaysia');
+   assert.equal(await page.locator('#addressPostcode').inputValue(),'63000');
+   assert.equal(await page.locator('#addressCity').inputValue(),'Cyberjaya');
+   assert.equal(await page.locator('#addressState').inputValue(),'Selangor');
    assert.equal(await page.locator('#deliveryLat').inputValue(),'2.92');
    for(const lang of ['zh','ms','en']){
      await page.locator('#langToggle,.buyer-lang-toggle').first().click();
      await page.waitForFunction(l=>document.documentElement.lang===l,lang);
    }
    assert.equal(await page.locator('#useAddress').innerText(),'Use this address');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+   await page.screenshot({path:path.resolve('release-zips/checkout-audit/address-complete-'+width+'.png'),fullPage:true});
+   await page.locator('#addressPostcode').fill('12');
+   const beforeIncomplete=calls.length;
+   await page.locator('#useAddress').click();
+   await page.getByText('Enter a five-digit postcode.',{exact:true}).waitFor();
+   await page.locator('#saveDefaultAddress').click();
+   assert.equal(calls.length,beforeIncomplete);
+   assert.equal(await page.locator('#addressEditor').isVisible(),true);
+   assert.equal(await page.locator('#pay').isEnabled(),false);
+   await page.locator('#addressPostcode').fill('63000');await page.locator('#addressCity').fill('');await page.locator('#useAddress').click();
+   await page.getByText('Enter the city.',{exact:true}).waitFor();
+   await page.locator('#addressCity').fill('Cyberjaya');await page.locator('#addressState').selectOption('');await page.locator('#useAddress').click();
+   await page.getByText('Select the state.',{exact:true}).waitFor();
    await page.locator('#address').fill('Another office, 50450 Kuala Lumpur, Malaysia');
    const n=calls.length;await page.waitForTimeout(800);assert.equal(calls.length,n);
    assert.equal(await page.evaluate(()=>Number.isNaN(pmDeliveryFee())),true);

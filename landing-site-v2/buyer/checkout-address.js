@@ -13,6 +13,35 @@
   extra.innerHTML = `<label for="addressUnit">${t('Unit / tingkat (pilihan)','Unit / floor (optional)')}</label><input id="addressUnit" autocomplete="address-line2" maxlength="120">
     <button type="button" class="soft" id="saveDefaultAddress">${t('Simpan sebagai alamat lalai','Save as default address')}</button>`;
   address.after(extra);
+  const regions=['Johor','Kedah','Kelantan','Melaka','Negeri Sembilan','Pahang','Pulau Pinang','Perak','Perlis','Selangor','Terengganu','Sabah','Sarawak','Kuala Lumpur','Labuan','Putrajaya'];
+  const locality=document.createElement('div');locality.className='row';
+  locality.innerHTML=`<label for="addressPostcode">${t('Poskod','Postcode')}<input id="addressPostcode" inputmode="numeric" autocomplete="postal-code" maxlength="5" pattern="[0-9]{5}" required></label><label for="addressCity">${t('Bandar','City')}<input id="addressCity" autocomplete="address-level2" maxlength="100" required></label><label for="addressState">${t('Negeri','State')}<select id="addressState" autocomplete="address-level1" required><option value="">${t('Pilih negeri','Select state')}</option>${regions.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></label>`;
+  extra.before(locality);
+  function fillParts(text,components=[]){
+    const component=type=>{const c=components.find(c=>c.types.includes(type));return c?.longText||c?.long_name||'';};
+    const state=component('administrative_area_level_1')||text;
+    el('addressState').value=regions.find(r=>state.toLowerCase().includes(r.toLowerCase()))||(/penang/i.test(state)?'Pulau Pinang':/malacca/i.test(state)?'Melaka':'');
+    el('addressPostcode').value=component('postal_code')||(text.match(/\b\d{5}\b/)||[''])[0];
+    const after=text.split(/\b\d{5}\b/)[1]||'';
+    el('addressCity').value=component('locality')||component('postal_town')||after.split(',')[0].replace(/Malaysia/gi,'').trim()||(['Kuala Lumpur','Labuan','Putrajaya'].includes(el('addressState').value)?el('addressState').value:'');
+  }
+  fillParts(address.value);
+  function validateAddress(){
+    if(!/^\d{5}$/.test(el('addressPostcode').value.trim()))throw new Error(t('Masukkan poskod 5 digit.','Enter a five-digit postcode.'));
+    if(el('addressCity').value.trim().length<2)throw new Error(t('Masukkan bandar.','Enter the city.'));
+    if(!el('addressState').value)throw new Error(t('Pilih negeri.','Select the state.'));
+    const street=address.value.replace(/\b\d{5}\b/g,'').replace(/Malaysia/gi,'').replaceAll(el('addressCity').value.trim(),'').replaceAll(el('addressState').value,'').replace(/[,\s]/g,'');
+    if(street.length<4)throw new Error(t('Masukkan nama jalan atau bangunan dan nombor rumah jika berkenaan.','Enter the street or building and house number where applicable.'));
+    if(!el('buyerPhone').value.trim())throw new Error(t('Masukkan nombor telefon penerima.','Enter the recipient phone number.'));
+    return true;
+  }
+  window.pmValidateDeliveryAddress=validateAddress;
+  function completeAddress(){
+    validateAddress();
+    let text=address.value.trim().replace(/\b\d{5}\b[\s\S]*$/,'').replace(/[,\s]+$/,'');
+    text=[text,el('addressPostcode').value.trim()+' '+el('addressCity').value.trim(),el('addressState').value,'Malaysia'].filter(Boolean).join(', ');
+    const changed=address.value!==text;address.value=text;base=text;if(changed)invalidate();
+  }
   const editor=document.createElement('div');editor.id='addressEditor';
   for(const child of [...section.children])if(child!==controls&&child.tagName!=='H2')editor.append(child);
   editor.prepend(el('addressSearch'),el('addressSearchStatus'),el('useDefaultAddress'));
@@ -25,7 +54,8 @@
     el('changeAddress').hidden=editing;
     if(window.pmDeliveryPendingLabel)renderSummary();
   }
-  displayAddress(!address.value.trim()||!el('buyerPhone').value.trim());
+  let complete=true;try{validateAddress();}catch(e){complete=false;}
+  displayAddress(!complete);
   let saved = currentUser().address || '', base = address.value, version = 0, loading;
   const status = value => { el('addressSearchStatus').textContent = value; };
   const drawDefault = () => {
@@ -39,7 +69,8 @@
     el('deliveryLat').value = ''; el('deliveryLng').value = '';
     address.dispatchEvent(new Event('input', {bubbles:true}));
   }
-  address.addEventListener('input', () => { version++; });
+  address.addEventListener('input', event => { version++;if(event.isTrusted)fillParts(address.value); });
+  for(const id of ['addressPostcode','addressCity','addressState'])el(id).addEventListener('input',invalidate);
   async function maps() {
     if (!loading) loading = (async () => {
       const cfg = await api('/api/maps/config');
@@ -58,9 +89,10 @@
     })();
     try { return await loading; } catch(e) { loading=null; throw e; }
   }
-  function applyLocation(text, location, expected) {
+  function applyLocation(text, location, expected, components=[]) {
     if (version !== expected) return;
     base = text; address.value = [el('addressUnit').value.trim(),text].filter(Boolean).join(', ');
+    fillParts(text,components);
     invalidate();
     el('deliveryLat').value = location.lat(); el('deliveryLng').value = location.lng();
     el('deliveryConfirmed').checked = true;
@@ -74,7 +106,7 @@
     const matches = response.results.filter(inMalaysia);
     if (!matches.length || matches[0].partial_match) throw new Error(t('Pilih alamat Malaysia yang tepat melalui carian.','Select a precise Malaysian address using search.'));
     if (!request.location && matches.length !== 1) throw new Error(t('Beberapa alamat ditemui. Pilih melalui carian.','Several addresses matched. Please choose using search.'));
-    applyLocation(keepText || matches[0].formatted_address,matches[0].geometry.location,expected);
+    applyLocation(keepText || matches[0].formatted_address,matches[0].geometry.location,expected,matches[0].address_components);
   }
   let widget, selectedSearch = '', selecting = false;
   el('changeAddress').onclick = async () => {
@@ -103,7 +135,7 @@
             await place.fetchFields({fields:['formattedAddress','location','addressComponents']});
             if (!place.location || !place.addressComponents.some(c=>c.types.includes('country')&&c.shortText==='MY')) throw new Error('Choose an address in Malaysia.');
             if(version!==expected)return;
-            el('addressUnit').value=''; applyLocation(place.formattedAddress,place.location,expected);
+            el('addressUnit').value=''; applyLocation(place.formattedAddress,place.location,expected,place.addressComponents);
           } catch(e) { if(version===expected)status(e.message); }
           finally {selecting=false;}
         });
@@ -125,9 +157,11 @@
     if(!address.value.trim()||!el('buyerPhone').value.trim())return status(t('Lengkapkan alamat dan nombor telefon.','Enter your address and phone number.'));
     done.disabled=true;
     try{
+      completeAddress();
       if(el('shipping').value!=='EasyParcel'&&el('shipping').value!=='Ambil Sendiri'&&!el('deliveryConfirmed').checked){
         await geocode({address:address.value,componentRestrictions:{country:'MY'}},version,address.value);
       }
+      validateAddress();
       displayAddress(false);status('');window.pmDeliveryInvalidate?.();
     }catch(e){status(e.message);}finally{done.disabled=false;renderSummary();}
   };
@@ -138,6 +172,7 @@
   address.addEventListener('change',()=>{base=address.value;el('addressUnit').value='';});
   el('saveDefaultAddress').onclick=async()=>{
     if(!address.value.trim())return status(t('Masukkan alamat dahulu.','Enter an address first.'));
+    try{completeAddress();}catch(e){status(e.message);return;}
     const button=el('saveDefaultAddress');button.disabled=true;
     const value=address.value.trim();
     try {
@@ -162,7 +197,7 @@
     saved=data.user.address||'';drawDefault();
     if(version===0){
       address.value=saved;base=saved;address.readOnly=!!saved;
-      displayAddress(!saved||!el('buyerPhone').value.trim());
+      fillParts(saved);let valid=true;try{validateAddress();}catch(e){valid=false;}displayAddress(!valid);
       if(saved){
         const expected=version;
         try{await geocode({address:saved,componentRestrictions:{country:'MY'}},expected,saved);}
