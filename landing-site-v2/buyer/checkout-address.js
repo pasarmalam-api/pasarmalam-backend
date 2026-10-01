@@ -45,9 +45,10 @@
   }
   const editor=document.createElement('div');editor.id='addressEditor';
   for(const child of [...section.children])if(child!==controls&&child.tagName!=='H2')editor.append(child);
-  editor.prepend(el('addressSearch'),el('addressSearchStatus'),el('useDefaultAddress'));
+  controls.insertBefore(el('useDefaultAddress'),el('changeAddress'));
+  editor.prepend(el('addressSearch'),el('addressSearchStatus'));
   el('deliveryLocate').hidden=false;
-  editor.insertBefore(el('deliveryLocate'),el('useDefaultAddress'));
+  editor.insertBefore(el('deliveryLocate'),el('addressSearch'));
   const done=document.createElement('button');done.type='button';done.className='primary';done.id='useAddress';done.textContent=t('Gunakan alamat ini','Use this address');editor.append(done);section.append(editor);
   function displayAddress(editing){
     window.pmAddressEditing=editing;editor.hidden=!editing;
@@ -67,7 +68,7 @@
   const status = value => { el('addressSearchStatus').textContent = value; };
   const drawDefault = () => {
     el('savedAddress').textContent = [currentUser().name,el('buyerPhone').value,address.value||saved].filter(Boolean).join(' | ');
-    el('useDefaultAddress').hidden = !saved;
+    el('useDefaultAddress').disabled = !saved;
   };
   drawDefault();
   address.readOnly = !!saved;
@@ -166,11 +167,9 @@
   window.addEventListener('pm-language-change',()=>{
     if(widget){widget.requestedLanguage=localStorage.getItem('pasarmalam-lang')||'ms';widget.placeholder=t('Cari alamat di Malaysia','Search Malaysian addresses');}
   });
-  el('useDefaultAddress').onclick = async () => {
+  el('useDefaultAddress').onclick = () => {
     address.value=saved; base=saved; el('addressUnit').value=''; address.readOnly=true;
-    invalidate(); const expected=version;
-    try { await geocode({address:saved,componentRestrictions:{country:'MY'}},expected,saved); }
-    catch(e) { if(version===expected)status(e.message); address.readOnly=false; }
+    fillParts(saved);invalidate();status('');showSavedAddress();window.pmDeliveryInvalidate?.();
   };
   done.onclick=async()=>{
     if(!address.value.trim()||!el('buyerPhone').value.trim())return status(t('Lengkapkan alamat dan nombor telefon.','Enter your address and phone number.'));

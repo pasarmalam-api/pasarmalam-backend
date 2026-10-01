@@ -30,6 +30,17 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    calls=[];await page.setViewportSize({width,height:900});await page.goto(origin+'/buyer/checkout.html?product_id=1');
    await page.locator('#parcelService').waitFor();
    assert.equal(await page.locator('#addressEditor').isVisible(),false);
+   assert.equal(await page.locator('#useDefaultAddress').isVisible(),true);
+   assert.equal(await page.locator('#changeAddress').isVisible(),true);
+   for(const id of ['addressPostcode','addressCity','addressState'])assert.equal(await page.locator('#'+id).isVisible(),false);
+   await page.locator('#changeAddress').click();
+   for(const id of ['addressPostcode','addressCity','addressState'])assert.equal(await page.locator('#'+id).isVisible(),true);
+   await page.locator('#address').fill('Temporary different address');
+   await page.locator('#useDefaultAddress').click();
+   assert.equal(await page.locator('#address').inputValue(),'Office, 50088 Kuala Lumpur, Malaysia');
+   assert.equal(await page.locator('#addressEditor').isVisible(),false);
+   for(const id of ['addressPostcode','addressCity','addressState'])assert.equal(await page.locator('#'+id).isVisible(),false);
+   await page.locator('#parcelService').waitFor();
    for(const id of ['deliveryLat','deliveryLng','deliveryVehicle','deliveryCity','deliveryPackage','deliveryConfirmed','checkoutBranch'])assert.equal(await page.locator('#'+id).isVisible(),false,id);
    await page.locator('#parcelService').selectOption('test-quote');
    assert.equal(await page.evaluate(()=>pmDeliveryFee()),6.99);
