@@ -72,6 +72,25 @@ class DeliveryTest(unittest.TestCase):
             pm = delivery.create_quote(con, self.user, self.product, 1, {**data, 'logistics_method': 'PM Express'}, self.client)
             self.assertNotIn('offers', pm)
 
+    def test_automatic_vehicle_uses_total_weight_and_bulky_type(self):
+        self.client.cities.return_value[0]['services'].append({'key': 'CAR', 'load': {'value': 40, 'unit': 'kg'}})
+        with server.connect() as con:
+            delivery.save_pickup(con, 2, {**self.point, 'city': 'MY KUL'})
+            data = {**self.data, 'simple_checkout': True, 'service_type': 'CAR'}
+            for product, qty, expected in [(self.product, 1, 'MOTORCYCLE'),
+                                           ({**self.product, 'weight_kg': 6}, 2, 'CAR'),
+                                           ({**self.product, 'shipping_type': 'Bulky Item'}, 1, 'CAR')]:
+                q = delivery.create_quote(con, self.user, product, qty, data, self.client)
+                self.assertEqual(self.client.quote.call_args.args[0]['service_type'], expected)
+                _, details = delivery.consume(con, self.user, product, qty, {**data, 'quote_id': q['quote_id']})
+                self.assertEqual(details['context']['service_type'], expected)
+            offers = delivery.create_quote(con, self.user, {**self.product, 'shipping_type': 'Bulky Item'}, 1,
+                                           {**data, 'service_options': True, 'service_type': ''}, self.client)['offers']
+            self.assertEqual([o['service_type'] for o in offers], ['CAR'])
+            with self.assertRaisesRegex(ValueError, 'suitable'):
+                delivery.create_quote(con, self.user, {**self.product, 'shipping_type': 'Bulky Item'}, 1,
+                                      {**data, 'service_options': True, 'service_type': 'MOTORCYCLE'}, self.client)
+
     def test_maps_config_exposes_only_browser_key_to_buyer(self):
         with patch.dict(os.environ, {'GOOGLE_MAPS_BROWSER_KEY':'restricted-browser-key','OPENAI_API_KEY':'private-secret'}), patch.object(server,'send_json') as send:
             self.handler.maps_config()

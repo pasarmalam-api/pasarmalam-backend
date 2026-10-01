@@ -65,10 +65,10 @@ def context(con, user, product, qty, data):
         raise ValueError('The seller must confirm their pickup location before Lalamove delivery is available.')
     if data.get('simple_checkout') is True:
         settings = pickup(con, product['seller_id']) or {}
-        if not settings.get('city') or not settings.get('service_type'):
+        if not settings.get('city'):
             raise ValueError('Local delivery is not set up by this seller yet. Choose another delivery option.')
         selected = data.get('service_type') if data.get('service_options') is True and method != 'pm_express' else None
-        data = {**data, 'city': settings['city'], 'service_type': selected or settings['service_type'], 'package_confirmed': True}
+        data = {**data, 'city': settings['city'], 'service_type': selected or 'AUTO', 'package_confirmed': True}
     if data.get('location_confirmed') is not True:
         raise ValueError('Confirm the delivery coordinates match your address.')
     destination = waypoint({'address': data.get('address'), 'coordinates': data.get('coordinates')})
@@ -76,10 +76,27 @@ def context(con, user, product, qty, data):
         raise ValueError('Confirm the package fits the selected vehicle limits.')
     return {**({'branch': branch} if branch else {}), 'buyer_id': user['id'], 'product_id': product['id'], 'seller_id': product['seller_id'],
             'quantity': qty, 'variant': str(data.get('variant') or ''), 'price': str(product['price']),
-            'weight_kg': str(product['weight_kg']), 'pickup': origin, 'dropoff': destination,
+            'weight_kg': str(product['weight_kg']), 'package_type': dict(product).get('shipping_type', ''),
+            'automatic_vehicle': data.get('service_type') == 'AUTO', 'pickup': origin, 'dropoff': destination,
             'mode': method, 'city': str(data.get('city') or ''),
             'service_type': str(data.get('service_type') or ''),
             'schedule_at': str(data.get('schedule_at') or '')}
+
+
+def suitable_service(service, product, qty):
+    load = service.get('load', {})
+    try:
+        weight, limit = float(product['weight_kg']) * qty, float(load.get('value'))
+    except (TypeError, ValueError):
+        return False
+    bike = service.get('key', '').upper() in ('MOTORCYCLE', 'BIKE', 'MOTORBIKE')
+    bulky = str(dict(product).get('shipping_type', '')).lower() in ('bulky item', 'barang besar')
+    return (load.get('unit') == 'kg' and math.isfinite(weight) and math.isfinite(limit)
+            and 0 < weight <= limit and not (bike and bulky))
+
+
+def service_name(key):
+    return 'Bike / Motorcycle' if key.upper() in ('MOTORCYCLE', 'BIKE', 'MOTORBIKE') else key.replace('_', ' ').title()
 
 
 def create_quote(con, user, product, qty, data, client=None):
@@ -95,20 +112,26 @@ def create_quote(con, user, product, qty, data, client=None):
     if data.get('service_options') is True and not data.get('service_type') and ctx['mode'] != 'pm_express':
         offers = []
         for candidate in (city or {}).get('services', []):
-            load = candidate.get('load', {})
-            if load.get('unit') != 'kg' or float(load.get('value') or 0) < float(product['weight_kg']) * qty:
+            if not suitable_service(candidate, product, qty):
                 continue
             try:
                 offer = create_quote(con, user, product, qty, {**data, 'service_type': candidate['key']}, client)
             except LalamoveError:
                 continue
-            offers.append({**offer, 'service_type': candidate['key'], 'service_name': candidate['key'].replace('_', ' ').title()})
+            offers.append({**offer, 'service_type': candidate['key'], 'service_name': service_name(candidate['key'])})
         if not offers:
             raise ValueError('No Lalamove service is available for this package weight.')
         return {'offers': sorted(offers, key=lambda item: item['fee'])}
+    if ctx['service_type'] == 'AUTO':
+        eligible = [s for s in (city or {}).get('services', []) if suitable_service(s, product, qty)]
+        if not eligible:
+            raise ValueError('No suitable vehicle is available for this item and total package weight.')
+        ctx['service_type'] = min(eligible, key=lambda s: float(s['load']['value']))['key']
     service = next((s for s in (city or {}).get('services', []) if s['key'] == ctx['service_type']), None)
     if not service:
         raise ValueError('Select an available city and vehicle.')
+    if not suitable_service(service, product, qty):
+        raise ValueError('This vehicle is not suitable for the item type or total package weight.')
     load = service.get('load', {})
     try:
         limit = float(load.get('value'))
@@ -148,7 +171,10 @@ def consume(con, user, product, qty, data):
                       (str(data.get('quote_id') or ''), user['id'])).fetchone()
     if not row or row['used'] or row['expires_at'] <= time.time():
         raise ValueError('Your delivery quote has expired or was used. Request a new quote.')
-    if json.loads(row['context']) != ctx:
+    stored_context = json.loads(row['context'])
+    if ctx.get('automatic_vehicle') and stored_context.get('automatic_vehicle'):
+        ctx['service_type'] = stored_context['service_type']
+    if stored_context != ctx:
         raise ValueError('Delivery details changed. Request a new quote.')
     quote = json.loads(row['quotation'])
     charges = quote.pop('_pasarmalam_charges', None)

@@ -7,7 +7,7 @@
   address.addEventListener('input',invalidate);
   async function maps(){
     if(!loading)loading=(async()=>{
-      const response=await fetch('https://pasarmalam-backend.onrender.com/api/maps/config');
+      const response=await fetch('https://pasarmalam-backend.onrender.com/api/maps/config',{headers:{Authorization:'Bearer '+(localStorage.getItem('pm_token')||'')}});
       const cfg=await response.json();
       if(!response.ok||!cfg.browser_key)throw new Error('Address search is unavailable. Please try again later.');
       await new Promise((resolve,reject)=>{
