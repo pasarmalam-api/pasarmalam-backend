@@ -96,7 +96,8 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    await sellerPage.goto(origin+'/seller/pickup-location.html');
    if(unavailable)await sellerPage.getByText('Temporarily unavailable',{exact:true}).waitFor();
    else await sellerPage.waitForFunction(()=>!document.getElementById('deliveryVehicle').disabled);
-   await sellerPage.locator('#confirmed').check();await sellerPage.locator('#savePickup').click();
+   assert.equal(await sellerPage.locator('#lat').isVisible(),false);
+   await sellerPage.locator('#savePickup').click();
    await sellerPage.getByText('Lokasi pengambilan disimpan.',{exact:true}).waitFor();
    assert.equal(saved.city,'MY KUL');assert.equal(saved.service_type,'MOTORCYCLE');
   }
