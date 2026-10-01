@@ -1,10 +1,11 @@
 import os
+import json
 import tempfile
 import unittest
 from unittest.mock import patch
 
 import server
-from buyer_address import registration_address
+from buyer_address import registration_address, saved_location
 
 
 class BuyerAddressTest(unittest.TestCase):
@@ -24,6 +25,13 @@ class BuyerAddressTest(unittest.TestCase):
                 registration_address({'address_fields': {**self.fields, key: value}})
         with self.assertRaises(ValueError):
             registration_address({'address': 'present 7 putrajaya'})
+
+    def test_location_validation(self):
+        point=dict(address='Office', lat=3.1, lng=101.7, confirmed=True)
+        self.assertEqual(json.loads(saved_location(point, 'Office')), point)
+        for change in ({'lat': float('nan')}, {'lng': 999}, {'confirmed': False}, {'address': 'Other'}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                saved_location({**point, **change}, 'Office')
 
     def test_signup_saves_canonical_address_not_untrusted_flat_text(self):
         with tempfile.TemporaryDirectory() as directory, patch.multiple(
@@ -45,6 +53,19 @@ class BuyerAddressTest(unittest.TestCase):
             with patch.object(server, 'send_json') as updated:
                 handler.update_profile({'address_fields': changed, 'address': 'ignored'})
             self.assertEqual(updated.call_args.args[2]['user']['address'], registration_address({'address_fields': changed}))
+            address=registration_address({'address_fields': changed})
+            point=dict(address=address,lat=3.1,lng=101.7,confirmed=True)
+            with patch.object(server, 'send_json') as updated:
+                handler.update_profile({'address': address, 'delivery_location': point})
+                user=updated.call_args.args[2]['user']
+                self.assertEqual(json.loads(user['delivery_location']), point)
+                handler.require_user=lambda *args: user
+                handler.get_buyer_profile()
+                self.assertEqual(json.loads(updated.call_args.args[2]['user']['delivery_location']), point)
+                handler.update_profile({'phone':'01123456788'})
+                self.assertEqual(json.loads(updated.call_args.args[2]['user']['delivery_location']), point)
+                handler.update_profile({'address':'Different address'})
+                self.assertEqual(updated.call_args.args[2]['user']['delivery_location'], '')
             with self.assertRaises(ValueError):
                 handler.update_profile({'address_fields': {**changed, 'postcode': 'wrong'}})
             with self.assertRaises(ValueError):

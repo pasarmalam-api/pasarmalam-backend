@@ -12,6 +12,8 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
   await context.addInitScript(()=>{localStorage.setItem('pasarmalam-lang','en');localStorage.setItem('pasarmalam-buyer-lang-version','20260903-ms-default');});
   await context.route('**/*',route=>{
    const req=route.request();if(req.url().startsWith(origin))return route.continue();
+   if(req.url().startsWith('https://maps.googleapis.com'))return route.fulfill({contentType:'text/javascript',body:"class Auto extends HTMLElement{};customElements.define('mock-profile-address',Auto);window.google={maps:{importLibrary:async()=>({PlaceAutocompleteElement:Auto})}};window.pmProfileMapsReady();"});
+   if(new URL(req.url()).pathname==='/api/maps/config')return route.fulfill({json:{browser_key:'test'}});
    if(new URL(req.url()).pathname==='/api/auth/signup'){signupData=req.postDataJSON();return route.fulfill({json:{error:'Test intercepted'}});}
    if(new URL(req.url()).pathname==='/api/profile'){
     if(req.method()==='POST'){profileData=req.postDataJSON();profile={...profile,...profileData};}
@@ -51,9 +53,9 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    assert.equal(await page.locator('#addressPostcode').inputValue(),'63000');
    assert.equal(await page.locator('#addressCity').inputValue(),'Cyberjaya');
    assert.equal(await page.locator('#addressState').inputValue(),'Selangor');
-   await page.locator('#addressPostcode').fill('prin');await page.locator('#profileForm button').click();assert.equal(profileData,null);
+   await page.locator('#addressPostcode').fill('prin');await page.locator('#profileForm button[type="submit"]').click();assert.equal(profileData,null);
    await page.locator('#address').fill('12 Jalan Baru');await page.locator('#addressUnit').fill('Unit 3');await page.locator('#addressPostcode').fill('50450');await page.locator('#addressCity').fill('Kuala Lumpur');await page.locator('#addressState').selectOption('Kuala Lumpur');
-   await page.locator('#profileForm button').click();await page.getByText('Profile saved.',{exact:true}).waitFor();
+   await page.locator('#profileForm button[type="submit"]').click();await page.getByText('Profile saved.',{exact:true}).waitFor();
    assert.equal(profileData.address,'Unit 3, 12 Jalan Baru, 50450 Kuala Lumpur, Kuala Lumpur, Malaysia');
    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.pm_user).address),profileData.address);
    await page.reload();await page.locator('#profileForm').waitFor();assert.equal(await page.locator('#addressPostcode').inputValue(),'50450');
@@ -61,6 +63,18 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    await page.screenshot({path:path.resolve('release-zips/checkout-audit/profile-address-'+width+'.png'),fullPage:true});
   }
   profile.address='present 7 putrajaya';await page.reload();await page.locator('#profileForm').waitFor();assert.equal(await page.locator('#address').inputValue(),'present 7 putrajaya');assert.equal(await page.locator('#addressPostcode').inputValue(),'');
-  assert.deepEqual(errors,[]);console.log('PASS registration and profile: complete address, validation, persistence, old addresses and three viewport widths');
+  await page.locator('#confirmLocation').click();await page.locator('mock-profile-address').waitFor({state:'attached'});
+  await page.evaluate(()=>{
+   const event=new Event('gmp-select');event.placePrediction={toPlace:()=>({fetchFields:async()=>{},formattedAddress:'12 Jalan Baru, 50450 Kuala Lumpur, Malaysia',location:{lat:()=>3.15,lng:()=>101.71},addressComponents:[{types:['country'],shortText:'MY'},{types:['postal_code'],longText:'50450'},{types:['locality'],longText:'Kuala Lumpur'},{types:['administrative_area_level_1'],longText:'Kuala Lumpur'}]})};document.querySelector('mock-profile-address').dispatchEvent(event);
+  });
+  await page.getByText('Delivery location confirmed.',{exact:true}).waitFor();
+  assert.deepEqual(await page.locator('#profileForm :invalid').evaluateAll(nodes=>nodes.map(n=>({id:n.id,value:n.value,message:n.validationMessage}))),[]);
+  await page.locator('#profileForm button[type="submit"]').click();await page.getByText('Profile saved.',{exact:true}).waitFor();
+  assert.equal(profileData.delivery_location.lat,3.15);assert.equal(profileData.delivery_location.address,profileData.address);
+  await page.reload();await page.getByText('Delivery location confirmed.',{exact:true}).waitFor();
+  await page.setViewportSize({width:360,height:900});await page.screenshot({path:path.resolve('release-zips/checkout-audit/profile-confirmed-360.png'),fullPage:true});
+  await page.locator('#address').fill('14 Jalan Baru');await page.locator('#profileForm button[type="submit"]').click();await page.getByText('Profile saved.',{exact:true}).waitFor();
+  assert.equal(profileData.delivery_location,null);
+  assert.deepEqual(errors,[]);console.log('PASS registration and profile: complete address, location confirmation, persistence, edit invalidation and three viewport widths');
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);process.exitCode=1;});

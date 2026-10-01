@@ -65,6 +65,13 @@
   }
   showSavedAddress();
   let saved = currentUser().address || '', base = address.value, version = 0, loading;
+  let savedLocation=null,profileReady=Promise.resolve();
+  function restoreLocation(){
+    const point=savedLocation;
+    if(!point||point.address!==address.value.trim()||point.confirmed!==true||!Number.isFinite(Number(point.lat))||!Number.isFinite(Number(point.lng)))return false;
+    el('deliveryLat').value=point.lat;el('deliveryLng').value=point.lng;el('deliveryConfirmed').checked=true;
+    el('deliveryConfirmed').dispatchEvent(new Event('change'));return true;
+  }
   const status = value => { el('addressSearchStatus').textContent = value; };
   const drawDefault = () => {
     el('savedAddress').textContent = [currentUser().name,el('buyerPhone').value,address.value||saved].filter(Boolean).join(' | ');
@@ -118,6 +125,7 @@
   }
   let resolving;
   window.pmResolveDeliveryAddress=async()=>{
+    await profileReady;
     validateAddress();
     if(el('deliveryConfirmed').checked&&el('deliveryLat').value&&el('deliveryLng').value)return;
     if(!resolving){
@@ -169,7 +177,7 @@
   });
   el('useDefaultAddress').onclick = () => {
     address.value=saved; base=saved; el('addressUnit').value=''; address.readOnly=true;
-    fillParts(saved);invalidate();status('');showSavedAddress();window.pmDeliveryInvalidate?.();
+    fillParts(saved);invalidate();restoreLocation();status('');showSavedAddress();window.pmDeliveryInvalidate?.();
   };
   done.onclick=async()=>{
     if(!address.value.trim()||!el('buyerPhone').value.trim())return status(t('Lengkapkan alamat dan nombor telefon.','Enter your address and phone number.'));
@@ -194,8 +202,11 @@
     const button=el('saveDefaultAddress');button.disabled=true;
     const value=address.value.trim();
     try {
-      await api('/api/profile',{method:'POST',body:JSON.stringify({address:value})});
-      saved=value;localStorage.setItem('pm_user',JSON.stringify({...currentUser(),address:value}));drawDefault();
+      await window.pmResolveDeliveryAddress();
+      if(value!==address.value.trim())throw new Error(t('Sahkan semula lokasi penerima.','Confirm the recipient location again.'));
+      const point={address:value,lat:Number(el('deliveryLat').value),lng:Number(el('deliveryLng').value),confirmed:el('deliveryConfirmed').checked};
+      const response=await api('/api/profile',{method:'POST',body:JSON.stringify({address:value,delivery_location:point})});
+      saved=value;savedLocation=point;localStorage.setItem('pm_user',JSON.stringify({...currentUser(),...response.user,address:value,delivery_location:point}));drawDefault();
       status(t('Alamat lalai disimpan.','Default address saved.'));
     }catch(e){status(e.message);}finally{button.disabled=false;}
   };
@@ -210,12 +221,14 @@
     },()=>{if(version===expected){el('deliveryLocationDetails').open=true;status(t('Lokasi tidak dibenarkan. Cari atau masukkan alamat.','Location denied. Search or enter an address.'));}},
     {enableHighAccuracy:true,timeout:15000,maximumAge:0});
   };
-  if(token())api('/api/profile').then(async data=>{
+  if(token())profileReady=api('/api/profile').then(async data=>{
     if(!data.user)return;
     saved=data.user.address||'';drawDefault();
+    try{savedLocation=typeof data.user.delivery_location==='string'?JSON.parse(data.user.delivery_location||'null'):data.user.delivery_location;}catch(e){savedLocation=null;}
     if(version===0){
       address.value=saved;base=saved;address.readOnly=!!saved;
       fillParts(saved);showSavedAddress();
+      restoreLocation();
       window.pmDeliveryInvalidate?.();
     }
   }).catch(()=>{});

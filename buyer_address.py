@@ -1,4 +1,20 @@
 import re
+import json
+import math
+
+
+def saved_location(value, address):
+    if not value:
+        return ''
+    if not isinstance(value, dict) or value.get('address') != address or value.get('confirmed') is not True:
+        raise ValueError('Confirm the location for this delivery address.')
+    try:
+        lat, lng = float(value['lat']), float(value['lng'])
+    except (KeyError, ValueError, TypeError):
+        raise ValueError('Invalid delivery location.') from None
+    if not math.isfinite(lat) or not math.isfinite(lng) or not (-90 <= lat <= 90 and -180 <= lng <= 180):
+        raise ValueError('Invalid delivery location.')
+    return json.dumps({'address': address, 'lat': lat, 'lng': lng, 'confirmed': True})
 
 REGIONS = ('Johor', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan',
            'Pahang', 'Pulau Pinang', 'Perak', 'Perlis', 'Selangor',

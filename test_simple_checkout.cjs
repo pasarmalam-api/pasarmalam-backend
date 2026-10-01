@@ -6,15 +6,15 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;
  const browser=await chromium.launch({channel:'msedge',headless:true});
  try{
-  const context=await browser.newContext();let calls=[],failed=false,incompleteProfile=false;
+  const context=await browser.newContext();let calls=[],failed=false,incompleteProfile=false,savedPoint=false,mapCalls=0;
   await context.addInitScript(()=>{localStorage.setItem('pm_token','test');localStorage.setItem('pm_user',JSON.stringify({id:1,role:'buyer',name:'Test Buyer',phone:'01123456789',email:'test@example.com',address:'Office, 50088 Kuala Lumpur, Malaysia'}));localStorage.setItem('pasarmalam-lang','en');localStorage.setItem('pasarmalam-buyer-lang-version','20260903-ms-default');});
   await context.route('**/*',async route=>{
    const req=route.request();if(req.url().startsWith(origin))return route.continue();
    if(req.url().startsWith('https://maps.googleapis.com'))return route.fulfill({contentType:'text/javascript',body:`class Auto extends HTMLElement{};customElements.define('mock-address',Auto);window.google={maps:{importLibrary:async()=>({PlaceAutocompleteElement:Auto}),Geocoder:class{async geocode(){return {results:[{formatted_address:'Office, 50088 Kuala Lumpur, Malaysia',address_components:[{types:['country'],short_name:'MY'}],geometry:{location:{lat:()=>3.15,lng:()=>101.71}}}]};}}}};window.pmMapsLoaded();`});
    const endpoint=new URL(req.url()).pathname;
    if(req.method()!=='GET')calls.push({endpoint,data:req.postDataJSON()});
-   if(endpoint==='/api/maps/config')return route.fulfill({json:{browser_key:'test'}});
-   if(endpoint==='/api/profile')return route.fulfill({json:{user:{address:incompleteProfile?'present 7 putrajaya':'Office, 50088 Kuala Lumpur, Malaysia'}}});
+   if(endpoint==='/api/maps/config'){mapCalls++;return route.fulfill({json:{browser_key:'test'}});}
+   if(endpoint==='/api/profile')return route.fulfill({json:{user:{address:incompleteProfile?'present 7 putrajaya':'Office, 50088 Kuala Lumpur, Malaysia',delivery_location:savedPoint?JSON.stringify({address:'Office, 50088 Kuala Lumpur, Malaysia',lat:3.15,lng:101.71,confirmed:true}):''}}});
    if(endpoint==='/api/product/branches')return route.fulfill({json:{branches:[{id:'',name:'Main shop',price:20,is_open:true,address:'Seller address'}]}});
    if(endpoint==='/api/delivery/quotation'){
     if(failed)return route.fulfill({status:400,json:{error:'Local delivery is not set up by this seller yet. Choose another delivery option.'}});
@@ -130,7 +130,13 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    await page.waitForFunction(()=>pmDeliveryFee()===6.99&&!document.getElementById('pay').disabled);
    await page.locator('input[name="deliveryChoice"][value="Ambil Sendiri"]').check();assert.equal(await page.evaluate(()=>pmDeliveryFee()),0);
   }
-  incompleteProfile=true;calls=[];
+  savedPoint=true;const beforeMaps=mapCalls;
+  await page.goto(origin+'/buyer/checkout.html?product_id=1');await page.locator('#parcelService').waitFor();
+  await page.locator('input[name="deliveryChoice"][value="Lalamove Segera"]').check();await page.locator('#parcelService').waitFor();
+  assert.equal(await page.evaluate(()=>pmDeliveryFee()),6.99);assert.equal(mapCalls,beforeMaps);
+  await page.locator('input[name="deliveryChoice"][value="PM Express"]').check();await page.waitForFunction(()=>pmDeliveryFee()===6.99);
+  assert.equal(mapCalls,beforeMaps);assert.equal(await page.locator('#addressEditor').isVisible(),false);
+  savedPoint=false;incompleteProfile=true;calls=[];
   await page.goto(origin+'/buyer/checkout.html?product_id=1');
   await page.locator('#addressNotice').filter({hasText:'Complete your delivery address'}).waitFor();
   assert.equal(await page.locator('#addressEditor').isVisible(),false);

@@ -1027,6 +1027,7 @@ def migrate_returns(con):
 def migrate_users(con):
     columns = table_columns(con, "users")
     additions = {
+        "delivery_location": "TEXT DEFAULT ''",
         "shop_open": "INTEGER DEFAULT 1",
         "shop_category": "TEXT DEFAULT ''",
         "status": "TEXT DEFAULT 'active'",
@@ -2268,7 +2269,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def get_buyer_profile(self):
         user = self.require_user('buyer')
-        send_json(self, 200, {'user': {key: user.get(key, '') for key in ('id', 'role', 'name', 'email', 'phone', 'address')}})
+        send_json(self, 200, {'user': {key: user.get(key, '') for key in ('id', 'role', 'name', 'email', 'phone', 'address', 'delivery_location')}})
 
     def maps_config(self):
         # This is a public browser key, restricted by HTTP referrer and API in Google Cloud.
@@ -2336,6 +2337,11 @@ class Handler(BaseHTTPRequestHandler):
         if user["role"] == "seller":
             allowed |= seller_allowed
         updates = {key: str(data[key]) for key in allowed if key in data}
+        if 'delivery_location' in data:
+            from buyer_address import saved_location
+            updates['delivery_location'] = saved_location(data['delivery_location'], updates.get('address', user.get('address', '')))
+        elif 'address' in updates and updates['address'] != user.get('address'):
+            updates['delivery_location'] = ''
         if user["role"] != "seller":
             updates.pop("shop_name", None)
         elif any(key in updates for key in ("business_type", "ssm_number", "ssm_document_url")):
@@ -2349,7 +2355,7 @@ class Handler(BaseHTTPRequestHandler):
             if user["role"] == "seller" and "shop_name" in updates:
                 con.execute("UPDATE products SET shop=? WHERE seller_id=?",
                             (updates["shop_name"], user["id"]))
-            row = row_to_dict(con.execute("SELECT id, role, name, phone, email, address, shop_name, shop_category, identity_type, identity_number, business_type, ssm_number, ssm_document_url, business_verification_status, business_verification_submitted_at, bank_name, bank_account_name, bank_account_number, status, seller_status FROM users WHERE id = ?", (user["id"],)).fetchone())
+            row = row_to_dict(con.execute("SELECT id, role, name, phone, email, address, delivery_location, shop_name, shop_category, identity_type, identity_number, business_type, ssm_number, ssm_document_url, business_verification_status, business_verification_submitted_at, bank_name, bank_account_name, bank_account_number, status, seller_status FROM users WHERE id = ?", (user["id"],)).fetchone())
         row['role'] = user['role']
         send_json(self, 200, {"ok": True, "user": row, "token": make_token(row)})
 
