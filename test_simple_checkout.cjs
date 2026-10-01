@@ -34,10 +34,29 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    await page.locator('#parcelService').selectOption('test-quote');
    assert.equal(await page.evaluate(()=>pmDeliveryFee()),6.99);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
-   await page.screenshot({path:path.resolve('../outputs/simple-checkout-'+width+'.png'),fullPage:true});
+   fs.mkdirSync('release-zips/checkout-audit',{recursive:true});
+   await page.screenshot({path:path.resolve('release-zips/checkout-audit/simple-checkout-'+width+'.png'),fullPage:true});
    await page.locator('#pay').click();await page.getByText('Test payment intercepted').waitFor();
    assert.equal(calls.at(-1).data.simple_checkout,true);assert.equal(calls.at(-1).data.quote_id,'test-quote');
-   await page.locator('#changeAddress').click();await page.locator('#address').fill('Another office, 50450 Kuala Lumpur, Malaysia');
+   await page.locator('#changeAddress').click();
+   await page.locator('mock-address').waitFor({state:'attached'});
+   await page.evaluate(()=>{
+     const w=document.querySelector('mock-address');w.value='Domain 1 Cyberjaya';w.dispatchEvent(new Event('input'));
+   });
+   assert.equal(await page.locator('#address').inputValue(),'Domain 1 Cyberjaya');
+   await page.evaluate(()=>{
+     const w=document.querySelector('mock-address');
+     const event=new Event('gmp-select');event.placePrediction={toPlace:()=>({fetchFields:()=>new Promise(r=>setTimeout(r,100)),formattedAddress:'Domain 1, Cyberjaya, Malaysia',location:{lat:()=>2.92,lng:()=>101.65},addressComponents:[{types:['country'],shortText:'MY'}]})};
+     w.dispatchEvent(event);w.dispatchEvent(new Event('input'));
+   });
+   await page.waitForFunction(()=>document.getElementById('address').value==='Domain 1, Cyberjaya, Malaysia');
+   assert.equal(await page.locator('#deliveryLat').inputValue(),'2.92');
+   for(const lang of ['zh','ms','en']){
+     await page.locator('#langToggle,.buyer-lang-toggle').first().click();
+     await page.waitForFunction(l=>document.documentElement.lang===l,lang);
+   }
+   assert.equal(await page.locator('#useAddress').innerText(),'Use this address');
+   await page.locator('#address').fill('Another office, 50450 Kuala Lumpur, Malaysia');
    const n=calls.length;await page.waitForTimeout(800);assert.equal(calls.length,n);
    assert.equal(await page.evaluate(()=>Number.isNaN(pmDeliveryFee())),true);
    await page.locator('#useAddress').click();await page.locator('#parcelService').waitFor();

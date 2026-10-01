@@ -1,6 +1,5 @@
 (() => {
-  const en=localStorage.getItem('pasarmalam-lang')==='en';
-  const t=(ms,enText)=>en?enText:ms;
+  const t=(ms,enText)=>window.pmBuyerText?window.pmBuyerText(ms,enText):localStorage.getItem('pasarmalam-lang')==='en'?enText:ms;
   let loaded=false, selected=null, rows=[], original=null;
   const section=document.createElement('section');section.className='checkout-section';section.hidden=true;
   section.innerHTML=`<h2>${t('Cawangan kedai','Store branch')}</h2><label for="checkoutBranch">${t('Cawangan pengambilan','Pickup branch')}</label><select id="checkoutBranch" disabled></select><p id="branchAddress" class="muted"></p><p id="branchStatus" role="status"></p><button type="button" class="soft" id="branchRetry" hidden>${t('Cuba lagi','Retry')}</button>`;

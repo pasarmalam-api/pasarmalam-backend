@@ -1,7 +1,6 @@
 (() => {
   const el = id => document.getElementById(id);
-  const en = localStorage.getItem('pasarmalam-lang') === 'en';
-  const t = (ms, english) => en ? english : ms;
+  const t = (ms, english) => window.pmBuyerText ? window.pmBuyerText(ms,english) : localStorage.getItem('pasarmalam-lang') === 'en' ? english : ms;
   const address = el('address');
   const section = address.closest('section');
   const controls = document.createElement('div');
@@ -16,7 +15,9 @@
   address.after(extra);
   const editor=document.createElement('div');editor.id='addressEditor';
   for(const child of [...section.children])if(child!==controls&&child.tagName!=='H2')editor.append(child);
-  editor.prepend(el('addressSearch'),el('useDefaultAddress'));
+  editor.prepend(el('addressSearch'),el('addressSearchStatus'),el('useDefaultAddress'));
+  el('deliveryLocate').hidden=false;
+  editor.insertBefore(el('deliveryLocate'),el('useDefaultAddress'));
   const done=document.createElement('button');done.type='button';done.className='primary';done.id='useAddress';done.textContent=t('Gunakan alamat ini','Use this address');editor.append(done);section.append(editor);
   function displayAddress(editing){
     window.pmAddressEditing=editing;editor.hidden=!editing;
@@ -47,14 +48,14 @@
         window.pmMapsLoaded = () => { clearTimeout(timer); resolve(); };
         window.gm_authFailure = () => { clearTimeout(timer); reject(new Error('Google Maps key or billing is unavailable.')); };
         const script = document.createElement('script');
-        const params = new URLSearchParams({key:cfg.browser_key,loading:'async',libraries:'places,geocoding',callback:'pmMapsLoaded',region:'MY',language:en?'en':'ms',v:'weekly'});
+        const params = new URLSearchParams({key:cfg.browser_key,loading:'async',libraries:'places,geocoding',callback:'pmMapsLoaded',region:'MY',language:localStorage.getItem('pasarmalam-lang')||'ms',v:'weekly'});
         script.src = 'https://maps.googleapis.com/maps/api/js?' + params;
         script.onerror = () => { clearTimeout(timer); reject(new Error('Google Maps could not load.')); };
         document.head.append(script);
       });
       return google.maps;
     })();
-    return loading;
+    try { return await loading; } catch(e) { loading=null; throw e; }
   }
   function applyLocation(text, location, expected) {
     if (version !== expected) return;
@@ -74,7 +75,7 @@
     if (!request.location && matches.length !== 1) throw new Error(t('Beberapa alamat ditemui. Pilih melalui carian.','Several addresses matched. Please choose using search.'));
     applyLocation(keepText || matches[0].formatted_address,matches[0].geometry.location,expected);
   }
-  let widget;
+  let widget, selectedSearch = '', selecting = false;
   el('changeAddress').onclick = async () => {
     displayAddress(true);
     address.readOnly = false; invalidate(); el('addressSearch').hidden = false;
@@ -85,10 +86,17 @@
         const {PlaceAutocompleteElement} = await g.importLibrary('places');
         widget = new PlaceAutocompleteElement({includedRegionCodes:['my']});
         widget.placeholder = t('Cari alamat di Malaysia','Search Malaysian addresses');
-        widget.addEventListener('input',invalidate);
+        widget.addEventListener('input',()=>{
+          const value=String(widget.value||'').trim();
+          if(selecting && value===selectedSearch)return;
+          invalidate();
+          if(value){address.value=value;base=value;el('addressUnit').value='';}
+          status(t('Pilih alamat daripada cadangan atau sahkan alamat penuh.','Choose an address suggestion or confirm the full address.'));
+        });
         widget.addEventListener('gmp-error',()=>status(t('Carian gagal. Cuba lagi atau masukkan alamat secara manual.','Search failed. Try again or enter an address manually.')));
         widget.addEventListener('gmp-select',async ({placePrediction})=>{
-          invalidate(); const expected = version;
+          invalidate(); const expected = version;selectedSearch=String(widget.value||'').trim();selecting=true;
+          status(t('Mengesahkan alamat...','Confirming address...'));
           try {
             const place = placePrediction.toPlace();
             await place.fetchFields({fields:['formattedAddress','location','addressComponents']});
@@ -96,12 +104,16 @@
             if(version!==expected)return;
             el('addressUnit').value=''; applyLocation(place.formattedAddress,place.location,expected);
           } catch(e) { if(version===expected)status(e.message); }
+          finally {selecting=false;}
         });
         el('addressSearch').append(widget);
       }
       status('');
     } catch(e) { status(e.message); address.focus(); }
   };
+  window.addEventListener('pm-language-change',()=>{
+    if(widget){widget.requestedLanguage=localStorage.getItem('pasarmalam-lang')||'ms';widget.placeholder=t('Cari alamat di Malaysia','Search Malaysian addresses');}
+  });
   el('useDefaultAddress').onclick = async () => {
     address.value=saved; base=saved; el('addressUnit').value=''; address.readOnly=true;
     invalidate(); const expected=version;

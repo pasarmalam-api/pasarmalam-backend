@@ -1,8 +1,7 @@
 /* The server owns prices; a quote is invalidated whenever its route changes. */
 (() => {
   const get = id => document.getElementById(id);
-  const english = localStorage.getItem('pasarmalam-lang') === 'en';
-  const t = (ms, en) => english ? en : ms;
+  const t = (ms, en) => window.pmBuyerText ? window.pmBuyerText(ms,en) : localStorage.getItem('pasarmalam-lang') === 'en' ? en : ms;
   const shipping = get('shipping'), address = get('address'), pay = get('pay');
   const payment = get('payment');
   payment.replaceChildren(

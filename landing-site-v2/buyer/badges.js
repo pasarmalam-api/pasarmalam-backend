@@ -90,8 +90,12 @@
     @media(max-width:760px){.buyer-home .bottom-nav .seller-entry{flex-direction:column;gap:3px}.buyer-home .seller-entry::before{flex-basis:auto}}
   `;
   document.head.appendChild(switchStyle);
+  Object.assign(dictionary.ms,{"Change address":"Tukar alamat","Use default address":"Guna alamat lalai","Unit / floor (optional)":"Unit / tingkat (pilihan)","Save as default address":"Simpan sebagai alamat lalai","Use this address":"Gunakan alamat ini","Google search is not configured. Enter your address manually.":"Carian Google belum tersedia. Masukkan alamat secara manual.","Select a precise Malaysian address using search.":"Pilih alamat Malaysia yang tepat melalui carian.","Several addresses matched. Please choose using search.":"Beberapa alamat ditemui. Pilih melalui carian.","Loading Google search...":"Memuatkan carian Google...","Search Malaysian addresses":"Cari alamat di Malaysia","Choose an address suggestion or confirm the full address.":"Pilih alamat daripada cadangan atau sahkan alamat penuh.","Search failed. Try again or enter an address manually.":"Carian gagal. Cuba lagi atau masukkan alamat secara manual.","Confirming address...":"Mengesahkan alamat...","Enter your address and phone number.":"Lengkapkan alamat dan nombor telefon.","Enter an address first.":"Masukkan alamat dahulu.","Default address saved.":"Alamat lalai disimpan.","Finding your location...":"Mencari lokasi...","Location denied. Search or enter an address.":"Lokasi tidak dibenarkan. Cari atau masukkan alamat.","Online banking (Billplz FPX)":"Perbankan dalam talian (Billplz FPX)","Cash on self pickup":"Tunai semasa ambil sendiri","Pay on Arrival (PM Express)":"Bayar semasa tiba (PM Express)","Self pickup":"Ambil sendiri","EasyParcel - standard courier":"EasyParcel - kurier standard","Express delivery - Lalamove":"Penghantaran segera - Lalamove","Delivery option":"Pilihan penghantaran","Recipient location":"Lokasi penerima","Use current location":"Gunakan lokasi semasa","Set another location":"Tetapkan lokasi lain","Latitude":"Latitud","Longitude":"Longitud","This location matches the recipient address.":"Lokasi ini ialah alamat penerima.","Area & vehicle":"Kawasan & kenderaan","Area":"Kawasan","Vehicle":"Kenderaan","Package fits the vehicle":"Bungkusan muat dalam kenderaan","Pickup time":"Masa pengambilan","Get delivery charge":"Dapatkan caj penghantaran","Choose courier":"Pilih kurier","Place order - pay on arrival":"Buat pesanan - bayar semasa tiba","Pay Now":"Bayar Sekarang","Confirm the recipient location again.":"Sahkan semula lokasi penerima.","Location is unavailable.":"Lokasi tidak tersedia.","Locating...":"Mencari lokasi...","Current location selected. Confirm it matches the recipient address below.":"Lokasi semasa dipilih. Sahkan alamat penerima di bawah.","Location denied. Set the recipient location manually.":"Lokasi tidak dibenarkan. Tetapkan lokasi penerima secara manual.","Retry":"Cuba lagi","Select a product first.":"Pilih produk dahulu.","Change your address and select a precise search result.":"Tukar alamat dan pilih alamat tepat melalui carian.","Getting quotation...":"Mendapatkan sebut harga...","Courier":"Kurier","Get a fresh delivery quotation.":"Dapatkan sebut harga penghantaran baharu.","Store branch":"Cawangan kedai","Pickup branch":"Cawangan pengambilan","Wait for branch details or retry.":"Tunggu maklumat cawangan atau cuba lagi.","This branch is closed.":"Cawangan ini ditutup.","Pickup address not configured.":"Alamat pengambilan belum disediakan.","unit":"unit","Loading branches...":"Memuatkan cawangan...","This store is unavailable.":"Kedai ini tidak tersedia."," (Closed)":" (Ditutup)"});
+  Object.assign(dictionary.ms,{'Sign Out':'Log Keluar','Please sign in to view your profile.':'Sila log masuk untuk melihat profil anda.','Full address':'Alamat penuh','Payment method':'Kaedah bayaran','Item:':'Item:','Shipping:':'Penghantaran:','Total:':'Jumlah:','Get a quote':'Dapatkan sebut harga','PasarMalam logistics admin fee:':'Fi pentadbiran logistik PasarMalam:','Voucher discount:':'Diskaun voucher:'});
+  Object.keys(dictionary.ms).forEach(key=>{dictionary.en[key]=key;});
+  window.pmBuyerText=(ms,en)=>{dictionary.ms[en]=ms;dictionary.en[en]=en;return dictionary[currentLang()][en]||en;};
   function token(){return localStorage.getItem("pm_token")||""}
-  function currentLang(){try{if(localStorage.getItem(BUYER_LANG_VERSION_KEY)!==BUYER_LANG_VERSION){localStorage.setItem(LANG_KEY,"ms");localStorage.setItem(BUYER_LANG_VERSION_KEY,BUYER_LANG_VERSION);return"ms"}const stored=localStorage.getItem(LANG_KEY);if(stored==="ms"||stored==="en"||stored==="zh")return stored;localStorage.setItem(LANG_KEY,"ms");return"ms"}catch(e){return"ms"}}
+  function currentLang(){try{const stored=localStorage.getItem(LANG_KEY);localStorage.setItem(BUYER_LANG_VERSION_KEY,BUYER_LANG_VERSION);if(stored==="ms"||stored==="en"||stored==="zh")return stored;localStorage.setItem(LANG_KEY,"ms");return"ms"}catch(e){return"ms"}}
   function sourceMap(){const map={Pengecas:"Chargers","\u5145\u7535\u5668":"Chargers"};[dictionary.ms,dictionary.en,dictionary.zh].forEach(group=>Object.entries(group).forEach(([key,value])=>{map[value]=key}));return map}
   function cleanVisibleText(value){
     return String(value||"")
@@ -107,7 +111,11 @@
   function translateText(value,lang,lookup){
     let text=cleanVisibleText(value);
     const key=lookup[text]||text;
-    text=(dictionary[lang]&&dictionary[lang][key])||text;
+    if(lookup[text]||dictionary.en[text])return dictionary[lang][key]||key;
+    // Canonicalise translated phrases before switching languages again.
+    Object.entries(lookup).sort((a,b)=>b[0].length-a[0].length).forEach(([value,source])=>{
+      if(value.length>=5&&value!==source)text=text.split(value).join(source);
+    });
     const phrases=Object.keys(dictionary.ms).sort((a,b)=>b.length-a.length);
     phrases.forEach(phrase=>{
       if(phrase.length<5)return;
@@ -147,6 +155,7 @@
     localStorage.setItem(LANG_KEY,next);
     localStorage.setItem(BUYER_LANG_VERSION_KEY,BUYER_LANG_VERSION);
     if(window.currentLang!==undefined)window.currentLang=next;
+    window.dispatchEvent(new CustomEvent('pm-language-change',{detail:{language:next}}));
     if(typeof window.pmRefreshBuyerLanguage==="function")window.pmRefreshBuyerLanguage(next);
     applyLanguage();
   }
