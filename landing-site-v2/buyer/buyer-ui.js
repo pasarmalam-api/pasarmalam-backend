@@ -17,9 +17,16 @@
     const group={'product.html':'category.html','seller-store.html':'category.html','order-detail.html':'orders.html','receipt.html':'orders.html','order-confirmation.html':'orders.html','returns.html':'orders.html','login.html':'profile.html','signup.html':'profile.html','password-reset.html':'profile.html'};
     routes.forEach(([href,label])=>{const a=document.createElement('a');a.href=href;a.textContent=label;if((group[page]||page)===href)a.setAttribute('aria-current','page');nav.appendChild(a)});
     document.querySelector('header')?.after(nav);
+    if(document.body.matches('.buyer-home,.buyer-product')){
+      const main=document.querySelector('main');
+      const moveExtras=()=>document.querySelectorAll('body>.pm-mobile-links,body>.pm-notify-enable').forEach(el=>main?.appendChild(el));
+      moveExtras();
+      new MutationObserver(moveExtras).observe(document.body,{childList:true});
+    }
     const cartLink=document.createElement('a');cartLink.href='cart.html';cartLink.className='buyer-cart-link';cartLink.textContent='Cart';
     if(page==='cart.html')cartLink.setAttribute('aria-current','page');
     if(document.body.classList.contains('buyer-home')){
+      document.querySelector('#search')?.setAttribute('placeholder','Search products');
       const seller=document.createElement('a');seller.href='become-seller.html';seller.className='buyer-seller-link';seller.textContent='Switch to Seller';
       document.querySelector('header .brand')?.appendChild(seller);
       return;

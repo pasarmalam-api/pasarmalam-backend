@@ -99,6 +99,17 @@
   Object.assign(dictionary.ms,{'Confirm delivery location':'Sahkan lokasi penghantaran','Delivery location confirmed.':'Lokasi penghantaran disahkan.','Confirm location for Lalamove and PM Express delivery.':'Sahkan lokasi untuk penghantaran Lalamove dan PM Express.'});
   Object.assign(dictionary.zh,{'Confirm delivery location':'确认配送位置','Delivery location confirmed.':'配送位置已确认。','Confirm location for Lalamove and PM Express delivery.':'请确认位置以使用 Lalamove 和 PM Express 配送。'});
   Object.keys(dictionary.ms).forEach(key=>{dictionary.en[key]=key;});
+  Object.assign(dictionary.ms,{
+    'Product option':'Pilihan produk','Default option':'Pilihan asal','Not specified':'Tidak dinyatakan',
+    'Request a return or exchange from the Orders page':'Mohon pulangan atau tukar barang dari halaman Pesanan',
+    'Not rated yet':'Belum dinilai','Search products':'Cari produk'
+  });
+  Object.assign(dictionary.zh,{
+    'Product option':'商品选项','Default option':'默认选项','Not specified':'未注明',
+    'Request a return or exchange from the Orders page':'在订单页面申请退货或换货',
+    'Not rated yet':'暂无评分','Search products':'搜索商品'
+  });
+  Object.keys(dictionary.ms).forEach(key=>{dictionary.en[key]=key;});
   window.pmBuyerText=(ms,en)=>{dictionary.ms[en]=ms;dictionary.en[en]=en;return dictionary[currentLang()][en]||en;};
   function token(){return localStorage.getItem("pm_token")||""}
   function currentLang(){try{const stored=localStorage.getItem(LANG_KEY);localStorage.setItem(BUYER_LANG_VERSION_KEY,BUYER_LANG_VERSION);if(stored==="ms"||stored==="en"||stored==="zh")return stored;localStorage.setItem(LANG_KEY,"ms");return"ms"}catch(e){return"ms"}}
