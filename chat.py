@@ -4,6 +4,35 @@ def migrate(con, columns):
         if name not in columns:
             con.execute(f'ALTER TABLE messages ADD COLUMN {name} {kind}')
     con.execute('CREATE INDEX IF NOT EXISTS messages_thread ON messages(buyer_id, product_id, id)')
+    con.execute('CREATE TABLE IF NOT EXISTS chat_blocks (blocker_id INTEGER NOT NULL, blocked_id INTEGER NOT NULL, PRIMARY KEY (blocker_id, blocked_id))')
+
+
+def safety_target(con, user, data):
+    where, args = scope(user)
+    row = con.execute('SELECT m.*, p.seller_id FROM messages m JOIN products p ON p.id=m.product_id WHERE '
+                      + where + ' AND m.id=?', args + [int(data.get('message_id') or 0)]).fetchone()
+    if not row or row['sender_role'] == user['role']:
+        raise PermissionError('Choose a received message in your conversation.')
+    return row, row['seller_id'] if user['role'] == 'buyer' else row['buyer_id']
+
+
+def block(con, user, data):
+    _, other = safety_target(con, user, data)
+    if data.get('blocked') is True:
+        con.execute('INSERT INTO chat_blocks (blocker_id,blocked_id) VALUES (?,?) ON CONFLICT DO NOTHING', (user['id'], other))
+    elif data.get('blocked') is False:
+        con.execute('DELETE FROM chat_blocks WHERE blocker_id=? AND blocked_id=?', (user['id'], other))
+    else:
+        raise ValueError('Choose block or unblock.')
+
+
+def report_data(con, user, data):
+    row, other = safety_target(con, user, data)
+    reason = str(data.get('reason', '')).strip()
+    if not reason or len(reason) > 1000:
+        raise ValueError('Enter a report reason between 1 and 1000 characters.')
+    return {'category': 'Chat safety', 'priority': 'high', 'subject': 'Chat report: message #' + str(row['id']),
+            'message': f"Reported account: {other}; product: {row['product_id']}; message: {row['id']}\nReason: {reason}\nMessage: {row['body']}"}
 
 
 def scope(user):
@@ -17,8 +46,10 @@ def scope(user):
 def listing(con, user):
     where, args = scope(user)
     return [dict(r) for r in con.execute(
-        'SELECT m.*, p.name AS product_name FROM messages m JOIN products p ON p.id=m.product_id '
-        'WHERE '+where+' ORDER BY m.id', args)]
+        'SELECT m.*, p.name AS product_name, EXISTS(SELECT 1 FROM chat_blocks b WHERE b.blocker_id=? AND '
+        'b.blocked_id=CASE WHEN m.buyer_id=? THEN p.seller_id ELSE m.buyer_id END) AS blocked_by_me '
+        'FROM messages m JOIN products p ON p.id=m.product_id '
+        'WHERE '+where+' ORDER BY m.id', [user['id'], user['id']] + args)]
 
 
 def target(role, product_id, buyer_id, message_id):
@@ -43,6 +74,9 @@ def send(con, user, data, now, notify):
         raise ValueError('Choose a buyer conversation.')
     if buyer_id == product['seller_id']:
         raise ValueError('You cannot message your own shop.')
+    if con.execute('SELECT 1 FROM chat_blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)',
+                   (buyer_id, product['seller_id'], product['seller_id'], buyer_id)).fetchone():
+        raise PermissionError('Messaging is blocked between these accounts.')
     if user['role'] == 'seller' and not con.execute(
             'SELECT id FROM messages WHERE product_id=? AND buyer_id=? LIMIT 1', (product_id,buyer_id)).fetchone() and not con.execute(
             'SELECT id FROM orders WHERE product_id=? AND buyer_id=? LIMIT 1', (product_id,buyer_id)).fetchone():

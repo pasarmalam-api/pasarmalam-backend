@@ -102,7 +102,7 @@
   Object.assign(dictionary.ms,{
     'Product option':'Pilihan produk','Default option':'Pilihan asal','Not specified':'Tidak dinyatakan',
     'Request a return or exchange from the Orders page':'Mohon pulangan atau tukar barang dari halaman Pesanan',
-    'Not rated yet':'Belum dinilai','Search products':'Cari produk'
+    'Reviews':'Ulasan','Not rated yet':'Belum dinilai','Search products':'Cari produk'
   });
   Object.assign(dictionary.zh,{
     'Product option':'商品选项','Default option':'默认选项','Not specified':'未注明',

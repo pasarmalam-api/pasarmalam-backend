@@ -4,13 +4,18 @@ const root=path.resolve('landing-site-v2');
 const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req.url,'http://localhost').pathname);if(!file.startsWith(root)||!fs.existsSync(file)){res.writeHead(404);return res.end()}res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file))});
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;
- const browser=await chromium.launch({channel:'msedge',headless:true});let rows=[],reads=[],fail=false;const errors=[];
+ const browser=await chromium.launch({channel:'msedge',headless:true});let rows=[],reads=[],fail=false,safety=[];const errors=[];
  try{
  async function pageFor(role,id){
   const ctx=await browser.newContext({viewport:{width:390,height:844}});
   await ctx.addInitScript(({role,id})=>{localStorage.setItem('pm_token',role+'-test');localStorage.setItem('pm_user',JSON.stringify({id,role,name:'Test'}));localStorage.setItem('pasarmalam-lang','en');},{role,id});
   await ctx.route('https://pasarmalam-backend.onrender.com/**',route=>{
    const req=route.request(),url=new URL(req.url());
+   if(['/api/messages/report','/api/messages/block'].includes(url.pathname)){
+    const data=req.postDataJSON();safety.push({path:url.pathname,...data});
+    if(url.pathname.endsWith('/block'))rows.forEach(m=>m.blocked_by_me=data.blocked);
+    return route.fulfill({json:{ok:true}});
+   }
    if(url.pathname==='/api/messages'&&req.method()==='POST'){
     if(fail)return route.fulfill({status:503,json:{error:'Try again'}});
     const data=req.postDataJSON();assert.equal(data.product_id,42);assert.equal(data.buyer_id,1);
@@ -28,6 +33,14 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
  await seller.locator('#chatText').fill('Yes <img src=x onerror=alert(1)>');await seller.locator('#chatSend').click();await seller.waitForFunction(()=>document.getElementById('chatStatus').textContent==='Message sent.');
  await buyer.locator('#chatRefresh').click();await buyer.waitForFunction(()=>document.getElementById('chatMessages').textContent.includes('Yes <img'));
  assert.equal(await buyer.locator('#chatMessages img').count(),0);assert(reads.some(r=>r.role==='buyer'));
+ buyer.once('dialog',dialog=>dialog.accept('Spam message'));await buyer.getByRole('button',{name:'Report',exact:true}).click();
+ await buyer.waitForFunction(()=>document.getElementById('chatStatus').textContent==='Report sent to support.');
+ assert(safety.some(s=>s.path.endsWith('/report')&&s.message_id===2&&s.reason==='Spam message'));
+ buyer.once('dialog',dialog=>dialog.accept());await buyer.getByRole('button',{name:'Block user',exact:true}).click();
+ await buyer.getByRole('button',{name:'Unblock user',exact:true}).waitFor();
+ assert(safety.some(s=>s.path.endsWith('/block')&&s.blocked===true));
+ buyer.once('dialog',dialog=>dialog.accept());await buyer.getByRole('button',{name:'Unblock user',exact:true}).click();
+ await buyer.getByRole('button',{name:'Block user',exact:true}).waitFor();
  fail=true;await buyer.locator('#chatText').fill('Keep this draft');await buyer.locator('#chatSend').click();await buyer.waitForFunction(()=>document.getElementById('chatStatus').textContent==='Try again');assert.equal(await buyer.locator('#chatText').inputValue(),'Keep this draft');
  fs.mkdirSync('../outputs/chat',{recursive:true});
  for(const p of [buyer,seller]){assert(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await p.screenshot({path:'../outputs/chat/'+(p===buyer?'buyer':'seller')+'-mobile.png',fullPage:true});await p.setViewportSize({width:1440,height:1000});await p.screenshot({path:'../outputs/chat/'+(p===buyer?'buyer':'seller')+'-desktop.png',fullPage:true});}

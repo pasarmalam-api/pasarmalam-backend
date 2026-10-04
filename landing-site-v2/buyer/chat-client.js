@@ -39,6 +39,23 @@
       const div=document.createElement('div');div.className='msg'+(message.sender_role===role?' me':'');
       const name=document.createElement('b');name.textContent=message.sender_role===role?'You':(seller?message.buyer_name:message.seller_name);
       const text=document.createElement('p');text.textContent=message.body;div.append(name,text);$('chatMessages').append(div);
+      if(message.sender_role!==role){
+        for(const action of ['Report',message.blocked_by_me?'Unblock user':'Block user']){
+          const button=document.createElement('button');button.type='button';button.className='soft';button.textContent=action;
+          button.onclick=async()=>{
+            const report=action==='Report';
+            const reason=report?prompt('Why are you reporting this message?'):null;
+            if(report&&!reason?.trim())return;
+            if(!report&&!confirm(action+' for all conversations with this account?'))return;
+            button.disabled=true;
+            try{
+              await api('/api/messages/'+(report?'report':'block'),{message_id:message.id,...(report?{reason}:{blocked:!message.blocked_by_me})});
+              await load();status(report?'Report sent to support.':action==='Block user'?'User blocked.':'User unblocked.');
+            }catch(e){status(e.message);}finally{button.disabled=false;}
+          };
+          div.append(button);
+        }
+      }
     }
     $('chatSend').disabled=!selected||sending||!localStorage.getItem('pm_token');
     if(!rows.length&&!selected)status('No conversations yet. Buyers can start from a product page.');

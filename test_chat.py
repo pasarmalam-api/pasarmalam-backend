@@ -50,5 +50,33 @@ class ChatTest(unittest.TestCase):
                 with self.assertRaises(ValueError):chat.send(con,{'id':1,'role':'buyer'},{'product_id':1,'body':body},1,server.create_notification)
             with self.assertRaises(PermissionError):chat.listing(con,{'id':3,'role':'admin'})
 
+    def test_block_and_report_authorization(self):
+        buyer={'id':1,'role':'buyer'}
+        with server.connect() as con:
+            first=chat.send(con,buyer,{'product_id':1,'body':'Hello'},10,server.create_notification)
+            reply=chat.send(con,self.seller,{'product_id':1,'buyer_id':1,'body':'Reply'},11,server.create_notification)
+            chat.block(con,buyer,{'message_id':reply,'blocked':True})
+            self.assertTrue(chat.listing(con,buyer)[0]['blocked_by_me'])
+            for user,data in [(buyer,{'product_id':1,'body':'Again'}),(self.seller,{'product_id':1,'buyer_id':1,'body':'Again'})]:
+                with self.assertRaises(PermissionError):chat.send(con,user,data,12,server.create_notification)
+            chat.block(con,self.seller,{'message_id':first,'blocked':False})
+            self.assertTrue(chat.listing(con,buyer)[0]['blocked_by_me'])
+            report=chat.report_data(con,buyer,{'message_id':reply,'reason':'Harassment','user_id':999})
+            self.assertEqual(report['priority'],'high')
+            self.assertIn('Reported account: 2',report['message'])
+            with self.assertRaises(PermissionError):chat.report_data(con,{'id':999,'role':'buyer'},{'message_id':reply,'reason':'X'})
+            with self.assertRaises(PermissionError):chat.block(con,buyer,{'message_id':first,'blocked':True})
+            chat.block(con,buyer,{'message_id':reply,'blocked':False})
+            chat.send(con,buyer,{'product_id':1,'body':'Unblocked'},13,server.create_notification)
+
+    def test_ratings_use_reviews_not_product_defaults(self):
+        with server.connect() as con:
+            con.execute('DELETE FROM reviews')
+            con.execute('UPDATE products SET rating=4.8')
+        self.h.get_products({})
+        product=self.reply.call_args.args[2]['products'][0]
+        self.assertEqual(product['rating'],0)
+        self.assertEqual(product['review_count'],0)
+
 
 if __name__=='__main__':unittest.main()

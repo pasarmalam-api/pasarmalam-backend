@@ -126,6 +126,7 @@ def purge(con, admin, data, timestamp, postgres=False):
     for table in ('messages', 'reviews'):
         con.execute(f'DELETE FROM {table} WHERE buyer_id=? OR product_id IN (SELECT id FROM products WHERE seller_id=?)', (uid, uid))
     con.execute('DELETE FROM reviews WHERE seller_id=?', (uid,))
+    con.execute('DELETE FROM chat_blocks WHERE blocker_id=? OR blocked_id=?', (uid, uid))
     for table in ('cart_items', 'wishlist'):
         con.execute(f'DELETE FROM {table} WHERE buyer_id=? OR product_id IN (SELECT id FROM products WHERE seller_id=?)', (uid, uid))
     for table in ('notifications', 'support_tickets', 'seller_email_queue'):

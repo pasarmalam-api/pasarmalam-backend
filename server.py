@@ -1597,6 +1597,16 @@ class Handler(BaseHTTPRequestHandler):
                     else:
                         raise ValueError('Unsupported wishlist action')
                 send_json(self, 200, {'ok': True})
+            elif parsed.path == "/api/messages/block":
+                user = self.require_user()
+                with connect() as con:
+                    chat.block(con, user, data)
+                send_json(self, 200, {"ok": True})
+            elif parsed.path == "/api/messages/report":
+                user = self.require_user()
+                with connect() as con:
+                    report = chat.report_data(con, user, data)
+                self.create_support_ticket(report)
             elif parsed.path == "/api/messages/read":
                 user = self.require_user()
                 with connect() as con:
@@ -1850,7 +1860,11 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as con:
             rows = [row_to_dict(row) for row in con.execute(sql, params)]
             sellers = {r['id']: bool(r['shop_open']) for r in con.execute("SELECT id, shop_open FROM users")}
+            ratings = {r['product_id']: dict(r) for r in con.execute('SELECT product_id, AVG(rating) AS rating, COUNT(*) AS review_count FROM reviews GROUP BY product_id')}
         for row in rows:
+            rating = ratings.get(row['id'], {})
+            row['rating'] = round(float(rating.get('rating') or 0), 1)
+            row['review_count'] = rating.get('review_count', 0)
             row['shop_open'] = sellers.get(row['seller_id'], True)
             row["images"] = json.loads(row.get("images") or "[]")
             row["variants"] = json.loads(row.get("variants") or "[]")
