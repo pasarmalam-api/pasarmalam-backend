@@ -36,10 +36,12 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
  buyer.once('dialog',dialog=>dialog.accept('Spam message'));await buyer.getByRole('button',{name:'Report',exact:true}).click();
  await buyer.waitForFunction(()=>document.getElementById('chatStatus').textContent==='Report sent to support.');
  assert(safety.some(s=>s.path.endsWith('/report')&&s.message_id===2&&s.reason==='Spam message'));
- buyer.once('dialog',dialog=>dialog.accept());await buyer.getByRole('button',{name:'Block user',exact:true}).click();
+ await buyer.getByRole('button',{name:'Block user',exact:true}).click();
+ await buyer.getByRole('dialog').getByRole('button',{name:'Block user',exact:true}).click();
  await buyer.getByRole('button',{name:'Unblock user',exact:true}).waitFor();
  assert(safety.some(s=>s.path.endsWith('/block')&&s.blocked===true));
- buyer.once('dialog',dialog=>dialog.accept());await buyer.getByRole('button',{name:'Unblock user',exact:true}).click();
+ await buyer.getByRole('button',{name:'Unblock user',exact:true}).click();
+ await buyer.getByRole('dialog').getByRole('button',{name:'Unblock user',exact:true}).click();
  await buyer.getByRole('button',{name:'Block user',exact:true}).waitFor();
  fail=true;await buyer.locator('#chatText').fill('Keep this draft');await buyer.locator('#chatSend').click();await buyer.waitForFunction(()=>document.getElementById('chatStatus').textContent==='Try again');assert.equal(await buyer.locator('#chatText').inputValue(),'Keep this draft');
  fs.mkdirSync('../outputs/chat',{recursive:true});

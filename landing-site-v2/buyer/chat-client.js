@@ -4,12 +4,27 @@
   const user=(()=>{try{return JSON.parse(localStorage.getItem('pm_user')||'{}')}catch{return {}}})();
   window.productId=Number(params.get('product_id'))||0;
   let selected=productId?{product_id:productId,buyer_id:seller?Number(params.get('buyer_id')):user.id}:null;
-  let rows=[],loading=false,sending=false;
+  let rows=[],loading=false,sending=false,safetyBusy=false;
   const drafts=new Map();
   const panel=document.querySelector('main .panel');
   panel.innerHTML='<h2>Conversations</h2><div id="conversations"></div><h3 id="conversationTitle">Select a conversation</h3><div id="chatMessages" aria-live="polite"></div><form id="chatForm"><label for="chatText">Message</label><textarea id="chatText" maxlength="4000" rows="3"></textarea><button class="primary" id="chatSend" type="submit">Send</button><button class="soft" id="chatRefresh" type="button">Refresh</button></form><p id="chatStatus" role="status"></p>';
   const style=document.createElement('style');style.textContent='#conversations{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}#conversations button{white-space:normal;text-align:left;max-width:100%;overflow-wrap:anywhere}#conversations button[aria-pressed=true]{border:2px solid #087f72}#chatMessages{max-height:55vh;overflow:auto}#chatMessages .msg{white-space:pre-wrap;overflow-wrap:anywhere}#chatText{width:100%;font:inherit;border:1px solid #ddd;border-radius:6px;padding:10px;resize:vertical}#chatForm button{margin:8px 8px 0 0}';document.head.append(style);
   const $=id=>document.getElementById(id), key=t=>t.product_id+':'+t.buyer_id;
+  function confirmSafety(action){
+    return new Promise(resolve=>{
+      const dialog=document.createElement('dialog');
+      dialog.style.cssText='max-width:calc(100% - 32px);width:360px;padding:20px;border:1px solid #ddd;border-radius:8px';
+      const heading=document.createElement('h3');heading.textContent=action+'?';
+      const description=document.createElement('p');description.textContent='This applies to all conversations with this account.';
+      const accept=document.createElement('button');accept.type='button';accept.className='primary';accept.textContent=action;
+      const cancel=document.createElement('button');cancel.type='button';cancel.className='soft';cancel.textContent='Cancel';cancel.style.marginLeft='12px';
+      dialog.setAttribute('aria-label',action+' confirmation');
+      const finish=value=>{dialog.close();dialog.remove();resolve(value);};
+      accept.onclick=()=>finish(true);cancel.onclick=()=>finish(false);
+      dialog.addEventListener('cancel',event=>{event.preventDefault();finish(false)});
+      dialog.append(heading,description,accept,cancel);document.body.append(dialog);dialog.showModal();cancel.focus();
+    });
+  }
   const status=text=>{
     $('chatStatus').textContent=text;
     if(!localStorage.getItem('pm_token')){
@@ -18,7 +33,7 @@
   };
   async function api(path,data){
     const token=localStorage.getItem('pm_token');if(!token)throw new Error('Please sign in to use messages.');
-    const res=await fetch('https://pasarmalam-backend.onrender.com'+path,{method:data?'POST':'GET',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},...(data?{body:JSON.stringify(data)}:{}),signal:AbortSignal.timeout(15000)});
+    const res=await fetch('https://pasarmalam-backend.onrender.com'+path,{method:data?'POST':'GET',cache:'no-store',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},...(data?{body:JSON.stringify(data)}:{}),signal:AbortSignal.timeout(15000)});
     const body=await res.json();if(!res.ok)throw new Error(body.error||'Unable to load messages.');return body;
   }
   function render(){
@@ -43,15 +58,25 @@
         for(const action of ['Report',message.blocked_by_me?'Unblock user':'Block user']){
           const button=document.createElement('button');button.type='button';button.className='soft';button.textContent=action;
           button.onclick=async()=>{
+            if(safetyBusy)return;
+            if(loading){status('Refreshing messages. Please try again in a moment.');return;}
             const report=action==='Report';
             const reason=report?prompt('Why are you reporting this message?'):null;
             if(report&&!reason?.trim())return;
-            if(!report&&!confirm(action+' for all conversations with this account?'))return;
+            safetyBusy=true;
+            if(!report&&!await confirmSafety(action)){safetyBusy=false;status('Action cancelled.');return;}
             button.disabled=true;
+            status(report?'Sending report...':'Updating block status...');
             try{
               await api('/api/messages/'+(report?'report':'block'),{message_id:message.id,...(report?{reason}:{blocked:!message.blocked_by_me})});
-              await load();status(report?'Report sent to support.':action==='Block user'?'User blocked.':'User unblocked.');
-            }catch(e){status(e.message);}finally{button.disabled=false;}
+              if(!report){
+                const blocked=!message.blocked_by_me;
+                rows.forEach(row=>{if(key(row)===key(message))row.blocked_by_me=blocked;});
+                render();
+              }
+              status(report?'Report sent to support.':action==='Block user'?'User blocked.':'User unblocked.');
+              $('chatStatus').scrollIntoView({block:'nearest'});
+            }catch(e){status(e.message);}finally{button.disabled=false;safetyBusy=false;}
           };
           div.append(button);
         }
@@ -68,14 +93,14 @@
     unread.forEach(m=>m.read_at=Date.now());render();window.dispatchEvent(new Event('seller-data-changed'));window.dispatchEvent(new Event('pm-chat-read'));
   }
   async function load(){
-    if(loading)return;loading=true;
+    if(loading||safetyBusy)return;loading=true;
     try {
       if(seller&&params.get('order_id')&&!selected){
         const order=((await api('/api/orders')).orders||[]).find(o=>String(o.id)===params.get('order_id'));
         if(!order)throw new Error('Order conversation is unavailable.');
         selected={product_id:order.product_id,buyer_id:order.buyer_id};
       }
-      rows=(await api('/api/messages')).messages||[];status('');render();await markRead();}
+      rows=(await api('/api/messages')).messages||[];render();await markRead();}
     catch(e){status(e.message);}finally{loading=false;}
   }
   $('chatForm').onsubmit=async event=>{
