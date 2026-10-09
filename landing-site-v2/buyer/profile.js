@@ -89,6 +89,7 @@
   try{const delivery=deliveryAddress();const confirmed=location?{...location,address:delivery.address}:null;const d=await request({method:'POST',body:JSON.stringify({name:el('name').value.trim(),phone:el('phone').value.trim(),...delivery,delivery_location:confirmed})});fill(d.user);localStorage.setItem('pm_user',JSON.stringify(d.user));if(d.token)localStorage.setItem('pm_token',d.token);el('profileStatus').textContent='Profile saved.'}
   catch(e){el('profileStatus').textContent=e instanceof TypeError?'Connection failed. Please try again.':e.message}finally{button.disabled=false}
  });
- el('logout').onclick=()=>{localStorage.removeItem('pm_token');localStorage.removeItem('pm_user');location.href='login.html'};
+ el('logout').hidden=!localStorage.getItem('pm_token');
+ el('logout').onclick=()=>{localStorage.removeItem('pm_token');localStorage.removeItem('pm_user');localStorage.removeItem('pm_last_checkout');window.location.replace('index.html')};
  request().then(d=>{fill(d.user);el('profileStatus').textContent=''}).catch(e=>{el('profileStatus').textContent=e instanceof TypeError?'Connection failed. Please reload to try again.':e.message;el('loginLink').hidden=false});
 })();

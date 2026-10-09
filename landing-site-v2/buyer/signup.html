@@ -12,7 +12,7 @@
     label{display:block;font-size:13px;font-weight:900;margin:12px 0 6px}input,textarea{width:100%;border:1px solid var(--line);border-radius:6px;padding:12px;background:#fff}textarea{min-height:74px;resize:vertical}.field{display:grid;grid-template-columns:1fr auto;gap:8px}.primary,.outline{border-radius:6px;min-height:44px;padding:0 14px;font-weight:900}.primary{width:100%;border:0;background:linear-gradient(90deg,var(--brand),var(--purple));color:#fff;margin-top:14px}.outline{border:1px solid var(--line);background:#fff;color:var(--brand)}.terms{display:flex;gap:8px;align-items:flex-start;margin:12px 0}.terms input{width:auto;margin-top:2px}.status{min-height:22px;margin-top:12px}.success{border:1px solid #b8fff5;background:#effdfa;color:#067a6f;border-radius:6px;padding:10px}.error{border:1px solid #fecaca;background:#fff1f2;color:#b42318;border-radius:6px;padding:10px}.note{background:#f9fafb;border:1px solid var(--line);border-radius:6px;padding:10px;margin-top:12px}
     @media(max-width:900px){.shell{grid-template-columns:1fr}.visual{min-height:260px}.visual h2{font-size:31px}}@media(max-width:520px){.shell{padding:16px 12px}.card{padding:18px}.visual{padding:22px}.field{grid-template-columns:1fr}.bar{align-items:flex-start}}
   </style>
-<link rel="icon" type="image/png" href="pasarmalam-logo.png"><link rel="stylesheet" href="buyer-ui.css?v=3"></head>
+<link rel="icon" type="image/png" href="pasarmalam-logo.png"><link rel="stylesheet" href="buyer-ui.css?v=20261009-auth"></head>
 <body class="buyer-page buyer-auth">
 <header><div class="bar"><div class="brand" onclick="location.href='index.html'"><a class="logo" href="index.html" title="Home"><img src="pasarmalam-logo.png" width="56" height="56" alt="PasarMalam"></a><div><h1>PasarMalam</h1><span>Aplikasi Pembeli</span></div></div><button class="outline" onclick="location.href='login.html'">Sign In</button></div></header>
 <main class="shell">
@@ -64,11 +64,11 @@ async function signup(){
   try{
   const r=await fetch(API+"/api/auth/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({name:name.value.trim(),email:email.value.trim(),password:password.value,phone:phone.value.trim(),...deliveryAddress,role:"buyer",email_otp_token:emailOtpToken})});
   const d=await r.json().catch(()=>({}));
-  if(d.token){localStorage.setItem("pm_token",d.token);localStorage.setItem("pm_user",JSON.stringify(d.user));setStatus("Account created. Redirecting...","success");setTimeout(()=>location.href="index.html",800)}
+  if(r.ok&&d.token&&d.user?.role==='buyer'){localStorage.setItem("pm_token",d.token);localStorage.setItem("pm_user",JSON.stringify(d.user));setStatus("Account created. Redirecting...","success");location.replace(window.pmAuthDestination?window.pmAuthDestination():'index.html')}
   else setStatus(d.error||"Signup failed.","error");
   }catch(e){setStatus('Connection failed. Please try again.','error')}finally{signup.busy=false}
 }
 document.getElementById('email').addEventListener('input',()=>{emailOtpToken=''});
 </script>
-<script src="badges.js?v=20261001c"></script><script src="buyer-ui.js?v=3"></script></body>
+<script src="badges.js?v=20261001c"></script><script src="buyer-ui.js?v=20261009-auth"></script></body>
 </html>
