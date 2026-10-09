@@ -4,6 +4,11 @@
   const publicPages=new Set(['index.html','login.html','register.html','thank-you.html','policies.html']);
   function user(){try{return JSON.parse(localStorage.getItem('pm_user')||'{}')}catch(e){return {}}}
   function signedIn(){return Boolean(localStorage.getItem('pm_token'))&&user().role==='seller'}
+  const initialShop=user().id;
+  window.addEventListener('storage',event=>{
+    if(['pm_token','pm_user',null].includes(event.key))location.reload();
+  });
+  window.addEventListener('pageshow',()=>{if(user().id!==initialShop)location.reload();});
   function escape(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   window.PMSellerSession={signedIn,escape};
   const originalFetch=window.fetch;
@@ -12,6 +17,7 @@
     const url=new URL(typeof input==='string'?input:input.url,location.href);
     let settings=options;
     if(url.origin===base){
+      if(signedIn()&&user().id!==initialShop)throw new Error('The active shop changed. Reload this page before continuing.');
       const headers=new Headers(options&&options.headers||input.headers||{});
       if(signedIn()&&!headers.has('Authorization'))headers.set('Authorization','Bearer '+localStorage.getItem('pm_token'));
       settings={...options,headers};
@@ -64,6 +70,10 @@
     }
     if(!publicPages.has(page)&&!active)return;
     if(active&&document.querySelector('.app')){const script=document.createElement('script');script.src='shop-availability.js?v=1';document.head.append(script)}
+    if(active&&document.querySelector('.app')){
+      const css=document.createElement('link');css.rel='stylesheet';css.href='seller-shops.css?v=20261009';document.head.append(css);
+      const script=document.createElement('script');script.src='seller-shops.js?v=20261009';document.head.append(script);
+    }
     if(page!=='index.html'){
       const target=document.querySelector('header .top')||document.querySelector('main');
       if(target){const back=document.createElement('button');back.type='button';back.className='soft';back.textContent='Back';back.id='sellerBack';back.onclick=()=>{

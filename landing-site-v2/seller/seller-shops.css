@@ -1,0 +1,7 @@
+.shop-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:16px 0;border-bottom:1px solid #d7e2df;margin-bottom:16px}
+.shop-toolbar label{font-weight:700}.shop-toolbar select{width:auto;max-width:100%;flex:1;min-width:140px;min-height:44px}
+.shop-toolbar button{min-height:44px}.shop-toolbar small{color:#52616b}.shop-feedback{flex-basis:100%;margin:0;color:#9e2929;overflow-wrap:anywhere}
+.shop-dialog{width:440px;max-width:calc(100% - 24px);border:1px solid #d7e2df;border-radius:8px;padding:24px;color:#243137;background:#fff}
+.shop-dialog::backdrop{background:#0006}.shop-dialog h2{font-size:22px;margin:0 0 20px}.shop-dialog label{display:block;margin:16px 0 6px;font-weight:600}
+.shop-dialog input,.shop-dialog select{width:100%;min-height:44px;box-sizing:border-box;font:inherit}.shop-dialog footer{display:flex;justify-content:flex-end;gap:12px;margin-top:24px}
+@media(max-width:480px){.shop-toolbar label{flex-basis:100%}.shop-dialog{padding:16px}}
