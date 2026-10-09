@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import Mock, patch
 import server
 import chat
 import test_seller_operations
@@ -77,6 +78,25 @@ class ChatTest(unittest.TestCase):
         product=self.reply.call_args.args[2]['products'][0]
         self.assertEqual(product['rating'],0)
         self.assertEqual(product['review_count'],0)
+
+    def test_block_through_postgres_adapter_without_id_column(self):
+        buyer = {'id': 1, 'role': 'buyer'}
+        with server.connect() as con:
+            chat.send(con, buyer, {'product_id': 1, 'body': 'Hello'}, 10, server.create_notification)
+            reply = chat.send(con, self.seller, {'product_id': 1, 'buyer_id': 1, 'body': 'Reply'}, 11, server.create_notification)
+            # Exercise the production SQL rewrite against the real composite-key
+            # table. Only placeholder syntax is translated for the SQLite fixture.
+            driver = Mock()
+            driver.execute.side_effect = lambda sql, params: con.con.execute(sql.replace('%s', '?'), params)
+            adapter = server.DbConnection(driver)
+            with patch.object(server, 'USE_POSTGRES', True):
+                chat.block(adapter, buyer, {'message_id': reply, 'blocked': True})
+                chat.block(adapter, buyer, {'message_id': reply, 'blocked': True})
+                self.assertEqual(con.con.execute('SELECT COUNT(*) FROM chat_blocks').fetchone()[0], 1)
+                chat.block(adapter, buyer, {'message_id': reply, 'blocked': False})
+            self.assertEqual(con.execute('SELECT COUNT(*) FROM chat_blocks').fetchone()[0], 0)
+            inserts = [call.args[0] for call in driver.execute.call_args_list if call.args[0].startswith('INSERT')]
+            self.assertTrue(all(sql.endswith('RETURNING blocker_id') for sql in inserts))
 
 
 if __name__=='__main__':unittest.main()

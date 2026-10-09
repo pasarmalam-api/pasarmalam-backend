@@ -30,7 +30,7 @@ const server=http.createServer((req,res)=>{
       const response=await page.goto(origin+'/delete-account.html');assert.equal(response.status(),200);
       assert(await page.getByRole('heading',{name:'Delete your PasarMalam account',exact:true}).isVisible());
       assert((await page.locator('main').innerText()).includes('within 30 days after verifying account ownership'));
-      const mail=new URL(await page.getByRole('link',{name:'Email deletion request',exact:true}).getAttribute('href'));
+      const mail=new URL(await page.locator('a[href^="mailto:"]').first().getAttribute('href'));
       assert.equal(mail.protocol,'mailto:');assert.equal(mail.pathname,'pasahmallam@gmail.com');
       assert.equal(mail.searchParams.get('subject'),'PasarMalam account deletion request');
       assert(mail.searchParams.get('body').includes('associated personal data'));

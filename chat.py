@@ -19,7 +19,8 @@ def safety_target(con, user, data):
 def block(con, user, data):
     _, other = safety_target(con, user, data)
     if data.get('blocked') is True:
-        con.execute('INSERT INTO chat_blocks (blocker_id,blocked_id) VALUES (?,?) ON CONFLICT DO NOTHING', (user['id'], other))
+        # Explicit RETURNING avoids the adapter's automatic single-column id.
+        con.execute('INSERT INTO chat_blocks (blocker_id,blocked_id) VALUES (?,?) ON CONFLICT DO NOTHING RETURNING blocker_id', (user['id'], other))
     elif data.get('blocked') is False:
         con.execute('DELETE FROM chat_blocks WHERE blocker_id=? AND blocked_id=?', (user['id'], other))
     else:
