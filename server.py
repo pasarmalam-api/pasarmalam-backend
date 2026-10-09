@@ -4,6 +4,7 @@ import base64
 from lalamove import Client as LalamoveClient, LalamoveError
 import delivery
 import branches
+import seller_shops
 import seller_ai
 import chat
 import easyparcel
@@ -192,7 +193,10 @@ def make_token(user):
     payload = {"id": user["id"], "role": user["role"], "name": user["name"], "email": user.get("email", ""), "shop_name": user.get("shop_name", ""), "exp": now() + 60 * 60 * 24 * 30}
     if user['role'] in ('buyer', 'seller'):
         with connect() as con:
-            row = con.execute('SELECT password FROM users WHERE id=?', (user['id'],)).fetchone()
+            shop = con.execute('SELECT shop_owner_id FROM users WHERE id=?', (user['id'],)).fetchone()
+            owner_id = shop['shop_owner_id'] if shop and shop['shop_owner_id'] else user['id']
+            payload['account_id'] = owner_id
+            row = con.execute('SELECT password FROM users WHERE id=?', (owner_id,)).fetchone()
         if row:
             payload['password_version'] = hmac.new(AUTH_SECRET.encode(), row['password'].encode(), hashlib.sha256).hexdigest()
     body = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode("utf-8")).decode("ascii")
@@ -1027,6 +1031,7 @@ def migrate_returns(con):
 def migrate_users(con):
     columns = table_columns(con, "users")
     additions = {
+        "shop_owner_id": "INTEGER NOT NULL DEFAULT 0",
         "delivery_location": "TEXT DEFAULT ''",
         "shop_open": "INTEGER DEFAULT 1",
         "shop_category": "TEXT DEFAULT ''",
@@ -1046,6 +1051,7 @@ def migrate_users(con):
     for name, sql in additions.items():
         if name not in columns:
             con.execute(f"ALTER TABLE users ADD COLUMN {name} {sql}")
+    con.execute('CREATE INDEX IF NOT EXISTS users_shop_owner ON users(shop_owner_id)')
 
 
 def migrate_passwords(con):
@@ -1366,14 +1372,24 @@ class Handler(BaseHTTPRequestHandler):
             return None
         with connect() as con:
             row = con.execute("SELECT * FROM users WHERE id=?", (payload["id"],)).fetchone()
+            owner_id = int(payload.get('account_id') or payload['id'])
+            owner = con.execute('SELECT * FROM users WHERE id=?', (owner_id,)).fetchone()
+            if not row or not owner or owner['shop_owner_id'] or owner['status'] != 'active':
+                return None
+            if int(row['shop_owner_id'] or row['id']) != owner_id:
+                return None
+            if row['shop_owner_id'] and (payload.get('role') != 'seller' or owner['role'] != 'seller' or owner['seller_status'] != 'approved'):
+                return None
             if row and row['role'] in ('buyer', 'seller'):
-                version = hmac.new(AUTH_SECRET.encode(), row['password'].encode(), hashlib.sha256).hexdigest()
-                reset = con.execute("SELECT id FROM email_otps WHERE email=? AND purpose='buyer_password_reset' AND verified=1 LIMIT 1", (row['email'].lower(),)).fetchone()
+                version = hmac.new(AUTH_SECRET.encode(), owner['password'].encode(), hashlib.sha256).hexdigest()
+                reset = con.execute("SELECT id FROM email_otps WHERE email=? AND purpose='buyer_password_reset' AND verified=1 LIMIT 1", (owner['email'].lower(),)).fetchone()
                 if (payload.get('password_version') and not hmac.compare_digest(payload['password_version'], version)) or (reset and not payload.get('password_version')):
                     return None
         if not row or row["status"] != "active":
             return None
         user = row_to_dict(row)
+        user['email'] = owner['email']
+        user['account_id'] = owner_id
         # A seller retains shopping access; the signed session selects its mode.
         mode = payload.get('role', user['role'])
         if mode == 'buyer' and user['role'] in ('buyer', 'seller'):
@@ -1478,6 +1494,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/seller/category": self.seller_category,
                 "/api/seller/profile": self.seller_profile,
                 "/api/seller/branches": self.seller_branches,
+                "/api/seller/shops": self.seller_shops,
                 "/api/product/branches": lambda: self.product_branches(query),
                 "/api/messages": lambda: self.list_table("messages", "messages"),
                 "/api/reviews": lambda: self.list_table("reviews", "reviews"),
@@ -1573,6 +1590,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.seller_category(data)
             elif parsed.path == "/api/seller/branches" and method == "POST":
                 self.seller_branches(data)
+            elif parsed.path == "/api/seller/shops" and method == "POST":
+                self.seller_shops(data)
+            elif parsed.path == "/api/seller/shops/switch" and method == "POST":
+                self.switch_shop(data)
             elif parsed.path == "/api/delivery/pickup" and method == "POST":
                 self.delivery_pickup(data)
             elif parsed.path == "/api/delivery/quotation" and method == "POST":
@@ -1722,6 +1743,29 @@ class Handler(BaseHTTPRequestHandler):
             point = delivery.pickup(con, user["id"]) if data is None else delivery.save_pickup(con, user["id"], data)
         send_json(self, 200, {"pickup": point})
 
+    def seller_shops(self, data=None):
+        user = self.require_user('seller')
+        owner_id = seller_shops.account_id(user)
+        with connect() as con:
+            created = seller_shops.create(con, owner_id, data, SHOP_CATEGORIES, USE_POSTGRES) if data is not None else None
+            shops = seller_shops.listing(con, owner_id)
+        send_json(self, 200, {'shops': shops, 'limit': seller_shops.LIMIT,
+                             'active_shop_id': user['id'], 'created_shop_id': created['id'] if created else None,
+                             'categories': SHOP_CATEGORIES})
+
+    def switch_shop(self, data):
+        user = self.require_user('seller')
+        try:
+            ident = int(data.get('shop_id'))
+        except (ValueError, TypeError):
+            raise ValueError('Choose a shop') from None
+        with connect() as con:
+            row = seller_shops.select(con, seller_shops.account_id(user), ident)
+        row.pop('password', None)
+        row['email'] = user['email']
+        row['account_id'] = seller_shops.account_id(user)
+        send_json(self, 200, {'user': row, 'token': make_token(row)})
+
     def seller_branches(self, data=None):
         user = self.require_user('seller')
         with connect() as con:
@@ -1789,6 +1833,8 @@ class Handler(BaseHTTPRequestHandler):
                               (user["id"],)).fetchone()
         profile = {field: row[field] for field in fields}
         profile["role"] = user["role"]
+        profile['email'] = user['email']
+        profile['account_id'] = seller_shops.account_id(user)
         send_json(self, 200, {"user": profile})
 
     def seller_category(self, data=None):
@@ -2259,7 +2305,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def login(self, data):
         with connect() as con:
-            row = con.execute("SELECT * FROM users WHERE LOWER(email) = ?", (str(data.get("email", "")).strip().lower(),)).fetchone()
+            row = con.execute("SELECT * FROM users WHERE LOWER(email) = ? AND shop_owner_id=0", (str(data.get("email", "")).strip().lower(),)).fetchone()
         if not row:
             send_json(self, 401, {"error": "Invalid login"})
             return
@@ -2298,7 +2344,7 @@ class Handler(BaseHTTPRequestHandler):
         if user['role'] not in ('buyer', 'seller') or mode not in ('buyer', 'seller'):
             raise PermissionError('Buyer or seller account required')
         with connect() as con:
-            row = row_to_dict(con.execute('SELECT * FROM users WHERE id=?', (user['id'],)).fetchone())
+            row = row_to_dict(con.execute('SELECT * FROM users WHERE id=?', (seller_shops.account_id(user),)).fetchone())
         if mode == 'seller' and (row['role'] != 'seller' or row['seller_status'] != 'approved'):
             send_json(self, 200, {'onboarding_required': True, 'seller_status': row['seller_status']})
             return
@@ -2371,10 +2417,13 @@ class Handler(BaseHTTPRequestHandler):
                             (updates["shop_name"], user["id"]))
             row = row_to_dict(con.execute("SELECT id, role, name, phone, email, address, delivery_location, shop_name, shop_category, identity_type, identity_number, business_type, ssm_number, ssm_document_url, business_verification_status, business_verification_submitted_at, bank_name, bank_account_name, bank_account_number, status, seller_status FROM users WHERE id = ?", (user["id"],)).fetchone())
         row['role'] = user['role']
+        row['email'] = user['email']
+        row['account_id'] = seller_shops.account_id(user)
         send_json(self, 200, {"ok": True, "user": row, "token": make_token(row)})
 
     def change_password(self, data):
         user = self.require_user()
+        user['id'] = seller_shops.account_id(user)
         current = data.get("current_password", "")
         new_password = data.get("new_password", "")
         if len(new_password) < 8:
@@ -2569,6 +2618,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def account_deletion_status(self):
         user = self.require_user()
+        user['id'] = seller_shops.account_id(user)
         if user['role'] not in ('buyer', 'seller'):
             raise PermissionError('Buyer or seller account required')
         with connect() as con:
@@ -2590,6 +2640,11 @@ class Handler(BaseHTTPRequestHandler):
         if data.get('confirm') is not True:
             raise ValueError('Confirm deletion of the entire buyer and seller account')
         with connect() as con:
+            owner_id = seller_shops.account_id(user)
+            user = dict(con.execute('SELECT * FROM users WHERE id=?', (owner_id,)).fetchone())
+            # Queue every store for the existing audited erasure workflow.
+            for shop in con.execute('SELECT * FROM users WHERE shop_owner_id=?', (owner_id,)).fetchall():
+                account_deletion.submit(con, dict(shop), now())
             row = account_deletion.submit(con, user, now())
             # Do not duplicate admin notifications on network retries.
             target = 'tickets.html#account-deletions'
@@ -3531,6 +3586,8 @@ class Handler(BaseHTTPRequestHandler):
                 raise ValueError("Account not found")
             if account["role"] == "admin" or user_id == admin["id"]:
                 raise ValueError("Administrator accounts cannot be deleted")
+            if con.execute('SELECT id FROM users WHERE shop_owner_id=? LIMIT 1', (user_id,)).fetchone():
+                raise ValueError('This account owns additional shops. Use the account deletion review for all shops first.')
             if data.get("confirm_email") != account["email"]:
                 raise ValueError("Type the account email exactly to confirm deletion")
             for table, column in (("products", "seller_id"), ("orders", "buyer_id"), ("returns", "buyer_id"), ("wallet", "seller_id"), ("campaigns", "seller_id"), ("reviews", "seller_id")):
@@ -4097,6 +4154,12 @@ def verify_email_otp_token(email, token, purpose="buyer_signup"):
 
 
 def send_email(to_email, subject, html, idempotency_key=None):
+    if to_email.endswith('@shops.invalid'):
+        with connect() as con:
+            owner = con.execute('SELECT owner.email FROM users shop JOIN users owner ON owner.id=shop.shop_owner_id WHERE shop.email=?', (to_email,)).fetchone()
+        if not owner:
+            raise ValueError('Shop owner email unavailable')
+        to_email = owner['email']
     payload = {
         "from": RESEND_FROM_EMAIL,
         "to": [to_email],

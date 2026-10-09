@@ -26,6 +26,8 @@ def inspect(con, user_id):
     returns = [dict(r) for r in con.execute('SELECT * FROM returns WHERE buyer_id=? OR order_id IN (SELECT id FROM orders WHERE product_id IN (SELECT id FROM products WHERE seller_id=?))', (user_id, user_id))]
     wallet = [dict(r) for r in con.execute('SELECT * FROM wallet WHERE seller_id=?', (user_id,))]
     blockers = []
+    for shop in con.execute('SELECT id,shop_name FROM users WHERE shop_owner_id=?', (user_id,)):
+        blockers.append(f"Complete linked shop #{shop['id']} ({shop['shop_name']}) erasure before the owner account")
     for order in orders:
         if order['order_status'] not in ('completed', 'cancelled') or order['payment_status'] in ('pending', 'pending_review'):
             blockers.append(f"Resolve order PM-{order['id']} before erasure")
