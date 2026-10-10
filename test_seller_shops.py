@@ -42,6 +42,23 @@ class SellerShopsTest(unittest.TestCase):
         with server.connect() as con:
             self.assertEqual(len(seller_shops.listing(con, 2)), 5)
 
+    def test_unread_counts_are_scoped_to_owned_shops(self):
+        shop = self.create()
+        with server.connect() as con:
+            con.execute('DELETE FROM notifications')
+            for role, ident in [('seller', 2), ('seller', shop['id']),
+                                ('seller', shop['id']), ('seller', 0),
+                                ('buyer', shop['id']), ('seller', 99999)]:
+                server.create_notification(con, role, ident, 'Test', 'Test')
+            rows = {row['id']: row for row in seller_shops.listing(con, 2)}
+            self.assertEqual(set(rows), {2, shop['id']})
+            self.assertEqual(rows[2]['unread_notifications'], 2)
+            self.assertEqual(rows[shop['id']]['unread_notifications'], 3)
+            con.execute('UPDATE notifications SET read_at=1 WHERE user_id=?', (shop['id'],))
+            rows = {row['id']: row for row in seller_shops.listing(con, 2)}
+            self.assertEqual(rows[shop['id']]['unread_notifications'], 1)
+            self.assertEqual(rows[2]['unread_notifications'], 2)
+
     def test_validation_and_ownership(self):
         shop = self.create()
         with self.assertRaises(ValueError):

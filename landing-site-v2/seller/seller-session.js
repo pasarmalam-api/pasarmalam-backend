@@ -71,8 +71,8 @@
     if(!publicPages.has(page)&&!active)return;
     if(active&&document.querySelector('.app')){const script=document.createElement('script');script.src='shop-availability.js?v=1';document.head.append(script)}
     if(active&&document.querySelector('.app')){
-      const css=document.createElement('link');css.rel='stylesheet';css.href='seller-shops.css?v=20261009';document.head.append(css);
-      const script=document.createElement('script');script.src='seller-shops.js?v=20261009';document.head.append(script);
+      const css=document.createElement('link');css.rel='stylesheet';css.href='seller-shops.css?v=20261010';document.head.append(css);
+      const script=document.createElement('script');script.src='seller-shops.js?v=20261010';document.head.append(script);
     }
     if(page!=='index.html'){
       const target=document.querySelector('header .top')||document.querySelector('main');

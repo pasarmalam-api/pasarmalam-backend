@@ -1,5 +1,7 @@
 .shop-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px;padding:16px 0;border-bottom:1px solid #d7e2df;margin-bottom:16px}
-.shop-toolbar label{font-weight:700}.shop-toolbar select{width:auto;max-width:100%;flex:1;min-width:140px;min-height:44px}
+.active-shop-name{font-family:inherit;font-size:22px;font-weight:800;letter-spacing:0;line-height:1.3;margin:0;overflow-wrap:anywhere}
+.shop-toolbar label{font-family:inherit;font-size:15px;font-weight:700;letter-spacing:0}.shop-toolbar select{width:auto;max-width:100%;flex:1;min-width:140px;min-height:44px;font-family:inherit;font-size:16px;font-weight:700;letter-spacing:0;line-height:1.4;color:#243137;background:#fff;border:1px solid #acbeba;border-radius:6px;padding:10px 12px;text-overflow:ellipsis}
+.shop-toolbar select:focus-visible{outline:2px solid #087e6f;outline-offset:2px}.shop-toolbar option{font-family:inherit;font-weight:700}
 .shop-toolbar button{min-height:44px}.shop-toolbar small{color:#52616b}.shop-feedback{flex-basis:100%;margin:0;color:#9e2929;overflow-wrap:anywhere}
 .shop-dialog{width:440px;max-width:calc(100% - 24px);border:1px solid #d7e2df;border-radius:8px;padding:24px;color:#243137;background:#fff}
 .shop-dialog::backdrop{background:#0006}.shop-dialog h2{font-size:22px;margin:0 0 20px}.shop-dialog label{display:block;margin:16px 0 6px;font-weight:600}

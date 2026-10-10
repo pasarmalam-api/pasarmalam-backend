@@ -15,8 +15,10 @@ def account_id(user):
 
 def listing(con, owner_id):
     return [dict(row) for row in con.execute(
-        "SELECT id,shop_name,shop_category,status,seller_status FROM users "
-        "WHERE (id=? OR shop_owner_id=?) AND role='seller' ORDER BY id",
+        "SELECT u.id,u.shop_name,u.shop_category,u.status,u.seller_status, "
+        "(SELECT COUNT(*) FROM notifications n WHERE n.role='seller' "
+        "AND (n.user_id=u.id OR n.user_id=0) AND n.read_at=0) AS unread_notifications "
+        "FROM users u WHERE (u.id=? OR u.shop_owner_id=?) AND u.role='seller' ORDER BY u.id",
         (owner_id, owner_id))]
 
 
