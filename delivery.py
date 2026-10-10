@@ -1,6 +1,6 @@
 """Persisted pickup locations and single-use, server-priced delivery quotations."""
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import json
 import math
 import secrets
@@ -13,11 +13,27 @@ import branches
 METHODS = {
     'EasyParcel': 'easyparcel',
     'PM Express': 'pm_express',
+    'PM Pooling': 'pm_pooling',
     'Ambil Sendiri': 'pickup', 'In-Store Pickup': 'pickup',
     'Lalamove Biasa': 'standard', 'Lalamove Regular': 'standard', 'Standard Rider': 'standard',
     'Lalamove Segera': 'express', 'Lalamove Instant': 'express', 'Express Rider': 'express',
 }
 ADMIN_FEE = Decimal('0.40')
+PM_RIDER_METHODS = ('pm_express', 'pm_pooling')
+# Food eligibility needs explicit storage information; legacy listings fail closed.
+POOLING_CATEGORIES = frozenset(('phones', 'chargers', 'electronics', 'car parts',
+                               'hardware', 'stationery', 'toys', 'shoes', 'clothes', 'cosmetics'))
+
+
+def pooling_eligible(product):
+    product = dict(product)
+    category = str(product.get('category') or '').strip().casefold()
+    storage = product.get('storage_class', 'unknown')
+    if storage == 'perishable':
+        return False
+    return (category in POOLING_CATEGORIES
+            or category == 'groceries' and storage in ('shelf_stable', 'canned_drink')
+            or category == 'drinks' and storage == 'canned_drink')
 
 
 def migrate(con):
@@ -54,7 +70,9 @@ def context(con, user, product, qty, data):
     if method == 'easyparcel':
         from parcel_delivery import context as parcel_context
         return parcel_context(con, user, product, qty, data)
-    if method not in ('express', 'standard', 'pm_express'):
+    if method == 'pm_pooling' and not pooling_eligible(product):
+        raise ValueError('PM Pooling is unavailable for this item. Fresh, hot, chilled, frozen and other perishable items are excluded; groceries and canned drinks need confirmed shelf-stable storage.')
+    if method not in ('express', 'standard', *PM_RIDER_METHODS):
         raise ValueError('Select immediate or scheduled Lalamove delivery.')
     seller = con.execute('SELECT status,seller_status FROM users WHERE id=?', (product['seller_id'],)).fetchone()
     if not seller or seller['status'] != 'active' or seller['seller_status'] != 'approved':
@@ -67,7 +85,7 @@ def context(con, user, product, qty, data):
         settings = pickup(con, product['seller_id']) or {}
         if not settings.get('city'):
             raise ValueError('Local delivery is not set up by this seller yet. Choose another delivery option.')
-        selected = data.get('service_type') if data.get('service_options') is True and method != 'pm_express' else None
+        selected = data.get('service_type') if data.get('service_options') is True and method not in PM_RIDER_METHODS else None
         data = {**data, 'city': settings['city'], 'service_type': selected or 'AUTO', 'package_confirmed': True}
     if data.get('location_confirmed') is not True:
         raise ValueError('Confirm the delivery coordinates match your address.')
@@ -109,7 +127,7 @@ def create_quote(con, user, product, qty, data, client=None):
     client = client or Client()
     cities = client.cities()
     city = next((c for c in cities if c['locode'] == ctx['city']), None)
-    if data.get('service_options') is True and not data.get('service_type') and ctx['mode'] != 'pm_express':
+    if data.get('service_options') is True and not data.get('service_type') and ctx['mode'] not in PM_RIDER_METHODS:
         offers = []
         for candidate in (city or {}).get('services', []):
             if not suitable_service(candidate, product, qty):
@@ -141,10 +159,15 @@ def create_quote(con, user, product, qty, data, client=None):
     if load.get('unit') != 'kg' or not math.isfinite(limit) or not math.isfinite(weight) or weight <= 0 or weight > limit:
         raise ValueError('The package weight exceeds this vehicle capacity or cannot be verified.')
     # PM riders use an immediate quote as a price reference only; never dispatch.
-    quote = client.quote({**ctx, 'mode': 'express'} if ctx['mode'] == 'pm_express' else ctx)
+    quote = client.quote({**ctx, 'mode': 'express'} if ctx['mode'] in PM_RIDER_METHODS else ctx)
     courier = Decimal(str(quote['priceBreakdown']['total'])).quantize(Decimal('0.01'))
     charges = {'courier_fee': float(courier), 'admin_fee': float(ADMIN_FEE),
                'total': float(courier + ADMIN_FEE), 'version': 1}
+    if ctx['mode'] == 'pm_pooling':
+        total = ((courier + ADMIN_FEE) / 2).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        admin = ADMIN_FEE / 2
+        charges.update(courier_fee=float(total - admin), admin_fee=float(admin),
+                       total=float(total), pm_express_reference_total=float(courier + ADMIN_FEE))
     # Store platform pricing separately from the unmodified provider quotation.
     stored_quote = {**quote, '_pasarmalam_charges': charges}
     ident = secrets.token_urlsafe(32)
@@ -193,6 +216,7 @@ def consume(con, user, product, qty, data):
     return charges['total'], {'context': ctx, 'quotation': quote, 'charges': charges,
                                                   'pickup_contact': dict(seller),
                                                   'recipient': {'name': user['name'], 'phone': str(data.get('buyer_phone') or user.get('phone') or '')},
-                                                  'provider': method if method in ('pm_express', 'easyparcel') else 'lalamove',
+                                                  **({'delivery_window': 'Up to 5 working days', 'max_working_days': 5} if method == 'pm_pooling' else {}),
+                                                  'provider': method if method in (*PM_RIDER_METHODS, 'easyparcel') else 'lalamove',
                                                   'quote_provider': 'easyparcel' if method == 'easyparcel' else 'lalamove',
-                                                  'dispatch_status': 'pm_rider_assignment_required' if method == 'pm_express' else 'manual_booking_required'}
+                                                  'dispatch_status': 'pm_rider_assignment_required' if method in PM_RIDER_METHODS else 'manual_booking_required'}

@@ -4,9 +4,9 @@ const root=path.resolve('landing-site-v2');
 const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req.url,'http://localhost').pathname);if(!file.startsWith(root)||!fs.existsSync(file)){res.writeHead(404);return res.end();}res.setHeader('Content-Type',file.endsWith('.js')?'text/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(file));});
 (async()=>{
  await new Promise(r=>server.listen(0,'127.0.0.1',r));const origin='http://127.0.0.1:'+server.address().port;
- const browser=await chromium.launch({channel:'msedge',headless:true});
+ const browser=await chromium.launch({channel:'msedge',headless:true}).catch(error=>{server.close();throw error;});
  try{
-  const context=await browser.newContext();let calls=[],failed=false,incompleteProfile=false,savedPoint=false,mapCalls=0,quoteDelay=0;
+  const context=await browser.newContext();let calls=[],failed=false,incompleteProfile=false,savedPoint=false,mapCalls=0,quoteDelay=0,poolingEligible=true;
   await context.addInitScript(()=>{localStorage.setItem('pm_token','test');localStorage.setItem('pm_user',JSON.stringify({id:1,role:'buyer',name:'Test Buyer',phone:'01123456789',email:'test@example.com',address:'Office, 50088 Kuala Lumpur, Malaysia'}));localStorage.setItem('pasarmalam-lang','en');localStorage.setItem('pasarmalam-buyer-lang-version','20260903-ms-default');});
   await context.route('**/*',async route=>{
    const req=route.request();if(req.url().startsWith(origin))return route.continue();
@@ -24,7 +24,7 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
     return route.fulfill({json:method==='EasyParcel'?{offers:[q]}:method==='Lalamove Segera'?{offers:[{...q,service_type:'MOTORCYCLE',service_name:'Motorcycle'},{...q,quote_id:'car-quote',service_type:'CAR',service_name:'Car',fee:12.4}]}:q});
    }
    if(endpoint==='/api/payments/billplz/create')return route.fulfill({json:{message:'Test payment intercepted'}});
-   return route.fulfill({json:{products:[{id:1,seller_id:2,name:'Cable',category:'Chargers',price:20,stock:5,shop:'Test Shop'}],cart:[],notifications:[],campaigns:[]}});
+   return route.fulfill({json:{products:[{id:1,seller_id:2,name:'Cable',category:'Chargers',pooling_eligible:poolingEligible,price:20,stock:5,shop:'Test Shop'}],cart:[],notifications:[],campaigns:[]}});
   });
   const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
   for(const width of [360,402,1440]){
@@ -101,6 +101,12 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    const request=calls.filter(c=>c.endpoint==='/api/delivery/quotation').at(-1).data;
    assert.equal(request.simple_checkout,true);assert.equal(request.location_confirmed,true);assert.equal(request.service_type,'');
    await page.locator('#payment').selectOption('Pay on Arrival');
+   await page.locator('input[name="deliveryChoice"][value="PM Pooling"]').check();
+   assert.equal(await page.locator('#payment').inputValue(),'Billplz');
+   await page.waitForFunction(()=>pmDeliveryFee()===6.99&&!document.getElementById('pay').disabled);
+   assert.equal(calls.filter(c=>c.endpoint==='/api/delivery/quotation').at(-1).data.logistics_method,'PM Pooling');
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+   await page.screenshot({path:path.resolve('release-zips/checkout-audit/pm-pooling-'+width+'.png'),fullPage:true});
    await page.locator('input[name="deliveryChoice"][value="EasyParcel"]').check();assert.equal(await page.locator('#payment').inputValue(),'Billplz');
    await page.locator('input[name="deliveryChoice"][value="Lalamove Segera"]').check();
    await page.locator('#parcelService').waitFor();await page.locator('#parcelService').selectOption('car-quote');
@@ -131,6 +137,11 @@ const server=http.createServer((req,res)=>{const file=path.join(root,new URL(req
    await page.waitForFunction(()=>pmDeliveryFee()===6.99&&!document.getElementById('pay').disabled);
    await page.locator('input[name="deliveryChoice"][value="Ambil Sendiri"]').check();assert.equal(await page.evaluate(()=>pmDeliveryFee()),0);
   }
+  poolingEligible=false;
+  await page.goto(origin+'/buyer/checkout.html?product_id=1');await page.locator('#parcelService').waitFor();
+  assert.equal(await page.locator('input[value="PM Pooling"]').isVisible(),false);
+  assert.equal(await page.locator('input[value="PM Pooling"]').isDisabled(),true);
+  poolingEligible=true;
   savedPoint=true;const beforeMaps=mapCalls;
   await page.goto(origin+'/buyer/checkout.html?product_id=1');await page.locator('#parcelService').waitFor();
   await page.locator('input[name="deliveryChoice"][value="Lalamove Segera"]').check();await page.locator('#parcelService').waitFor();

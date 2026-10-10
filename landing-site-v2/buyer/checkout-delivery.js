@@ -13,6 +13,7 @@
   shipping.replaceChildren(...[
     ['Ambil Sendiri', t('Ambil sendiri', 'Self pickup')],
     ['PM Express', 'Pasar Malam Express'],
+    ['PM Pooling', t('PM Pooling - 50% caj PM Express, rider PM, sehingga 5 hari bekerja', 'PM Pooling - 50% of PM Express, PM riders, up to 5 working days')],
     ['EasyParcel', t('EasyParcel - kurier standard', 'EasyParcel - standard courier')],
     ['Lalamove Segera', t('Penghantaran segera - Lalamove', 'Express delivery - Lalamove')]
   ].map(([value, label]) => new Option(label, value)));
@@ -26,6 +27,10 @@
     const radio = document.createElement('input');
     radio.type = 'radio'; radio.name = 'deliveryChoice'; radio.value = option.value;
     radio.checked = option.value === shipping.value;
+    if (option.value === 'PM Pooling') {
+      label.hidden = true;
+      radio.disabled = option.disabled = true;
+    }
     radio.addEventListener('change', () => { shipping.value = radio.value; shipping.dispatchEvent(new Event('change')); });
     const name = document.createElement('span'); name.textContent = option.textContent;
     label.append(radio, name); choices.append(label);
@@ -84,6 +89,12 @@
         ? new Date(get('deliverySchedule').value).toISOString() : ''};
   }
   function reset() {
+    const poolingAllowed = checkoutProduct?.pooling_eligible === true;
+    const poolingRadio = choices.querySelector('input[value="PM Pooling"]');
+    poolingRadio.disabled = !poolingAllowed;
+    poolingRadio.closest('label').hidden = !poolingAllowed;
+    shipping.querySelector('option[value="PM Pooling"]').disabled = !poolingAllowed;
+    if (shipping.value === 'PM Pooling' && !poolingAllowed) shipping.value = 'PM Express';
     revision++; quote = null; needsAddress=false;
     get('result').textContent = '';
     get('parcelOffers').hidden = true;
@@ -202,6 +213,7 @@
   };
   requireCheckoutReady = function() {
     baseReady();
+    if (shipping.value === 'PM Pooling' && checkoutProduct?.pooling_eligible !== true) throw new Error(t('Produk ini tidak layak untuk PM Pooling.', 'This product is not eligible for PM Pooling.'));
     window.pmValidateDeliveryAddress?.();
     if (!valid()) throw new Error(get('deliveryStatus').textContent||window.pmDeliveryPendingLabel());
     if (!isPickup() && get('payment').value === 'Cash Pickup') throw new Error('Cash is for self pickup only.');

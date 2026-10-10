@@ -51,6 +51,112 @@ class DeliveryTest(unittest.TestCase):
         self.assertEqual(fee, 9.4)
         self.assertEqual(details['context']['city'], 'MY KUL')
 
+    def test_pooling_categories_fail_closed(self):
+        for category in ('Meals', 'Street Food', 'Food', 'Drinks', 'Groceries', '', None, 'Fresh Food', 'Unknown'):
+            with self.subTest(category=category), server.connect() as con:
+                product = {**self.product, 'category': category}
+                self.assertFalse(delivery.pooling_eligible(product))
+                with self.assertRaisesRegex(ValueError, 'PM Pooling is unavailable'):
+                    delivery.create_quote(con, self.user, product, 1,
+                                          {**self.data, 'logistics_method': 'PM Pooling', 'pooling_eligible': True}, self.client)
+        self.client.quote.assert_not_called()
+        for category in delivery.POOLING_CATEGORIES:
+            self.assertTrue(delivery.pooling_eligible({'category': category.upper()}))
+
+    def test_pooling_storage_classification(self):
+        for category, storage, expected in [
+            ('Groceries', 'shelf_stable', True), ('Groceries', 'unknown', False),
+            ('Groceries', 'perishable', False), ('Drinks', 'canned_drink', True),
+            ('Drinks', 'shelf_stable', False), ('Drinks', 'perishable', False),
+            ('Meals', 'shelf_stable', False), ('Food', 'shelf_stable', False),
+            ('Cosmetics', 'unknown', True), ('Cosmetics', 'perishable', False)]:
+            with self.subTest(category=category, storage=storage):
+                self.assertEqual(delivery.pooling_eligible({'category': category, 'storage_class': storage}), expected)
+        self.assertIn('Cosmetics', server.SHOP_CATEGORIES)
+        self.handler.validate_product({'storage_class': 'canned_drink', 'weight_kg': .35})
+        with self.assertRaises(ValueError):
+            self.handler.validate_product({'storage_class': 'anything'})
+
+    def test_storage_change_invalidates_pooling_eligibility(self):
+        self.product.update(category='Groceries', storage_class='shelf_stable')
+        self.data.update(logistics_method='PM Pooling')
+        data = self.quoted()
+        with server.connect() as con, self.assertRaisesRegex(ValueError, 'PM Pooling is unavailable'):
+            delivery.consume(con, self.user, {**self.product, 'storage_class': 'perishable'}, 1, data)
+
+    def test_product_storage_and_decimal_weight_persist(self):
+        self.handler.current_user = lambda: {'id': 2, 'role': 'seller', 'name': 'Test shop'}
+        with server.connect() as con:
+            con.execute("UPDATE users SET shop_category='Groceries' WHERE id=2")
+        payload = {'name': 'Rice', 'shop': 'Test shop', 'category': 'Groceries',
+                   'price': 10, 'stock': 5, 'condition': 'New', 'price_mode': 'Fixed',
+                   'weight_kg': 1.25, 'storage_class': 'shelf_stable'}
+        with patch.object(server, 'send_json') as send:
+            self.handler.create_product(payload)
+        ident = send.call_args.args[2]['id']
+        with server.connect() as con:
+            product = dict(con.execute('SELECT * FROM products WHERE id=?', (ident,)).fetchone())
+            self.assertEqual(product['weight_kg'], 1.25)
+            self.assertTrue(delivery.pooling_eligible(product))
+        with patch.object(server, 'send_json'):
+            self.handler.product_by_id('PUT', f'/api/products/{ident}',
+                                       {'weight_kg': .35, 'storage_class': 'perishable'})
+        with server.connect() as con:
+            product = dict(con.execute('SELECT * FROM products WHERE id=?', (ident,)).fetchone())
+            self.assertEqual(product['weight_kg'], .35)
+            self.assertEqual(product['storage_class'], 'perishable')
+            self.assertFalse(delivery.pooling_eligible(product))
+
+    def test_pooling_half_full_price_own_rider_and_revalidation(self):
+        self.product['category'] = 'Chargers'
+        self.data.update(logistics_method='PM Pooling')
+        with server.connect() as con:
+            for reference, expected in [('9.0', 4.70), ('9.01', 4.71), ('9.03', 4.72)]:
+                self.client.quote.return_value['priceBreakdown']['total'] = reference
+                quote = delivery.create_quote(con, self.user, self.product, 1, self.data, self.client)
+                self.assertEqual(quote['fee'], expected)
+                self.assertEqual(quote['admin_fee'], .2)
+                payload = {**self.data, 'quote_id': quote['quote_id'], 'logistics_fee': 0}
+                with self.assertRaisesRegex(ValueError, 'PM Pooling is unavailable'):
+                    delivery.consume(con, self.user, {**self.product, 'category': 'Meals'}, 1, payload)
+                with self.assertRaisesRegex(ValueError, 'changed'):
+                    delivery.consume(con, self.user, self.product, 1, {**payload, 'logistics_method': 'PM Express'})
+                fee, details = delivery.consume(con, self.user, self.product, 1, payload)
+                self.assertEqual(fee, expected)
+                self.assertEqual(details['provider'], 'pm_pooling')
+                self.assertEqual(details['max_working_days'], 5)
+                self.assertEqual(details['dispatch_status'], 'pm_rider_assignment_required')
+                self.assertEqual(self.client.quote.call_args.args[0]['mode'], 'express')
+                with self.assertRaises(ValueError):
+                    delivery.consume(con, self.user, self.product, 1, payload)
+
+    def test_pooling_gateway_and_admin_dispatch(self):
+        with server.connect() as con:
+            con.execute("UPDATE products SET category='Chargers' WHERE id=1")
+        self.product['category'] = 'Chargers'
+        self.data.update(logistics_method='PM Pooling')
+        with patch.multiple(server, BILLPLZ_API_KEY='test', BILLPLZ_COLLECTION_ID='test'), \
+             patch.object(server, 'post_billplz', return_value={'id': 'test', 'url': 'https://example.test/pay'}), \
+             patch.object(server, 'send_json'):
+            self.handler.create_billplz_payment(self.quoted())
+        with server.connect() as con:
+            order = con.execute('SELECT * FROM orders ORDER BY id DESC LIMIT 1').fetchone()
+            self.assertEqual(order['logistics_fee'], 4.7)
+            self.assertEqual(order['logistics_admin_fee'], .2)
+            self.assertEqual(order['payment_status'], 'unpaid')
+            self.assertEqual(json.loads(order['delivery_data'])['provider'], 'pm_pooling')
+            notification = con.execute("SELECT * FROM notifications WHERE title LIKE 'PM Pooling rider%' ORDER BY id DESC LIMIT 1").fetchone()
+            self.assertIn('5 working days', notification['body'])
+            self.assertIn('Do not book Lalamove', notification['body'])
+        with self.assertRaises(ValueError):
+            self.handler.checkout({**self.data, 'payment_method': 'Pay on Arrival'})
+
+    def test_product_api_exposes_pooling_eligibility(self):
+        with patch.object(server, 'send_json') as send:
+            self.handler.get_products({})
+        for product in send.call_args.args[2]['products']:
+            self.assertEqual(product['pooling_eligible'], delivery.pooling_eligible(product))
+
     def test_simple_checkout_missing_seller_configuration(self):
         self.data['simple_checkout'] = True
         with self.assertRaisesRegex(ValueError, 'seller'):

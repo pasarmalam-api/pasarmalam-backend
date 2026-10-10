@@ -54,7 +54,7 @@ BILLPLZ_MODE = os.environ.get("BILLPLZ_MODE", "sandbox").lower()
 BILLPLZ_BASE_URL = "https://www.billplz-sandbox.com" if BILLPLZ_MODE != "live" else "https://www.billplz.com"
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-SHOP_CATEGORIES = ("Phones", "Chargers", "Electronics", "Car Parts", "Hardware", "Stationery", "Toys", "Shoes", "Clothes", "Meals", "Street Food", "Food", "Drinks", "Groceries")
+SHOP_CATEGORIES = ("Phones", "Chargers", "Electronics", "Car Parts", "Hardware", "Stationery", "Toys", "Shoes", "Clothes", "Meals", "Street Food", "Food", "Drinks", "Groceries", "Cosmetics")
 
 
 if USE_POSTGRES:
@@ -809,6 +809,7 @@ def migrate_products(con):
         "weight_kg": "REAL DEFAULT 0.5",
         "selling_mode": "TEXT NOT NULL DEFAULT 'retail'",
         "minimum_order": "INTEGER NOT NULL DEFAULT 1",
+        "storage_class": "TEXT NOT NULL DEFAULT 'unknown'",
     }
     for name, sql in additions.items():
         if name not in columns:
@@ -1804,6 +1805,11 @@ class Handler(BaseHTTPRequestHandler):
                         (json.dumps(details), details.get('charges', {}).get('admin_fee', 0), order_id))
             if details.get('provider') == 'pickup':
                 return
+            if details.get('provider') == 'pm_pooling':
+                notify_admins(con, f"PM Pooling rider required for PM-{order_id}",
+                              "Confirm online payment before dispatch. Assign a Pasar Malam rider for pooled delivery within 5 working days. Do not book Lalamove.",
+                              "logistics", "orders.html")
+                return
             if details.get('provider') == 'pm_express':
                 notify_admins(con, f"PM Express rider required for PM-{order_id}",
                               "Assign a Pasar Malam rider. Do not book Lalamove. Check payment method and collect the full order total on arrival if unpaid.",
@@ -1912,6 +1918,7 @@ class Handler(BaseHTTPRequestHandler):
             row['rating'] = round(float(rating.get('rating') or 0), 1)
             row['review_count'] = rating.get('review_count', 0)
             row['shop_open'] = sellers.get(row['seller_id'], True)
+            row['pooling_eligible'] = delivery.pooling_eligible(row)
             row["images"] = json.loads(row.get("images") or "[]")
             row["variants"] = json.loads(row.get("variants") or "[]")
         send_json(self, 200, {"products": rows})
@@ -1934,8 +1941,8 @@ class Handler(BaseHTTPRequestHandler):
             cur = con.execute(
                 """
                 INSERT INTO products
-                (seller_id, name, shop, category, price, stock, condition, price_mode, description, warranty, variants, images, image_url, shipping_type, weight_kg, created_at, selling_mode, minimum_order)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (seller_id, name, shop, category, price, stock, condition, price_mode, description, warranty, variants, images, image_url, shipping_type, weight_kg, created_at, selling_mode, minimum_order, storage_class)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     seller_id,
@@ -1956,11 +1963,14 @@ class Handler(BaseHTTPRequestHandler):
                     now(),
                     data.get("selling_mode", "retail"),
                     int(data.get("minimum_order", 1)),
+                    data.get("storage_class", "unknown"),
                 ),
             )
         send_json(self, 201, {"id": cur.lastrowid})
 
     def validate_product(self, data):
+        if data.get('storage_class', 'unknown') not in ('unknown', 'shelf_stable', 'canned_drink', 'perishable'):
+            raise ValueError('Invalid storage classification')
         mode = data.get('selling_mode', 'retail')
         if mode not in ('retail', 'bulk'):
             raise ValueError('Choose retail or bulk selling')
@@ -2008,7 +2018,7 @@ class Handler(BaseHTTPRequestHandler):
                 con.execute("DELETE FROM products WHERE id = ?", (product_id,))
                 send_json(self, 200, {"ok": True})
                 return
-            allowed = ["name", "shop", "category", "price", "stock", "condition", "price_mode", "description", "warranty", "shipping_type", "weight_kg", "selling_mode", "minimum_order"]
+            allowed = ["name", "shop", "category", "price", "stock", "condition", "price_mode", "description", "warranty", "shipping_type", "weight_kg", "selling_mode", "minimum_order", "storage_class"]
             self.validate_product({**dict(product), **data})
             if "category" in data:
                 self.require_product_category(con, product['seller_id'], data['category'])

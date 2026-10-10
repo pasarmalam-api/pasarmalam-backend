@@ -1,7 +1,7 @@
 (function(){
  const params=new URLSearchParams(location.search),main=document.querySelector('main');
  const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- const categories=['All','Phones','Phone Accessories','Electronics','Car Parts','Hardware','Stationery','Toys','Shoes','Clothes','Meals','Street Food','Food','Drinks','Groceries'];
+ const categories=['All','Phones','Phone Accessories','Electronics','Car Parts','Hardware','Stationery','Toys','Shoes','Clothes','Meals','Street Food','Food','Drinks','Groceries','Cosmetics'];
  const normal=c=>c==='Chargers'?'Phone Accessories':c;
  const form=document.createElement('form');form.className='filter-toolbar';
  form.innerHTML='<label>Search<input name="q" type="search" placeholder="Product or shop" aria-label="Search products"></label><label>Categories<select name="category"></select></label><label>Sort by<select name="sort"><option value="relevance">Relevance</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="latest">Latest</option></select></label><label>Min RM<input name="min" type="number" min="0" step="0.01"></label><label>Max RM<input name="max" type="number" min="0" step="0.01"></label><button class="soft" type="submit">Search</button><button class="soft" type="reset">Reset</button>';
