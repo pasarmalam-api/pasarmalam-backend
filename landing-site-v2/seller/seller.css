@@ -566,7 +566,7 @@ td .primary{
 }
 
 img.logo{display:block;object-fit:contain;flex-shrink:0;background:#fff;box-shadow:none;border-radius:6px!important}
-input,select,textarea,button,nav a{font-family:Arial,sans-serif;font-size:var(--seller-text-size)!important}
+input,select,textarea,button,nav a{font-family:var(--seller-font);font-size:var(--seller-text-size)!important}
 [hidden]{display:none!important}
 :root{--seller-text-size:14px}
 body{font-size:13px;line-height:1.5;letter-spacing:0}
@@ -575,7 +575,7 @@ body{font-size:13px;line-height:1.5;letter-spacing:0}
 .app nav a,.app button,.app .quick a{font-size:13px;font-weight:600}
 .app button{min-height:38px}.app input,.app select,.app textarea{font-size:16px}
 .seller-table-scroll{max-width:100%;overflow:auto}
-body,.app p,.app label,.app .label,.app .muted,.app th,.app td,.app .tag,.app nav a,.app button,.app input,.app select,.app textarea,.app .quick a,.app .stat span{font-family:Arial,sans-serif!important;font-size:var(--seller-text-size)!important;line-height:1.5;letter-spacing:0}
+body,.app p,.app label,.app .label,.app .muted,.app th,.app td,.app .tag,.app nav a,.app button,.app input,.app select,.app textarea,.app .quick a,.app .stat span{font-family:var(--seller-font)!important;font-size:var(--seller-text-size)!important;line-height:1.5;letter-spacing:0}
 @media(max-width:980px){:root{--seller-text-size:16px}}
 #previewGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,160px));gap:10px;margin:12px 0}
 #previewGrid .preview{aspect-ratio:1;background-size:cover;background-position:center;border:1px solid var(--line);border-radius:6px}
@@ -619,3 +619,17 @@ body,.app p,.app label,.app .label,.app .muted,.app th,.app td,.app .tag,.app na
 #switchToBuyer:focus-visible{outline:3px solid #d49e28;outline-offset:3px}
 #switchToBuyer:disabled{opacity:.65;cursor:wait}
 @media(max-width:760px){#switchToBuyer{margin-top:10px}}
+
+/* Shared type hierarchy and visible separators across seller screens. */
+:root{--seller-font:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;--line:#b9c7cf;--muted:#52616b}
+body{font-weight:400}
+.app :is(h1,h2,h3,b,strong){font-weight:700}
+.app :is(label,th,nav a,button,.quick a,.stat span){font-weight:600}
+.app :is(button,.primary,.soft),.app nav a.active{font-weight:700}
+.app :is(input,select,textarea){font-weight:400;border-color:#a9bac4}
+.app :is(input,textarea)::placeholder{color:#61717b;opacity:1}
+.app :is(input,select,textarea,button,a):focus-visible{outline:2px solid #087f72;outline-offset:3px}
+.app .panel-head{border-bottom-color:#b9c7cf}
+.app aside .brand{border-bottom-color:#ffffff50}
+.app aside nav a{border-color:#ffffff40!important}
+.app aside :is(h1,.label,nav a){line-height:1.4!important}

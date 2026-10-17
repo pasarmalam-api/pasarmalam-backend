@@ -1,5 +1,5 @@
 /* Shared buyer typography and page chrome. Catalogue geometry stays in catalogue.css. */
-body.buyer-page{margin:0;font-family:Arial,sans-serif!important;font-size:14px!important;line-height:1.5;letter-spacing:0;color:#243137;background:#f6f8fa}
+body.buyer-page{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif!important;font-size:14px!important;line-height:1.5;letter-spacing:0;color:#243137;background:#f6f8fa}
 .buyer-page *{box-sizing:border-box}
 .buyer-page :is(main,section,article,fieldset,.panel,.card,.item,.box,.grid,.row,.bar,.buyer-header-actions){min-width:0}
 .buyer-page :is(p,a,label,h1,h2,h3,.msg,.item,.box){overflow-wrap:anywhere}
@@ -7,13 +7,13 @@ body.buyer-page{margin:0;font-family:Arial,sans-serif!important;font-size:14px!i
 .buyer-page textarea{resize:vertical}
 .buyer-page [hidden]{display:none!important}
 .buyer-page :is(button,input,select,textarea){font-family:inherit!important;letter-spacing:0;max-width:100%;min-width:0}
-body.buyer-page :is(button,.soft,.outline){font-size:13px!important;font-weight:600!important;line-height:1.4;min-height:40px;border-radius:6px;cursor:pointer;white-space:normal}
+body.buyer-page :is(button,.soft,.outline){font-size:13px!important;font-weight:700!important;line-height:1.4;min-height:40px;border-radius:6px;cursor:pointer;white-space:normal}
 .buyer-page :is(input,select,textarea){font-size:14px!important;border:1px solid #cbd5dc;border-radius:6px;background:#fff;color:#243137;padding:10px 12px}
 .buyer-page :is(input,select):not([type=checkbox]):not([type=radio]):not([type=hidden]){min-height:42px}
 .buyer-page :is(input[type=checkbox],input[type=radio]){width:18px;height:18px;min-height:0;flex:none;accent-color:#168574;padding:0}
-.buyer-page label{font-size:13px;font-weight:600;line-height:1.5}
-.buyer-page main h1,.buyer-page main h2{font-size:22px!important;line-height:1.3!important;font-weight:600;margin:0 0 16px;overflow-wrap:anywhere}
-.buyer-page main h3{font-size:16px!important;line-height:1.4!important;font-weight:600}
+.buyer-page label{font-size:14px;font-weight:700;line-height:1.5}
+.buyer-page main h1,.buyer-page main h2{font-size:22px!important;line-height:1.3!important;font-weight:700;margin:0 0 16px;overflow-wrap:anywhere}
+.buyer-page main h3{font-size:16px!important;line-height:1.4!important;font-weight:700}
 .buyer-page .muted{font-size:13px;line-height:1.5;color:#617078}
 .buyer-page :is(a,button,input,select,textarea):focus-visible{outline:2px solid #168574;outline-offset:3px}
 .buyer-page header{background:#fff!important;color:#243137!important;border-bottom:1px solid #dce3e8;box-shadow:none!important}
@@ -149,3 +149,14 @@ body.buyer-page :is(button,.soft,.outline){font-size:13px!important;font-weight:
  .buyer-home .market-banner{max-height:180px!important;object-fit:contain}
 }
 @media print{.buyer-account-bar,.buyer-navigation,.buyer-header-actions,.buyer-page .pm-mobile-links,.buyer-page .pm-notify-enable{display:none!important}}
+
+/* Stronger hierarchy without making descriptions or entered values heavy. */
+.buyer-page :is(.muted,.shop){color:#52616b;font-weight:500}
+.buyer-page :is(.buyer-navigation a,.buyer-account-bar a,.buyer-account-bar button,label){font-weight:700}
+.buyer-page :is(input,select,textarea){border-color:#a9bac4}
+.buyer-page :is(input,textarea)::placeholder{color:#61717b;opacity:1}
+.buyer-page :is(header,.buyer-account-bar,.buyer-navigation,.cats,.cart-summary,.filter-toolbar){border-color:#b9c7cf}
+.buyer-page:not(.buyer-home) main>.panel,.buyer-product .trust>div{border-bottom-color:#b9c7cf}
+.buyer-page :is(.soft,.outline,.cart,.buyer-cart-link,.buyer-back),.buyer-home .grid>.card{border-color:#b9c7cf}
+.buyer-page :is(.card,.item,.voucher,.msg,th,td){border-color:#c4cfd6}
+.buyer-page.buyer-auth label{font-weight:700}
