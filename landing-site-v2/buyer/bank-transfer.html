@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Bulk Bank Transfer - PasarMalam</title>
+  <link rel="icon" href="pasarmalam-logo.png"><link rel="stylesheet" href="buyer-ui.css?v=20261009-auth">
+  <style>
+    *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;color:#243538;background:#f5f7fb;letter-spacing:0}
+    header{padding:16px 24px;background:#fff;border-bottom:1px solid #dde4e7;display:flex;align-items:center;gap:16px}
+    header img{width:48px;height:48px}header a:last-child{margin-left:auto}a{color:#087f74}
+    main{max-width:720px;margin:auto;padding:24px 20px}h1{font-size:24px}h2{font-size:18px}
+    section{padding:20px 0;border-top:1px solid #dce4e8}dl{display:grid;grid-template-columns:160px minmax(0,1fr);gap:16px;margin:24px 0}
+    dt{color:#596c72}dd{margin:0;font-weight:700;overflow-wrap:anywhere}input,button{font:inherit;border-radius:6px;padding:12px}
+    input{display:block;width:100%;margin:10px 0 16px;border:1px solid #aebfc5}button{border:0;background:#087f74;color:white;font-weight:700;cursor:pointer}
+    button:disabled{opacity:.5}#status{font-weight:700;color:#8a571b}#message{overflow-wrap:anywhere}label{display:block}
+    @media(max-width:480px){dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:12px}header{padding:12px;gap:10px}}
+  </style>
+</head>
+<body>
+  <header><img src="pasarmalam-logo.png" alt="PasarMalam"><b>PasarMalam</b><a href="orders.html">Orders</a></header>
+  <main><h1>Bulk Bank Transfer</h1><p id="status" role="status">Loading order...</p>
+    <section id="bank" hidden><h2>Transfer Details</h2><dl id="details"></dl><p>Include the payment reference in your bank transfer. Your order will be prepared after admin confirms the deposit.</p></section>
+    <section id="submission" hidden><h2>Payment Confirmation</h2><form id="transferForm"><label for="senderReference">Your bank transaction reference</label><input id="senderReference" maxlength="160" required autocomplete="off"><button id="submitReference">Submit for Review</button></form></section>
+    <p id="message" role="status"></p><p><a id="orderLink" href="orders.html">View Order</a> &middot; <button id="refresh" type="button">Refresh Status</button></p>
+  </main>
+  <script src="bank-transfer.js?v=1"></script>
+</body></html>

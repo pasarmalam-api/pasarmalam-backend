@@ -1,4 +1,12 @@
 const API="https://pasarmalam-backend.onrender.com";
+if (location.pathname.endsWith('/payments.html')) {
+  window.addEventListener('load', () => {
+    const script = document.createElement('script');
+    script.src = 'bank-transfer-review.js?v=1';
+    script.onload = () => loadPayments();
+    document.head.append(script);
+  });
+}
 if (location.pathname.endsWith('/tickets.html')) {
   const deletionScript = document.createElement('script');
   deletionScript.src = 'account-deletions.js?v=1';

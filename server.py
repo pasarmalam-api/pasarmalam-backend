@@ -1516,6 +1516,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/payments/toyyibpay/status": lambda: self.toyyibpay_status(query),
                 "/api/payments/toyyibpay/return": lambda: self.toyyibpay_return(query),
                 "/api/payments/billplz/status": lambda: self.billplz_status(query),
+                "/api/payments/bank-transfer": lambda: self.bank_transfer_details(query),
                 "/api/payments/billplz/return": lambda: self.billplz_return(query),
                 "/api/admin/users": self.admin_users,
                 "/api/admin/sellers": self.admin_sellers,
@@ -1642,6 +1643,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply_review(data)
             elif parsed.path == "/api/checkout":
                 self.checkout(data)
+            elif parsed.path == "/api/payments/bank-transfer/notify":
+                self.bank_transfer_notify(data)
             elif parsed.path == "/api/payments/toyyibpay/create":
                 self.create_toyyibpay_payment(data)
             elif parsed.path == "/api/payments/toyyibpay/callback":
@@ -1803,6 +1806,9 @@ class Handler(BaseHTTPRequestHandler):
         if details:
             con.execute("UPDATE orders SET delivery_data=?, logistics_admin_fee=?, tracking_no='', awb_label='' WHERE id=?",
                         (json.dumps(details), details.get('charges', {}).get('admin_fee', 0), order_id))
+            payment = con.execute('SELECT payment_method, payment_status FROM orders WHERE id=?', (order_id,)).fetchone()
+            if payment and payment['payment_method'] == 'Bank Transfer' and payment['payment_status'] != 'paid':
+                return
             if details.get('provider') == 'pickup':
                 return
             if details.get('provider') == 'pm_pooling':
@@ -2898,26 +2904,31 @@ class Handler(BaseHTTPRequestHandler):
 
     def checkout(self, data):
         user = self.require_user("buyer")
+        transfer = data.get("payment_method") == "Bank Transfer"
         arrival = data.get("payment_method") == "Pay on Arrival" and data.get("logistics_method") == "PM Express"
-        if not arrival and (data.get("payment_method") != "Cash Pickup" or delivery.METHODS.get(data.get("logistics_method")) != "pickup"):
+        if not transfer and not arrival and (data.get("payment_method") != "Cash Pickup" or delivery.METHODS.get(data.get("logistics_method")) != "pickup"):
             raise ValueError("Use the payment gateway for delivery orders. Cash payment is for pickup only.")
         buyer_id = user["id"]
         buyer_name = user["name"]
         with connect() as con:
+            if transfer and not USE_POSTGRES:
+                con.execute('BEGIN IMMEDIATE')
             product, qty, address, payment_method, buyer_phone = self.validate_checkout_payload(con, data, user)
+            if transfer and product['selling_mode'] != 'bulk':
+                raise ValueError('Bank transfer is available for bulk listings only')
             fee, delivery_details = delivery.consume(con, user, product, qty, data)
             subtotal = float(product["price"]) * qty
             discount, voucher_code = campaign_discount(con, product["seller_id"], data.get("voucher_code", ""), subtotal)
             if voucher_code and str(data.get("voucher_code", "")).strip() and str(voucher_code).lower() != str(data.get("voucher_code", "")).strip().lower():
                 voucher_code = data.get("voucher_code", "")
             total = max(subtotal + fee - discount, 0)
-            tracking = "" if arrival else f"PM{now()}{product['id']}"
-            awb = "" if arrival else f"AWB-{tracking}-{data.get('logistics_method', product['shipping_type']).replace(' ', '-')}"
+            tracking = "" if arrival or transfer else f"PM{now()}{product['id']}"
+            awb = "" if arrival or transfer else f"AWB-{tracking}-{data.get('logistics_method', product['shipping_type']).replace(' ', '-')}"
             payment_status = "unpaid"
             order_status = "placed" if arrival else "pending_payment"
             escrow_status = "pending"
-            payment_proof_url = data.get("payment_proof_url", "")
-            payment_reference = data.get("payment_reference", "")
+            payment_proof_url = "" if transfer else data.get("payment_proof_url", "")
+            payment_reference = "" if transfer else data.get("payment_reference", "")
             if voucher_code:
                 payment_reference = f"{payment_reference} Voucher:{voucher_code} Discount:{discount}".strip()
             cur = con.execute(
@@ -2929,6 +2940,13 @@ class Handler(BaseHTTPRequestHandler):
                 (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), address, total, data.get("logistics_method", product["shipping_type"]), fee, payment_method, payment_status, payment_reference, data.get("payment_url", ""), payment_proof_url, order_status, escrow_status, tracking, awb, now()),
             )
             self.attach_delivery(con, cur.lastrowid, delivery_details)
+            if transfer:
+                payment_reference = f"PM-BULK-{cur.lastrowid}-{secrets.token_hex(3).upper()}"
+                con.execute("UPDATE orders SET payment_reference=?, payment_url='' WHERE id=?", (payment_reference, cur.lastrowid))
+                create_notification(con, 'buyer', buyer_id, f'Bank transfer order PM-{cur.lastrowid}',
+                                    'Awaiting Public Bank transfer and admin confirmation.', 'payment', f'bank-transfer.html?id={cur.lastrowid}')
+                notify_admins(con, f'Bulk transfer order PM-{cur.lastrowid}',
+                              f'{payment_reference}: RM{total:.2f}. Confirm receipt in Public Bank before approving.', 'payment', 'payments.html')
             if arrival:
                 create_notification(con, "seller", product["seller_id"], f"PM Express order PM-{cur.lastrowid}",
                                     "Pay on Arrival order received. Prepare for a PM rider; payment has not been collected.", "order", "orders.html")
@@ -2937,7 +2955,35 @@ class Handler(BaseHTTPRequestHandler):
                     con.execute("UPDATE products SET stock = GREATEST(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, product["id"]))
                 else:
                     con.execute("UPDATE products SET stock = MAX(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, product["id"]))
-        send_json(self, 201, {"id": cur.lastrowid, "total": total, "discount": discount, "voucher_code": voucher_code, "tracking_no": tracking, "escrow_status": escrow_status, "payment_status": payment_status})
+        send_json(self, 201, {"id": cur.lastrowid, "total": total, "discount": discount, "voucher_code": voucher_code, "tracking_no": tracking, "escrow_status": escrow_status, "payment_status": payment_status, "payment_reference": payment_reference})
+
+    def bank_transfer_details(self, query):
+        user = self.require_user('buyer')
+        order_id = int((query.get('order_id') or ['0'])[0])
+        with connect() as con:
+            order = con.execute("SELECT id, total, payment_reference, payment_status, order_status, payment_review_note FROM orders WHERE id=? AND buyer_id=? AND payment_method='Bank Transfer'", (order_id, user['id'])).fetchone()
+            if not order:
+                raise PermissionError('Bank transfer order not found')
+        send_json(self, 200, {'order': dict(order), 'bank': {'name': 'Public Bank Berhad', 'account_name': 'TANITOOLUWA VENTURES', 'account_number': '3248827222'}})
+
+    def bank_transfer_notify(self, data):
+        user = self.require_user('buyer')
+        order_id = int(data.get('order_id') or 0)
+        reference = str(data.get('sender_reference') or '').strip()
+        if not reference or len(reference) > 160:
+            raise ValueError('Enter your bank transaction reference (up to 160 characters)')
+        with connect() as con:
+            if not USE_POSTGRES:
+                con.execute('BEGIN IMMEDIATE')
+            order = con.execute("SELECT * FROM orders WHERE id=? AND buyer_id=? AND payment_method='Bank Transfer'" + (' FOR UPDATE' if USE_POSTGRES else ''), (order_id, user['id'])).fetchone()
+            if not order:
+                raise PermissionError('Bank transfer order not found')
+            if order['order_status'] != 'pending_payment' or order['payment_status'] == 'paid':
+                raise ValueError('This order is closed for payment submissions')
+            con.execute("UPDATE orders SET payment_status='pending_review', payment_review_note=?, status_updated_at=? WHERE id=?", ('Buyer supplied reference (unverified): ' + reference, now(), order_id))
+            notify_admins(con, f'Check Public Bank deposit for PM-{order_id}',
+                          f"{order['payment_reference']}: RM{order['total']:.2f}. Buyer reference: {reference}. Verify the bank deposit before approval.", 'payment', 'payments.html')
+        send_json(self, 200, {'ok': True, 'payment_status': 'pending_review'})
 
     def validate_checkout_payload(self, con, data, user):
         if not user or user.get("role") != "buyer":
@@ -2971,8 +3017,8 @@ class Handler(BaseHTTPRequestHandler):
         if qty < product['minimum_order']:
             raise ValueError(f"Minimum order is {product['minimum_order']} units")
         reserved = con.execute("""SELECT COALESCE(SUM(quantity),0) AS qty FROM orders
-            WHERE product_id=? AND payment_method='Pay on Arrival' AND logistics_method='PM Express'
-            AND payment_status='unpaid' AND order_status<>'cancelled'""", (product['id'],)).fetchone()['qty']
+            WHERE product_id=? AND ((payment_method='Pay on Arrival' AND logistics_method='PM Express' AND payment_status='unpaid')
+            OR (payment_method='Bank Transfer' AND payment_status<>'paid')) AND order_status<>'cancelled'""", (product['id'],)).fetchone()['qty']
         available = max(0, int(product['stock'] or 0) - int(reserved))
         if qty > available:
             raise ValueError(f"Only {available} item(s) available")
@@ -3690,10 +3736,22 @@ class Handler(BaseHTTPRequestHandler):
         escrow_status = "holding" if decision == "paid" else "pending"
         note = data.get("note", "Admin payment review")
         with connect() as con:
-            order = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+            if not USE_POSTGRES:
+                con.execute('BEGIN IMMEDIATE')
+            order = con.execute("SELECT * FROM orders WHERE id = ?" + (' FOR UPDATE' if USE_POSTGRES else ''), (order_id,)).fetchone()
             if not order:
                 raise ValueError("Order not found")
             was_paid = order["payment_status"] == "paid"
+            if order['payment_method'] == 'Bank Transfer':
+                if order['order_status'] in ('cancelled', 'completed') or was_paid:
+                    raise ValueError('This bank transfer payment is already closed')
+                if decision == 'paid':
+                    if data.get('bank_confirmed') is not True or not str(data.get('settlement_reference') or '').strip():
+                        raise ValueError('Confirm the deposit in Public Bank and enter its transaction reference')
+                    stock = con.execute('SELECT stock FROM products WHERE id=?' + (' FOR UPDATE' if USE_POSTGRES else ''), (order['product_id'],)).fetchone()
+                    if not stock or int(stock['stock']) < int(order['quantity']):
+                        raise ValueError('Insufficient stock. Reconcile the deposit before fulfilment')
+                    note = 'Public Bank deposit confirmed: ' + str(data['settlement_reference']).strip()[:160]
             if order["payment_method"] == "Pay on Arrival" and order["logistics_method"] == "PM Express":
                 if order["order_status"] == "cancelled":
                     raise ValueError("A cancelled PM Express order cannot be marked paid")
@@ -3710,6 +3768,13 @@ class Handler(BaseHTTPRequestHandler):
                     con.execute("UPDATE products SET stock = GREATEST(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, order["product_id"]))
                 else:
                     con.execute("UPDATE products SET stock = MAX(stock - ?, 0), sold = sold + ? WHERE id = ?", (qty, qty, order["product_id"]))
+                if order['payment_method'] == 'Bank Transfer':
+                    ctx = order_context(con, order_id)
+                    if ctx:
+                        create_notification(con, 'buyer', ctx['buyer_id'], f'Payment confirmed PM-{order_id}', 'Public Bank deposit confirmed. Your order can now be prepared.', 'payment', 'orders.html')
+                        create_notification(con, 'seller', ctx['seller_id'], f'Paid bulk order PM-{order_id}', 'Payment confirmed by admin. Prepare the order.', 'order', 'orders.html')
+                        notify_admins(con, f'Bulk payment confirmed PM-{order_id}',
+                                      'Public Bank deposit confirmed. Arrange the selected delivery or pickup; no payment needs collecting on arrival.', 'logistics', 'orders.html')
         self.audit("manual_payment_review", "order", order_id, f"{decision}: {note}")
         send_json(self, 200, {"ok": True, "payment_status": decision, "order_status": order_status, "escrow_status": escrow_status})
 
@@ -3718,7 +3783,9 @@ class Handler(BaseHTTPRequestHandler):
         order_id = int(data["order_id"])
         note = data.get("note", "Admin cancelled stale unpaid order")
         with connect() as con:
-            order = con.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
+            if not USE_POSTGRES:
+                con.execute('BEGIN IMMEDIATE')
+            order = con.execute("SELECT * FROM orders WHERE id = ?" + (' FOR UPDATE' if USE_POSTGRES else ''), (order_id,)).fetchone()
             if not order:
                 raise ValueError("Order not found")
             if order["payment_status"] == "paid":
