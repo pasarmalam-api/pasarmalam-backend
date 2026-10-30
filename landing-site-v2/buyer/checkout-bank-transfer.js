@@ -13,6 +13,9 @@
     if (!payment.querySelector('option[value="Bank Transfer"]')) {
       payment.add(new Option('Public Bank transfer (bulk orders)', 'Bank Transfer'));
     }
+    for (const option of payment.options) option.disabled = option.value !== 'Bank Transfer';
+    payment.value = 'Bank Transfer';
+    payment.dispatchEvent(new Event('change'));
   };
   window.addEventListener('pm-checkout-loaded', update);
   update();

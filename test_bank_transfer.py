@@ -99,6 +99,41 @@ class BankTransferTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.h.admin_update_payment_status({'order_id': order_id, 'payment_status': 'paid', 'bank_confirmed': True, 'settlement_reference': 'LATE'})
 
+    def test_bulk_cash_and_arrival_are_rejected(self):
+        for payment, method in [('Cash Pickup', 'Ambil Sendiri'), ('Pay on Arrival', 'PM Express')]:
+            with self.subTest(payment=payment), self.assertRaisesRegex(ValueError, 'All bulk orders'):
+                self.h.checkout({**self.data, 'payment_method': payment, 'logistics_method': method})
+
+    def test_bulk_gateway_is_rejected_even_with_forged_transfer_method(self):
+        with patch.multiple(server, BILLPLZ_API_KEY='test', BILLPLZ_COLLECTION_ID='test'), patch.object(server, 'post_billplz') as gateway:
+            for method in ('Billplz', 'Bank Transfer', 'quotation'):
+                with self.subTest(method=method), self.assertRaisesRegex(ValueError, 'Bulk orders must use'):
+                    self.h.create_billplz_payment({**self.data, 'payment_method': method})
+            gateway.assert_not_called()
+
+    def test_legacy_bulk_minimum_enforced_and_migrated(self):
+        with server.connect() as con:
+            con.execute('UPDATE products SET minimum_order=2 WHERE id=1')
+            with self.assertRaisesRegex(ValueError, '10 units'):
+                self.h.validate_checkout_payload(con, {**self.data, 'quantity': 9}, self.user)
+            server.migrate_products(con)
+            self.assertEqual(con.execute('SELECT minimum_order FROM products WHERE id=1').fetchone()['minimum_order'], 10)
+
+    def test_bulk_commission_is_five_for_new_and_verified_sellers(self):
+        for verified in ('verified', 'not_submitted'):
+            with self.subTest(verified=verified):
+                order_id = self.create()
+                with server.connect() as con:
+                    con.execute("UPDATE users SET created_at=?,business_verification_status=? WHERE id=2", (server.now(), verified))
+                    con.execute("UPDATE orders SET payment_status='paid',order_status='completed',escrow_status='holding' WHERE id=?", (order_id,))
+                    server.sync_wallet_settlements(con)
+                    row = con.execute("SELECT commission_rate,commission_amount,seller_earning FROM wallet WHERE order_id=? AND type='settlement'", (order_id,)).fetchone()
+                    self.assertEqual((row['commission_rate'], row['commission_amount'], row['seller_earning']), (5, 2.5, 47.5))
+
+    def test_retail_commission_is_unchanged(self):
+        self.assertEqual(server.commission_rate_for_seller({'created_at': server.now()}), 3)
+        self.assertEqual(server.commission_rate_for_seller({'created_at': server.now()-60*86400, 'business_verification_status': 'verified'}), 4)
+
 
 if __name__ == '__main__':
     unittest.main()

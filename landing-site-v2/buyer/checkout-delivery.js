@@ -105,11 +105,12 @@
     for (const radio of choices.querySelectorAll('input')) radio.checked = radio.value === shipping.value;
     get('deliveryScheduleLabel').hidden = shipping.value !== 'Lalamove Biasa';
     const cash = get('payment').querySelector('option[value="Cash Pickup"]');
-    cash.disabled = !isPickup();
-    cash.hidden = !isPickup();
+    const bulk = checkoutProduct?.selling_mode === 'bulk';
+    cash.disabled = bulk || !isPickup();
+    cash.hidden = bulk || !isPickup();
     if (cash.disabled && payment.value === 'Cash Pickup') payment.value = 'Billplz';
     const arrival = payment.querySelector('option[value="Pay on Arrival"]');
-    arrival.disabled = arrival.hidden = shipping.value !== 'PM Express';
+    arrival.disabled = arrival.hidden = bulk || shipping.value !== 'PM Express';
     if (arrival.disabled && payment.value === 'Pay on Arrival') payment.value = 'Billplz';
     queued = !isPickup();
     status(''); renderSummary();

@@ -37,7 +37,7 @@ class BulkTests(unittest.TestCase):
             self.assertEqual((row['selling_mode'], row['minimum_order'], row['price']), ('bulk', 10, 4))
 
     def test_invalid_minimum(self):
-        for minimum in (0, 1, -1, 2.5, True, None, 'x', float('inf')):
+        for minimum in (0, 1, 2, 9, -1, 2.5, True, None, 'x', float('inf')):
             with self.subTest(minimum=minimum), self.assertRaises(ValueError):
                 self.h.create_product({**self.payload, 'minimum_order': minimum})
         with self.assertRaises(ValueError):
