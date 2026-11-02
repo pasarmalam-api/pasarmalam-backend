@@ -815,6 +815,7 @@ def migrate_products(con):
         if name not in columns:
             con.execute(f"ALTER TABLE products ADD COLUMN {name} {sql}")
     con.execute("UPDATE products SET minimum_order=10 WHERE selling_mode='bulk' AND minimum_order<10")
+    con.execute("UPDATE products SET minimum_order=500 WHERE selling_mode='factory' AND minimum_order<500")
 
 
 def migrate_orders(con):
@@ -841,10 +842,14 @@ def migrate_orders(con):
         "awb_label": "TEXT DEFAULT ''",
         "delivery_data": "TEXT DEFAULT ''",
         "logistics_admin_fee": "REAL DEFAULT 0",
+        "order_type": "TEXT NOT NULL DEFAULT 'retail'",
+        "agreed_commission_rate": "REAL DEFAULT NULL",
     }
     for name, sql in additions.items():
         if name not in columns:
             con.execute(f"ALTER TABLE orders ADD COLUMN {name} {sql}")
+    if 'order_type' not in columns:
+        con.execute("UPDATE orders SET order_type='bulk', agreed_commission_rate=5 WHERE payment_method='Bank Transfer'")
 
 
 def migrate_payments(con):
@@ -1979,8 +1984,8 @@ class Handler(BaseHTTPRequestHandler):
         if data.get('storage_class', 'unknown') not in ('unknown', 'shelf_stable', 'canned_drink', 'perishable'):
             raise ValueError('Invalid storage classification')
         mode = data.get('selling_mode', 'retail')
-        if mode not in ('retail', 'bulk'):
-            raise ValueError('Choose retail or bulk selling')
+        if mode not in ('retail', 'bulk', 'factory'):
+            raise ValueError('Choose retail, bulk or factory direct selling')
         raw = data.get('minimum_order', 1)
         try:
             minimum = float(raw)
@@ -1990,6 +1995,8 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError('Minimum order must be a positive whole number') from None
         if mode == 'bulk' and minimum < 10:
             raise ValueError('Bulk minimum order must be at least 10 units')
+        if mode == 'factory' and minimum < 500:
+            raise ValueError('Factory Direct minimum order must be at least 500 units')
         if mode == 'retail' and minimum != 1:
             raise ValueError('Retail minimum order must be 1')
         for key in ("name", "category"):
@@ -2915,10 +2922,10 @@ class Handler(BaseHTTPRequestHandler):
             if transfer and not USE_POSTGRES:
                 con.execute('BEGIN IMMEDIATE')
             product, qty, address, payment_method, buyer_phone = self.validate_checkout_payload(con, data, user)
-            if transfer and product['selling_mode'] != 'bulk':
-                raise ValueError('Bank transfer is available for bulk listings only')
-            if product['selling_mode'] == 'bulk' and not transfer:
-                raise ValueError('All bulk orders require direct bank transfer to TANITOOLUWA VENTURES at Public Bank')
+            if transfer and product['selling_mode'] not in ('bulk', 'factory'):
+                raise ValueError('Bank transfer is available for bulk listings and Factory Direct only')
+            if product['selling_mode'] in ('bulk', 'factory') and not transfer:
+                raise ValueError('All bulk orders and Factory Direct orders require direct bank transfer to TANITOOLUWA VENTURES at Public Bank')
             fee, delivery_details = delivery.consume(con, user, product, qty, data)
             subtotal = float(product["price"]) * qty
             discount, voucher_code = campaign_discount(con, product["seller_id"], data.get("voucher_code", ""), subtotal)
@@ -2943,12 +2950,16 @@ class Handler(BaseHTTPRequestHandler):
                 (buyer_id, buyer_name, product["id"], qty, data.get("variant", ""), address, total, data.get("logistics_method", product["shipping_type"]), fee, payment_method, payment_status, payment_reference, data.get("payment_url", ""), payment_proof_url, order_status, escrow_status, tracking, awb, now()),
             )
             self.attach_delivery(con, cur.lastrowid, delivery_details)
+            # Preserve the purchased order type and agreed wholesale rate after listing edits.
+            con.execute("UPDATE orders SET order_type=?, agreed_commission_rate=? WHERE id=?",
+                        (product['selling_mode'], 3.0 if product['selling_mode'] == 'factory' else 5.0 if transfer else None, cur.lastrowid))
             if transfer:
-                payment_reference = f"PM-BULK-{cur.lastrowid}-{secrets.token_hex(3).upper()}"
+                prefix = 'FACTORY' if product['selling_mode'] == 'factory' else 'BULK'
+                payment_reference = f"PM-{prefix}-{cur.lastrowid}-{secrets.token_hex(3).upper()}"
                 con.execute("UPDATE orders SET payment_reference=?, payment_url='' WHERE id=?", (payment_reference, cur.lastrowid))
                 create_notification(con, 'buyer', buyer_id, f'Bank transfer order PM-{cur.lastrowid}',
                                     'Awaiting Public Bank transfer and admin confirmation.', 'payment', f'bank-transfer.html?id={cur.lastrowid}')
-                notify_admins(con, f'Bulk transfer order PM-{cur.lastrowid}',
+                notify_admins(con, f'{prefix.title()} transfer order PM-{cur.lastrowid}',
                               f'{payment_reference}: RM{total:.2f}. Confirm receipt in Public Bank before approving.', 'payment', 'payments.html')
             if arrival:
                 create_notification(con, "seller", product["seller_id"], f"PM Express order PM-{cur.lastrowid}",
@@ -2964,7 +2975,7 @@ class Handler(BaseHTTPRequestHandler):
         user = self.require_user('buyer')
         order_id = int((query.get('order_id') or ['0'])[0])
         with connect() as con:
-            order = con.execute("SELECT id, total, payment_reference, payment_status, order_status, payment_review_note FROM orders WHERE id=? AND buyer_id=? AND payment_method='Bank Transfer'", (order_id, user['id'])).fetchone()
+            order = con.execute("SELECT id, total, payment_reference, payment_status, order_status, payment_review_note, order_type FROM orders WHERE id=? AND buyer_id=? AND payment_method='Bank Transfer'", (order_id, user['id'])).fetchone()
             if not order:
                 raise PermissionError('Bank transfer order not found')
         send_json(self, 200, {'order': dict(order), 'bank': {'name': 'Public Bank Berhad', 'account_name': 'TANITOOLUWA VENTURES', 'account_number': '3248827222'}})
@@ -3017,7 +3028,7 @@ class Handler(BaseHTTPRequestHandler):
             raise ValueError("Quantity must be a whole number") from None
         if qty < 1:
             raise ValueError("Quantity must be at least 1")
-        minimum = max(10 if product['selling_mode'] == 'bulk' else 1, int(product['minimum_order']))
+        minimum = max({'bulk': 10, 'factory': 500}.get(product['selling_mode'], 1), int(product['minimum_order']))
         if qty < minimum:
             raise ValueError(f"Minimum order is {minimum} units")
         reserved = con.execute("""SELECT COALESCE(SUM(quantity),0) AS qty FROM orders
@@ -3049,8 +3060,8 @@ class Handler(BaseHTTPRequestHandler):
         buyer_email = data.get("buyer_email") or user.get("email", "")
         with connect() as con:
             product, qty, address, payment_method, buyer_phone = self.validate_checkout_payload(con, data, user)
-            if product['selling_mode'] == 'bulk':
-                raise ValueError('Bulk orders must use the Public Bank transfer checkout, not Billplz')
+            if product['selling_mode'] in ('bulk', 'factory'):
+                raise ValueError('Bulk orders must use the Public Bank transfer checkout, not Billplz; this also applies to Factory Direct')
             fee, delivery_details = delivery.consume(con, user, product, qty, data)
             subtotal = float(product["price"]) * qty
             discount, voucher_code = campaign_discount(con, product["seller_id"], data.get("voucher_code", ""), subtotal)
@@ -4040,7 +4051,9 @@ def sync_wallet_settlements(con):
             continue
         seller = con.execute("SELECT * FROM users WHERE id = ?", (order["seller_id"],)).fetchone()
         seller = row_to_dict(seller) if seller else {"created_at": now(), "business_verification_status": "not_submitted"}
-        rate = 5.0 if order['payment_method'] == 'Bank Transfer' or order['selling_mode'] == 'bulk' else commission_rate_for_seller(seller)
+        rate = order.get('agreed_commission_rate')
+        if rate is None:
+            rate = 5.0 if order['payment_method'] == 'Bank Transfer' or order['selling_mode'] == 'bulk' else commission_rate_for_seller(seller)
         gross = round(as_float(order["total"]), 2)
         details = json.loads(order.get("delivery_data") or '{}')
         if details.get('charges', {}).get('version') == 1:

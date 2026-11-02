@@ -1,5 +1,7 @@
 (function(){
+  let currentImages=[];
   window.renderProductPhotos=function(images){
+    currentImages=images;
     const grid=document.getElementById('previewGrid');
     grid.replaceChildren();
     const lang=localStorage.getItem('pasarmalam-lang')||'ms';
@@ -20,7 +22,10 @@
         document.getElementById('out').tabIndex=-1;
         (next[Math.min(index,next.length-1)]||document.getElementById('out')).focus();
       };
-      tile.append(image,remove);grid.append(tile);
+      tile.append(image,remove);
+      if(window.PMSelling)PMSelling.labelPhoto(tile,{selling_mode:document.getElementById('sellingMode')?.value});
+      grid.append(tile);
     });
   };
+  document.getElementById('sellingMode')?.addEventListener('change',()=>renderProductPhotos(currentImages));
 })();

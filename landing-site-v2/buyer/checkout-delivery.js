@@ -105,7 +105,7 @@
     for (const radio of choices.querySelectorAll('input')) radio.checked = radio.value === shipping.value;
     get('deliveryScheduleLabel').hidden = shipping.value !== 'Lalamove Biasa';
     const cash = get('payment').querySelector('option[value="Cash Pickup"]');
-    const bulk = checkoutProduct?.selling_mode === 'bulk';
+    const bulk = ['bulk', 'factory'].includes(checkoutProduct?.selling_mode);
     cash.disabled = bulk || !isPickup();
     cash.hidden = bulk || !isPickup();
     if (cash.disabled && payment.value === 'Cash Pickup') payment.value = 'Billplz';

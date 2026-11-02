@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ms">
-<head>
+<head><script src="../selling-types.js?v=factory-photo2"></script><link rel="stylesheet" href="../selling-types.css?v=factory-photo2">
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PasarMalam Seller Store</title><script src="shop-status.js?v=1"></script>
 <style>
@@ -24,7 +24,7 @@ async function load(){
  if(!rows.length){shopStatus.textContent='Tiada produk tersedia.';return}
  shopName.textContent=rows[0].shop;
  shopStatus.innerHTML=PMShop.badge(rows.find(p=>/^(food|street food|meals|drinks)$/i.test(p.category))||rows[0]);
- items.innerHTML=rows.map(p=>`<article><a href="product.html?id=${Number(p.id)}">${p.image_url?`<img src="${esc(p.image_url)}" alt="${esc(p.name)}">`:''}<h2>${esc(p.name)}</h2><p class="price">RM${Number(p.price).toFixed(2)}</p>${PMShop.badge(p)}</a></article>`).join('');
+ items.innerHTML=rows.map(p=>`<article><a href="product.html?id=${Number(p.id)}"><div class="selling-photo">${p.image_url?`<img src="${esc(p.image_url)}" alt="${esc(p.name)}">`:''}${PMSelling.photoBadge(p)}</div><h2>${esc(p.name)}</h2><p class="price">RM${Number(p.price).toFixed(2)}</p>${PMShop.badge(p)}</a></article>`).join('');
 }
 load().catch(e=>shopStatus.textContent=e.message);
 window.addEventListener('focus',()=>load().catch(()=>{}));

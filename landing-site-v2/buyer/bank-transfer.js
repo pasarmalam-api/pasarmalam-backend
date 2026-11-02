@@ -16,6 +16,7 @@
       return;
     }
     const {order, bank} = await request('/api/payments/bank-transfer?order_id=' + encodeURIComponent(id));
+    document.querySelector('h1').textContent = order.order_type === 'factory' ? 'Factory Direct - Public Bank transfer' : 'Bulk order - Public Bank transfer';
     const open = order.order_status === 'pending_payment' && order.payment_status !== 'paid';
     get('status').textContent = 'Order PM-' + order.id + ' | ' + (order.order_status === 'cancelled'
       ? 'Cancelled - do not transfer' : order.payment_status === 'paid' ? 'Payment confirmed'
