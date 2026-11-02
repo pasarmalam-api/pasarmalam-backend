@@ -2,6 +2,42 @@
   const page=location.pathname.split('/').pop();
   const byId=id=>document.getElementById(id);
   const settingsLink=document.querySelector('nav a[href="settings.html"]');
+  const productsLink=document.querySelector('nav a[href="products.html"]');
+  if(productsLink){
+    const factory=document.createElement('a');
+    factory.href='products.html?selling_mode=factory';factory.textContent='Factory Direct';
+    if(page==='products.html'&&new URLSearchParams(location.search).get('selling_mode')==='factory'){
+      productsLink.classList.remove('active');factory.className='active';
+    }
+    productsLink.after(factory);
+  }
+  if(page==='index.html'){
+    const factory=document.createElement('a');factory.className='soft';
+    factory.href='add-product.html?selling_mode=factory';factory.textContent='Add Factory Direct Product';
+    document.querySelector('.toolbar')?.append(factory);
+  }
+  if(page==='products.html'){
+    const filter=byId('sellingFilter'),requested=new URLSearchParams(location.search).get('selling_mode');
+    if(['retail','bulk','factory'].includes(requested))filter.value=requested;
+    filter.addEventListener('change',()=>{
+      const url=new URL(location.href);
+      if(filter.value)url.searchParams.set('selling_mode',filter.value);else url.searchParams.delete('selling_mode');
+      history.replaceState(null,'',url);
+      const factory=document.querySelector('nav a[href="products.html?selling_mode=factory"]');
+      factory?.classList.toggle('active',filter.value==='factory');
+      productsLink?.classList.toggle('active',filter.value!=='factory');
+    });
+    const originalDraw=window.draw;
+    window.draw=function(){
+      originalDraw();
+      if(!byId('rows').children.length){
+        const row=document.createElement('tr'),cell=document.createElement('td');cell.colSpan=6;
+        cell.textContent=filter.value==='factory'?'No Factory Direct products in this shop.':'No matching products in this shop.';
+        row.append(cell);byId('rows').append(row);
+      }
+    };
+    window.draw();
+  }
   if(page==='settings.html'){
     const section=document.createElement('section');section.style.padding='16px 0';
     const link=document.createElement('a');link.href='pickup-location.html';link.textContent='Pickup address & delivery settings';section.append(link);document.querySelector('main')?.prepend(section);

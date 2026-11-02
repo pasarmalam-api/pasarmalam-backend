@@ -27,6 +27,11 @@
     const lang=localStorage.getItem('pasarmalam-lang')||'ms';
     document.documentElement.lang=translations[lang]?lang:'en';
     ['heading','message','another','products'].forEach((id,i)=>document.getElementById(id).textContent=(translations[lang]||translations.en)[i]);
+    const mode=new URLSearchParams(location.search).get('selling_mode');
+    if(['bulk','factory'].includes(mode)){
+      document.getElementById('another').href='add-product.html?selling_mode='+mode;
+      document.getElementById('products').href='products.html?selling_mode='+mode;
+    }
     document.title=document.getElementById('heading').textContent+' - PasarMalam';
   </script>
 </body>

@@ -2532,9 +2532,10 @@ class Handler(BaseHTTPRequestHandler):
             product_id = int(data.get("product_id") or 0)
             if not product_id:
                 raise ValueError("Product is required")
-            product = con.execute("SELECT id, stock, seller_id, minimum_order FROM products WHERE id = ?", (product_id,)).fetchone()
+            product = con.execute("SELECT id, stock, seller_id, selling_mode, minimum_order FROM products WHERE id = ?", (product_id,)).fetchone()
             if not product:
                 raise ValueError("Product not found")
+            minimum = max({'bulk': 10, 'factory': 500}.get(product['selling_mode'], 1), int(product['minimum_order']))
             self.require_shop_open(con, product)
             stock = int(product["stock"] or 0)
             if stock < 1:
@@ -2557,8 +2558,8 @@ class Handler(BaseHTTPRequestHandler):
                 (buyer_id, product_id, variant),
             ).fetchone()
             if method == "PUT":
-                if quantity < product['minimum_order']:
-                    raise ValueError(f"Minimum order is {product['minimum_order']} units")
+                if quantity < minimum:
+                    raise ValueError(f"Minimum order is {minimum} units")
                 item_id = int(data.get("id") or data.get("cart_item_id") or (existing["id"] if existing else 0))
                 if not item_id:
                     raise ValueError("Cart item id is required")
@@ -2570,13 +2571,13 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if existing:
                 quantity = min(int(existing["quantity"] or 0) + quantity, stock)
-                if quantity < product['minimum_order']:
-                    raise ValueError(f"Minimum order is {product['minimum_order']} units")
+                if quantity < minimum:
+                    raise ValueError(f"Minimum order is {minimum} units")
                 con.execute("UPDATE cart_items SET quantity = ? WHERE id = ? AND buyer_id = ?", (quantity, existing["id"], buyer_id))
                 send_json(self, 200, {"ok": True, "id": existing["id"], "quantity": quantity})
                 return
-            if quantity < product['minimum_order']:
-                raise ValueError(f"Minimum order is {product['minimum_order']} units")
+            if quantity < minimum:
+                raise ValueError(f"Minimum order is {minimum} units")
             cur = con.execute(
                 "INSERT INTO cart_items (buyer_id, product_id, quantity, variant, created_at) VALUES (?, ?, ?, ?, ?)",
                 (buyer_id, product_id, quantity, variant, now()),

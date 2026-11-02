@@ -33,6 +33,11 @@ class FactoryTests(BankTransferTests):
             self.h.cart_route('PUT', {'id': item, 'product_id': 1, 'quantity': 499})
         with server.connect() as con:
             con.execute('UPDATE products SET minimum_order=1 WHERE id=1')
+        with self.assertRaisesRegex(ValueError, '500 units'):
+            self.h.cart_route('PUT', {'id': item, 'product_id': 1, 'quantity': 499})
+        with self.assertRaisesRegex(ValueError, '500 units'):
+            self.h.cart_route('POST', {'product_id': 1, 'quantity': 499, 'variant': 'New variant'})
+        with server.connect() as con:
             with self.assertRaisesRegex(ValueError, '500 units'):
                 self.h.validate_checkout_payload(con, {**self.data, 'quantity': 499}, self.user)
             server.migrate_products(con)
