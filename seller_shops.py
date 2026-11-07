@@ -7,6 +7,13 @@ import secrets
 import time
 
 LIMIT = 5
+STORE_TYPES = ('retail', 'bulk', 'factory')
+
+
+def store_type(value):
+    if value not in STORE_TYPES:
+        raise ValueError('Choose Retail, Bulk / Wholesale or Factory Direct')
+    return value
 
 
 def account_id(user):
@@ -15,7 +22,7 @@ def account_id(user):
 
 def listing(con, owner_id):
     return [dict(row) for row in con.execute(
-        "SELECT u.id,u.shop_name,u.shop_category,u.status,u.seller_status, "
+        "SELECT u.id,u.shop_name,u.shop_category,u.store_type,u.status,u.seller_status, "
         "(SELECT COUNT(*) FROM notifications n WHERE n.role='seller' "
         "AND (n.user_id=u.id OR n.user_id=0) AND n.read_at=0) AS unread_notifications "
         "FROM users u WHERE (u.id=? OR u.shop_owner_id=?) AND u.role='seller' ORDER BY u.id",
@@ -42,6 +49,7 @@ def create(con, owner_id, data, categories, postgres=False):
     owner = dict(row)
     name = str(data.get('shop_name') or '').strip()
     category = data.get('shop_category')
+    mode = store_type(data.get('store_type', 'retail'))
     if not 2 <= len(name) <= 100:
         raise ValueError('Shop name must contain 2 to 100 characters')
     if category not in categories:
@@ -57,7 +65,7 @@ def create(con, owner_id, data, categories, postgres=False):
               'business_verification_submitted_at', 'bank_name', 'bank_account_name', 'bank_account_number')
     values = {key: owner[key] for key in fields}
     values.update(role='seller', email='shop-'+secrets.token_hex(16)+'@shops.invalid',
-                  password='', shop_owner_id=owner_id, shop_name=name, shop_category=category,
+                  password='', shop_owner_id=owner_id, shop_name=name, shop_category=category, store_type=mode,
                   status='active', seller_status='approved', created_at=int(time.time()))
     columns = ','.join(values)
     placeholders = ','.join('?' for _ in values)

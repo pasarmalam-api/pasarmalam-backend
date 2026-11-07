@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ms">
-<head><script src="shop-category.js?v=cosmetics1"></script><script src="seller-session.js?v=shops-20261009"></script>
+<head><script src="shop-category.js?v=cosmetics1"></script><script src="seller-session.js?v=store-types1"></script>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Seller Registration</title><link rel="stylesheet" href="seller.css?v=role-switch2">
 <link rel="icon" type="image/jpeg" href="seller-logo.jpg"></head>
@@ -15,10 +15,10 @@ function required(id,message){if(!$(id).value.trim()){setText("applyStatus",mess
 let submittingSeller=false;
 async function applySeller(){if(submittingSeller)return;try{
   if(!required("sellerName","Owner name is required."))return;if(!required("sellerPhone","Phone number is required."))return;if(!required("sellerEmail","Email is required."))return;if(!sellerOtpToken){setText("applyStatus","Please verify seller email OTP first.");return}if($("sellerPassword").value.length<8){setText("applyStatus","Password must be at least 8 characters.");return}
-  for(const item of [["shopCategory","Choose your shop category."],["shopName","Shop name is required."],["identityType","Identity type is required."],["identityNumber","Identity number is required."],["sellerAddress","Seller address is required."],["bankName","Bank name is required."],["bankAccountName","Bank account holder name is required."],["bankAccountNumber","Bank account number is required."]]){if(!required(item[0],item[1]))return}
+  for(const item of [["storeType","Choose your store type."],["shopCategory","Choose your shop category."],["shopName","Shop name is required."],["identityType","Identity type is required."],["identityNumber","Identity number is required."],["sellerAddress","Seller address is required."],["bankName","Bank name is required."],["bankAccountName","Bank account holder name is required."],["bankAccountNumber","Bank account number is required."]]){if(!required(item[0],item[1]))return}
   submittingSeller=true;
   setText("applyStatus","Submitting seller application...");
-  await post("/api/auth/signup",{role:"seller",shop_category:$("shopCategory").value,name:$("sellerName").value.trim(),email:$("sellerEmail").value.trim(),password:$("sellerPassword").value,phone:$("sellerPhone").value.trim(),address:$("sellerAddress").value.trim(),shop_name:$("shopName").value.trim(),identity_type:$("identityType").value,identity_number:$("identityNumber").value.trim(),business_type:$("businessType").value,ssm_number:$("ssmNumber").value.trim(),bank_name:$("bankName").value.trim(),bank_account_name:$("bankAccountName").value.trim(),bank_account_number:$("bankAccountNumber").value.trim(),email_otp_token:sellerOtpToken});
+  await post("/api/auth/signup",{role:"seller",shop_category:$("shopCategory").value,store_type:$("storeType").value,name:$("sellerName").value.trim(),email:$("sellerEmail").value.trim(),password:$("sellerPassword").value,phone:$("sellerPhone").value.trim(),address:$("sellerAddress").value.trim(),shop_name:$("shopName").value.trim(),identity_type:$("identityType").value,identity_number:$("identityNumber").value.trim(),business_type:$("businessType").value,ssm_number:$("ssmNumber").value.trim(),bank_name:$("bankName").value.trim(),bank_account_name:$("bankAccountName").value.trim(),bank_account_number:$("bankAccountNumber").value.trim(),email_otp_token:sellerOtpToken});
   location.replace("thank-you.html");
 }catch(e){submittingSeller=false;setText("applyStatus",e.message)}}
-</script><script src="seller-actions.js?v=branches1"></script><script src="badges.js?v=20261001c"></script></body></html>
+</script><script src="seller-actions.js?v=store-types1"></script><script src="badges.js?v=20261001c"></script></body></html>

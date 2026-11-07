@@ -32,6 +32,7 @@
     return response;
   };
   function init(){
+    document.body.classList.toggle('seller-dashboard',page==='index.html');
     const active=signedIn();
     if(page==='register.html'&&localStorage.getItem('pm_token')&&user().role==='buyer'&&location.pathname.startsWith('/seller/')){
       location.replace('../buyer/become-seller.html');return;
@@ -52,7 +53,13 @@
         location.href=location.pathname.startsWith('/seller/')?'../buyer/index.html':'https://www.pasarmalamapp.com/buyer/login.html';
       }catch(error){alert(error.message);switchBuyer.disabled=false}
     };
-    (document.querySelector('header .top')||document.querySelector('main'))?.append(switchBuyer);
+    const account=document.createElement('details');account.className='pm-account-menu';
+    const summary=document.createElement('summary');summary.textContent='Account';
+    const accountItems=document.createElement('div');accountItems.className='pm-account-items';
+    account.append(summary,accountItems);accountItems.append(switchBuyer);
+    (document.querySelector('header .top')||document.querySelector('main'))?.append(account);
+    const sharedStyle=document.createElement('link');sharedStyle.rel='stylesheet';sharedStyle.href='../workspace-ui.css?v=store-types1';document.head.append(sharedStyle);
+    const storeTypes=document.createElement('script');storeTypes.src='../store-types.js?v=1';document.head.append(storeTypes);
     document.querySelectorAll('a[href],button[onclick]').forEach(el=>{
       const target=el.getAttribute('href')||el.getAttribute('onclick')||'';
       if(/(?:login|register)\.html/.test(target)&&active)el.hidden=true;
@@ -64,15 +71,15 @@
     }
     const nav=document.querySelector('aside nav');
     if(active&&nav){
-      const password=document.createElement('a');password.href='login.html';password.textContent='Change Password';nav.append(password);
+      const password=document.createElement('a');password.href='login.html';password.textContent='Change Password';accountItems.append(password);
       const logout=document.createElement('button');logout.className='soft';logout.type='button';logout.textContent='Sign Out';
-      logout.onclick=()=>{localStorage.removeItem('pm_token');localStorage.removeItem('pm_user');location.replace('login.html')};nav.append(logout);
+      logout.onclick=()=>{localStorage.removeItem('pm_token');localStorage.removeItem('pm_user');location.replace('login.html')};accountItems.append(logout);
     }
     if(!publicPages.has(page)&&!active)return;
     if(active&&document.querySelector('.app')){const script=document.createElement('script');script.src='shop-availability.js?v=1';document.head.append(script)}
     if(active&&document.querySelector('.app')){
       const css=document.createElement('link');css.rel='stylesheet';css.href='seller-shops.css?v=20261010';document.head.append(css);
-      const script=document.createElement('script');script.src='seller-shops.js?v=20261010';document.head.append(script);
+      const script=document.createElement('script');script.src='seller-shops.js?v=store-types1';document.head.append(script);
     }
     if(page!=='index.html'){
       const target=document.querySelector('header .top')||document.querySelector('main');

@@ -42,5 +42,5 @@ vm.runInContext(product.slice(product.indexOf('    function selectedQty'),produc
 purchase.buyNow();assert.match(purchase.location.href,/checkout.html\?product_id=1&quantity=1000&variant=Blue/);
 qty.value=999;purchase.location.href='unchanged';purchase.buyNow();assert.equal(purchase.location.href,'unchanged');assert.match(status.textContent,/1000 units/);
 assert.match(read('buyer/catalogue-search.js'), /selling_mode.*selling_mode/s);
-assert.match(read('seller/products.html'), /add-product.html\?selling_mode=factory/);
+assert.doesNotMatch(read('seller/products.html'), /Add Factory Direct Product/);
 console.log('Factory seller controls, buyer filtering, MOQ badges, Buy Now navigation and changed-script syntax passed');

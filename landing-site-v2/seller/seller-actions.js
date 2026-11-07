@@ -3,19 +3,6 @@
   const byId=id=>document.getElementById(id);
   const settingsLink=document.querySelector('nav a[href="settings.html"]');
   const productsLink=document.querySelector('nav a[href="products.html"]');
-  if(productsLink){
-    const factory=document.createElement('a');
-    factory.href='products.html?selling_mode=factory';factory.textContent='Factory Direct';
-    if(page==='products.html'&&new URLSearchParams(location.search).get('selling_mode')==='factory'){
-      productsLink.classList.remove('active');factory.className='active';
-    }
-    productsLink.after(factory);
-  }
-  if(page==='index.html'){
-    const factory=document.createElement('a');factory.className='soft';
-    factory.href='add-product.html?selling_mode=factory';factory.textContent='Add Factory Direct Product';
-    document.querySelector('.toolbar')?.append(factory);
-  }
   if(page==='products.html'){
     const filter=byId('sellingFilter'),requested=new URLSearchParams(location.search).get('selling_mode');
     if(['retail','bulk','factory'].includes(requested))filter.value=requested;
@@ -25,7 +12,7 @@
       history.replaceState(null,'',url);
       const factory=document.querySelector('nav a[href="products.html?selling_mode=factory"]');
       factory?.classList.toggle('active',filter.value==='factory');
-      productsLink?.classList.toggle('active',filter.value!=='factory');
+      productsLink?.classList.add('active');
     });
     const originalDraw=window.draw;
     window.draw=function(){

@@ -8,6 +8,10 @@
   const dialog=document.createElement('dialog');dialog.className='shop-dialog';dialog.setAttribute('aria-labelledby','newShopTitle');
   dialog.innerHTML='<form id="newShopForm"><h2 id="newShopTitle">Add Shop</h2><label for="newShopName">Shop name</label><input id="newShopName" required minlength="2" maxlength="100" autocomplete="off"><label for="newShopCategory">Category</label><select id="newShopCategory" required></select><p id="newShopFeedback" class="shop-feedback" role="status"></p><footer><button type="button" class="soft" id="cancelShop">Cancel</button><button type="submit" class="primary" id="saveShop">Create Shop</button></footer></form>';
   document.body.append(dialog);
+  const typeLabel=document.createElement('label');typeLabel.htmlFor='newShopType';typeLabel.textContent='Store type';
+  const typeSelect=document.createElement('select');typeSelect.id='newShopType';typeSelect.required=true;
+  typeSelect.replaceChildren(new Option('Choose store type',''),new Option('Retail','retail'),new Option('Bulk / Wholesale','bulk'),new Option('Factory Direct','factory'));
+  dialog.querySelector('label[for="newShopCategory"]').before(typeLabel,typeSelect);
   const el=id=>document.getElementById(id);let activeId=null,busy=false,loading=false;
   async function api(path,body){
     const response=await fetch(base+path,body?{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}:{cache:'no-store'});
@@ -26,7 +30,7 @@
       const data=await api('/api/seller/shops');activeId=data.active_shop_id;
       if(busy)return;
       const active=data.shops.find(shop=>String(shop.id)===String(activeId));
-      heading.textContent=active?.shop_name||'My Shop';
+      heading.textContent=(active?.shop_name||'My Shop')+(active?.store_type?' | '+({retail:'Retail',bulk:'Bulk / Wholesale',factory:'Factory Direct'}[active.store_type]||''):'');
       el('activeShop').replaceChildren(...data.shops.map(shop=>{
         const count=Math.max(0,Number(shop.unread_notifications)||0);
         const option=new Option((shop.shop_name||'My Shop')+(count?' ('+count+' unread)':''),shop.id);
@@ -56,7 +60,7 @@
     el('newShopFeedback').textContent='Creating shop...';
     let created=false;
     try{
-      const result=await api('/api/seller/shops',{shop_name:el('newShopName').value.trim(),shop_category:el('newShopCategory').value});
+      const result=await api('/api/seller/shops',{shop_name:el('newShopName').value.trim(),shop_category:el('newShopCategory').value,store_type:el('newShopType').value});
       created=true;await switchShop(result.created_shop_id);
     }catch(error){
       if(created){busy=false;dialog.close();await load();el('shopFeedback').textContent='Shop created. Select it from My Shops to continue.';}

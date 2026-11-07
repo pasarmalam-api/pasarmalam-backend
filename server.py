@@ -1042,6 +1042,7 @@ def migrate_users(con):
         "delivery_location": "TEXT DEFAULT ''",
         "shop_open": "INTEGER DEFAULT 1",
         "shop_category": "TEXT DEFAULT ''",
+        "store_type": "TEXT NOT NULL DEFAULT ''",
         "status": "TEXT DEFAULT 'active'",
         "seller_status": "TEXT DEFAULT 'pending'",
         "identity_type": "TEXT DEFAULT ''",
@@ -1843,7 +1844,7 @@ class Handler(BaseHTTPRequestHandler):
     def seller_profile(self):
         user = self.require_user("seller")
         fields = ("id", "role", "name", "email", "phone", "address", "shop_name",
-                  "shop_category", "identity_type", "identity_number", "bank_name",
+                  "shop_category", "store_type", "identity_type", "identity_number", "bank_name",
                   "bank_account_name", "bank_account_number", "business_type",
                   "ssm_number", "ssm_document_url", "business_verification_status")
         with connect() as con:
@@ -1939,6 +1940,16 @@ class Handler(BaseHTTPRequestHandler):
         user = self.current_user()
         if not user or user["role"] not in ("seller", "admin"):
             raise PermissionError("Seller or admin login is required to create products")
+        if user['role'] == 'seller':
+            with connect() as con:
+                shop_type = con.execute('SELECT store_type FROM users WHERE id=?', (user['id'],)).fetchone()['store_type']
+            if shop_type:
+                raw_minimum = float(data.get('minimum_order') or 1)
+                if not math.isfinite(raw_minimum) or not raw_minimum.is_integer() or isinstance(data.get('minimum_order'), bool):
+                    raise ValueError('Minimum order must be a whole number')
+                data = {**data, 'selling_mode': shop_type,
+                        'minimum_order': max({'retail': 1, 'bulk': 10, 'factory': 500}[shop_type],
+                                             int(raw_minimum))}
         required = ["name", "shop", "category", "price", "stock", "condition", "price_mode", "weight_kg"]
         for key in required:
             if key not in data:
@@ -2176,6 +2187,7 @@ class Handler(BaseHTTPRequestHandler):
             if not verify_email_otp_token(data["email"], email_otp_token, f"{role}_signup"):
                 raise PermissionError("Email OTP verification required")
         if role == "seller":
+            seller_shops.store_type(data.get('store_type', 'retail'))
             if data.get("shop_category") not in SHOP_CATEGORIES:
                 raise ValueError("Choose a valid shop category")
             seller_required = {
@@ -2224,7 +2236,7 @@ class Handler(BaseHTTPRequestHandler):
                 ),
             )
             if role == "seller":
-                con.execute("UPDATE users SET shop_category=? WHERE id=?", (data['shop_category'], cur.lastrowid))
+                con.execute("UPDATE users SET shop_category=?,store_type=? WHERE id=?", (data['shop_category'], data.get('store_type', 'retail'), cur.lastrowid))
                 queue_seller_emails(con, cur.lastrowid, data)
         user = {"id": cur.lastrowid, "role": role, "name": data["name"], "phone": data.get("phone", ""), "email": data["email"], "address": data.get("address", ""), "shop_name": data.get("shop_name", ""), "status": "active", "seller_status": seller_status}
         user['shop_category'] = data['shop_category'] if role == 'seller' else ''
@@ -2379,6 +2391,7 @@ class Handler(BaseHTTPRequestHandler):
     def seller_onboarding(self, data=None):
         user = self.require_user('buyer')
         fields = ('name', 'email', 'phone', 'address', 'shop_name', 'shop_category',
+                  'store_type',
                   'identity_type', 'identity_number', 'business_type', 'ssm_number',
                   'bank_name', 'bank_account_name', 'bank_account_number')
         with connect() as con:
@@ -2394,6 +2407,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError('Complete all required seller profile fields')
                 if values['shop_category'] not in SHOP_CATEGORIES:
                     raise ValueError('Choose a valid shop category')
+                seller_shops.store_type(values['store_type'])
                 if values['identity_type'] not in ('MyKad', 'Passport', 'Business Owner ID'):
                     raise ValueError('Choose MyKad or Passport')
                 keys = [key for key in fields if key != 'email']
@@ -2417,7 +2431,9 @@ class Handler(BaseHTTPRequestHandler):
             from buyer_address import registration_address
             data = {**data, 'address': registration_address(data)}
         allowed = {"name", "phone", "address", "shop_name"}
-        seller_allowed = {"identity_type", "identity_number", "business_type", "ssm_number", "ssm_document_url", "bank_name", "bank_account_name", "bank_account_number"}
+        seller_allowed = {"identity_type", "identity_number", "business_type", "ssm_number", "ssm_document_url", "bank_name", "bank_account_name", "bank_account_number", "store_type"}
+        if 'store_type' in data:
+            seller_shops.store_type(data['store_type'])
         if user["role"] == "seller":
             allowed |= seller_allowed
         updates = {key: str(data[key]) for key in allowed if key in data}

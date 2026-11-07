@@ -21,6 +21,7 @@
     location.href='login.html?next='+encodeURIComponent(current+location.search);
   },true);
   function init(){
+    const style=document.createElement('link');style.rel='stylesheet';style.href='../workspace-ui.css?v=store-types1';document.head.append(style);
     const page=location.pathname.split('/').pop()||'index.html';
     if(['login.html','signup.html'].includes(page)){
       const next=encodeURIComponent(destination());
@@ -52,6 +53,11 @@
       const action=document.createElement(signedIn?'button':'a');action.textContent=labels[signedIn?3:1];
       if(signedIn){action.type='button';action.onclick=window.pmSignOut;}else action.href='signup.html?next='+encodeURIComponent(target);
       account.append(action);
+      const menu=document.createElement('details');menu.className='pm-account-menu';
+      const summary=document.createElement('summary');summary.textContent=lang==='ms'?'Akaun':lang==='zh'?'\u8d26\u6237':'Account';
+      const items=document.createElement('div');items.className='pm-account-items';items.append(link,action);
+      const seller=document.createElement('a');seller.href='become-seller.html';seller.textContent=lang==='ms'?'Pusat Penjual':lang==='zh'?'\u5356\u5bb6\u4e2d\u5fc3':'Seller Centre';items.append(seller);
+      menu.append(summary,items);account.replaceChildren(menu);
       const me=nav.querySelector('a[href="profile.html"],a[data-account-nav]');
       if(me){me.dataset.accountNav='true';me.href=signedIn?'profile.html':'login.html?next=profile.html';me.textContent=signedIn?'Me':labels[0];}
     }
@@ -72,9 +78,10 @@
     const cartLink=document.createElement('a');cartLink.href='cart.html';cartLink.className='buyer-cart-link';cartLink.textContent='Cart';
     if(page==='cart.html')cartLink.setAttribute('aria-current','page');
     if(document.body.classList.contains('buyer-home')){
+      document.getElementById('langToggle')?.parentElement?.prepend(account);
       document.querySelector('#search')?.setAttribute('placeholder','Search products');
-      const seller=document.createElement('a');seller.href='become-seller.html';seller.className='buyer-seller-link';seller.textContent='Switch to Seller';
-      document.querySelector('header .brand')?.appendChild(seller);
+      const filter=document.getElementById('sellingFilter');
+      filter?.closest('.head')?.classList.add('shop-mode-toolbar');
       return;
     }
     const bar=document.querySelector('header .bar');
