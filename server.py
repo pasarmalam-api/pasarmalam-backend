@@ -3,6 +3,7 @@ from urllib.parse import urlparse, parse_qs
 import base64
 from lalamove import Client as LalamoveClient, LalamoveError
 import delivery
+import cod_policy
 import branches
 import seller_shops
 import seller_ai
@@ -1807,6 +1808,9 @@ class Handler(BaseHTTPRequestHandler):
         with connect() as con:
             product, qty, _, _, _ = self.validate_checkout_payload(con, {**data, "payment_method": "quotation"}, user)
             quote = delivery.create_quote(con, user, product, qty, data)
+            if data.get('logistics_method') == 'PM Express':
+                quote['cod'] = cod_policy.eligibility(con, user, product, data,
+                    float(product['price']) * qty + float(quote['fee']))
         send_json(self, 200, quote)
 
     def attach_delivery(self, con, order_id, details):
@@ -2936,14 +2940,20 @@ class Handler(BaseHTTPRequestHandler):
         buyer_id = user["id"]
         buyer_name = user["name"]
         with connect() as con:
-            if transfer and not USE_POSTGRES:
+            if (transfer or arrival) and not USE_POSTGRES:
                 con.execute('BEGIN IMMEDIATE')
+            if arrival and USE_POSTGRES:
+                con.execute('SELECT id FROM users WHERE id=? FOR UPDATE', (buyer_id,)).fetchone()
             product, qty, address, payment_method, buyer_phone = self.validate_checkout_payload(con, data, user)
             if transfer and product['selling_mode'] not in ('bulk', 'factory'):
                 raise ValueError('Bank transfer is available for bulk listings and Factory Direct only')
             if product['selling_mode'] in ('bulk', 'factory') and not transfer:
                 raise ValueError('All bulk orders and Factory Direct orders require direct bank transfer to TANITOOLUWA VENTURES at Public Bank')
             fee, delivery_details = delivery.consume(con, user, product, qty, data)
+            if arrival:
+                cod = cod_policy.eligibility(con, user, product, data, float(product['price']) * qty + fee)
+                if not cod['eligible']:
+                    raise ValueError(cod['reason'])
             subtotal = float(product["price"]) * qty
             discount, voucher_code = campaign_discount(con, product["seller_id"], data.get("voucher_code", ""), subtotal)
             if voucher_code and str(data.get("voucher_code", "")).strip() and str(voucher_code).lower() != str(data.get("voucher_code", "")).strip().lower():

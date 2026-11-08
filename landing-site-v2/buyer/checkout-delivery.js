@@ -7,7 +7,7 @@
   payment.replaceChildren(
     new Option(t('Perbankan dalam talian (Billplz FPX)', 'Online banking (Billplz FPX)'), 'Billplz'),
     new Option(t('Tunai semasa ambil sendiri', 'Cash on self pickup'), 'Cash Pickup'),
-    new Option(t('Bayar semasa tiba (PM Express)', 'Pay on Arrival (PM Express)'), 'Pay on Arrival')
+    new Option(t('Bayar semasa tiba - COD (PM Express)', 'Cash on Delivery - COD (PM Express)'), 'Pay on Arrival')
   );
   payment.value = 'Billplz';
   shipping.replaceChildren(...[
@@ -110,12 +110,37 @@
     cash.hidden = bulk || !isPickup();
     if (cash.disabled && payment.value === 'Cash Pickup') payment.value = 'Billplz';
     const arrival = payment.querySelector('option[value="Pay on Arrival"]');
-    arrival.disabled = arrival.hidden = bulk || shipping.value !== 'PM Express';
+    arrival.hidden = bulk || shipping.value !== 'PM Express';
+    arrival.disabled = true;
+    updateCod();
     if (arrival.disabled && payment.value === 'Pay on Arrival') payment.value = 'Billplz';
     queued = !isPickup();
     status(''); renderSummary();
     clearTimeout(refreshTimer);
     if (!isPickup()) refreshTimer = setTimeout(() => window.pmLoadDelivery?.(), 600);
+  }
+  function updateCod() {
+    const arrival = payment.querySelector('option[value="Pay on Arrival"]');
+    if (!arrival) return;
+    const retail = !['bulk', 'factory'].includes(checkoutProduct?.selling_mode);
+    const visible = retail && shipping.value === 'PM Express';
+    arrival.hidden = !visible;
+    arrival.disabled = !visible || !valid() || quote?.cod?.eligible !== true;
+    if (arrival.disabled && payment.value === 'Pay on Arrival') {
+      payment.value = 'Billplz';
+      payment.dispatchEvent(new Event('change'));
+    }
+    let note = get('codEligibility');
+    if (!note) {
+      note = document.createElement('p');
+      note.id = 'codEligibility';
+      note.className = 'muted';
+      note.setAttribute('role', 'status');
+      payment.closest('label').append(note);
+    }
+    note.hidden = !visible;
+    note.textContent = valid() && quote?.cod?.reason
+      ? quote.cod.reason : t('Dapatkan sebut harga untuk menyemak kelayakan COD.', 'Confirm delivery details to check COD eligibility.');
   }
   function vehicles() {
     const services = cities.find(c => c.locode === get('deliveryCity').value)?.services || [];
@@ -206,6 +231,7 @@
         renderSummary(); return;
       }
       quote = response;
+      updateCod();
       get('result').textContent = '';
       status(money(quote.fee));
       renderSummary();
@@ -219,6 +245,7 @@
     if (!valid()) throw new Error(get('deliveryStatus').textContent||window.pmDeliveryPendingLabel());
     if (!isPickup() && get('payment').value === 'Cash Pickup') throw new Error('Cash is for self pickup only.');
     if (shipping.value !== 'PM Express' && payment.value === 'Pay on Arrival') throw new Error('Pay on Arrival is for PM Express only.');
+    if (payment.value === 'Pay on Arrival' && quote?.cod?.eligible !== true) throw new Error('This order is not eligible for COD. Choose online payment.');
   };
   api = async function(path, options = {}) {
     if (['/api/checkout','/api/payments/billplz/create','/api/payments/toyyibpay/create'].includes(path)) {

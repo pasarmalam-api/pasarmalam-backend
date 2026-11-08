@@ -1,0 +1,31 @@
+PM EXPRESS COD PILOT
+
+COD remains disabled unless PM_COD_ENABLED=true and all configuration below is
+valid. No production settings were changed by this implementation.
+
+Render backend environment variables:
+PM_COD_MAX_TOTAL: approved maximum in MYR, including delivery, before vouchers.
+PM_COD_AREAS: JSON list of [south_lat, west_lng, north_lat, east_lng] boxes.
+PM_COD_VERIFIED_BUYERS: JSON object mapping buyer IDs to manually verified
+Malaysian phone numbers in international format. Do not commit real customer
+phone numbers to Git. Verify the account holder and delivery phone before
+adding approval; changing either phone invalidates approval.
+
+Example format ONLY, not approved production limits or service areas:
+PM_COD_MAX_TOTAL=100
+PM_COD_AREAS=[[2.90,101.60,3.00,101.70]]
+PM_COD_VERIFIED_BUYERS={"123":"601112345678"}
+
+Rules enforced again on the server when placing the order:
+- Retail only, delivered by PM Express; bulk/factory remain Public Bank only.
+- Valid server-priced delivery quotation and confirmed recipient coordinates.
+- Both saved account phone and checkout phone match manual verification.
+- At least one paid completed/delivered order; new customers prepay first.
+- No previous unpaid COD order, including cancelled COD. Support must review
+  exceptions; never mark an unpaid order paid just to restore eligibility.
+- No parallel unpaid COD orders: buyer-level transaction locking.
+- Remains unpaid until the existing admin cash-collection confirmation flow.
+
+Before enabling, confirm the real cap and service boundaries, approve test
+buyers, and test eligible/ineligible checkout with PM riders. A browser-visible
+eligibility result never overrides the server's final check.
