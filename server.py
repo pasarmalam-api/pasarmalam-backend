@@ -39,7 +39,7 @@ def production_app_url(env_key, fallback):
     return value
 
 
-ADMIN_APP_URL = production_app_url("ADMIN_APP_URL", "https://www.pasarmalamapp.com/admin")
+ADMIN_APP_URL = os.environ.get("ADMIN_APP_URL", "https://bronze-kally-50.tiiny.site").strip().rstrip("/")
 ADMIN_RESET_EMAIL = os.environ.get("ADMIN_RESET_EMAIL", "pasahmalla@gmail.com")
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "")
 RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "PasarMalam <otp@mail.pasarmalamapp.com>")
@@ -2504,21 +2504,25 @@ class Handler(BaseHTTPRequestHandler):
         send_json(self, 200, {"ok": True})
 
     def send_admin_reset_email(self, data):
-        email = data.get("email", "admin@pasarmalam.my")
+        email = str(data.get("email") or "").strip().lower()
+        if not email or "@" not in email:
+            raise ValueError("Enter your registered admin email")
         if not RESEND_API_KEY:
             raise PermissionError("Email reset is not enabled. Set RESEND_API_KEY in Render.")
+        message = "If this email belongs to an admin account, a reset link has been sent. Check your inbox and spam folder."
         with connect() as con:
-            row = con.execute("SELECT id, role FROM users WHERE email = ?", (email,)).fetchone()
+            row = con.execute("SELECT id, role, email FROM users WHERE LOWER(email) = ?", (email,)).fetchone()
             if not row or row["role"] != "admin":
-                raise PermissionError("Admin account not found")
+                return send_json(self, 200, {"ok": True, "message": message})
+        email = row["email"]
         token = make_admin_reset_token(email)
         reset_url = f"{ADMIN_APP_URL.rstrip('/')}/reset-admin.html?token={urllib.parse.quote(token)}&email={urllib.parse.quote(email)}"
         send_email(
-            ADMIN_RESET_EMAIL,
+            email,
             "PasarMalam admin password reset",
             f"<p>Use this link to reset the PasarMalam admin password:</p><p><a href=\"{reset_url}\">{reset_url}</a></p><p>This link expires in 1 hour.</p>",
         )
-        send_json(self, 200, {"ok": True, "message": f"Reset link sent to {ADMIN_RESET_EMAIL}"})
+        send_json(self, 200, {"ok": True, "message": message})
 
     def get_cart(self, query):
         user = self.current_user()
