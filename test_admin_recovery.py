@@ -7,6 +7,16 @@ from unittest.mock import Mock
 
 
 class AdminRecoveryTests(unittest.TestCase):
+    def test_existing_admin_is_not_recreated_or_modified(self):
+        tree = ast.parse(pathlib.Path(__file__).with_name('server.py').read_text(encoding='utf-8'))
+        method = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'ensure_admin')
+        namespace = {}
+        exec(compile(ast.Module(body=[method], type_ignores=[]), '<ensure-admin>', 'exec'), namespace)
+        con = Mock()
+        con.execute.return_value.fetchone.return_value = {'id': 42}
+        namespace['ensure_admin'](con)
+        con.execute.assert_called_once_with("SELECT id FROM users WHERE role = 'admin' LIMIT 1")
+
     def setup_handler(self, row):
         tree = ast.parse(pathlib.Path(__file__).with_name('server.py').read_text(encoding='utf-8'))
         handler = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'Handler')

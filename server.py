@@ -1140,6 +1140,9 @@ def seed(con):
 
 
 def ensure_admin(con):
+    # Preserve existing admin identities, including a changed login email.
+    if con.execute("SELECT id FROM users WHERE role = 'admin' LIMIT 1").fetchone():
+        return
     row = con.execute("SELECT id FROM users WHERE email = ?", ("admin@pasarmalam.my",)).fetchone()
     if row:
         con.execute("UPDATE users SET role = 'admin', status = 'active', seller_status = 'not_applicable' WHERE email = ?", ("admin@pasarmalam.my",))
