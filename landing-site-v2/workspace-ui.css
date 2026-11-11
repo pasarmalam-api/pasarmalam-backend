@@ -1,20 +1,21 @@
-.pm-account-menu{position:relative;display:inline-block;flex:0 0 auto;text-align:left;font:600 14px Arial,sans-serif;letter-spacing:0}
-.pm-account-menu summary{cursor:pointer;list-style:none;border:1px solid #b7c7c5;border-radius:5px;padding:9px 12px;background:#fff;color:#174d49;white-space:nowrap}
-.pm-account-menu summary::after{content:'\25BE';margin-left:8px;font-size:11px}
-.pm-account-menu summary::-webkit-details-marker{display:none}
-.pm-account-items{position:absolute;right:0;top:calc(100% + 7px);min-width:190px;max-width:calc(100vw - 24px);padding:6px;background:#fff;border:1px solid #cbd5d3;border-radius:6px;box-shadow:0 5px 18px #162d2920;z-index:1000}
-.pm-account-items a,.pm-account-items button{display:block!important;width:100%!important;text-align:left!important;box-sizing:border-box;text-decoration:none;padding:11px!important;border:0!important;border-radius:3px!important;background:#fff!important;color:#203b37!important;font:600 14px Arial,sans-serif!important;min-height:40px}
+.pm-account-menu{display:block;flex:0 1 auto;min-width:0;max-width:100%;max-height:none;overflow:visible;padding:0;text-align:left;font:700 14px Arial,sans-serif;letter-spacing:0}
+.pm-account-items{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px;max-width:100%}
+.pm-account-items a,.pm-account-items button{display:inline-flex!important;align-items:center;justify-content:center;width:auto!important;max-width:100%;text-align:center!important;box-sizing:border-box;text-decoration:none;padding:8px 10px!important;border:1px solid #c3d5d1!important;border-radius:6px!important;background:#fff!important;color:#174d49!important;font:700 13px Arial,sans-serif!important;line-height:1.35!important;min-height:44px;white-space:normal!important;overflow-wrap:anywhere;box-shadow:0 1px 2px #153c3210}
+.buyer-account-bar .pm-account-items>a:first-child{background:#087f72!important;color:#fff!important;border-color:#087f72!important}
 .pm-account-items a:hover,.pm-account-items button:hover{background:#edf5f3!important}
 .pm-account-menu :focus-visible{outline:2px solid #00796b;outline-offset:2px}
 .store-type-settings{padding:18px 0;border-bottom:1px solid #cbd5d3;margin-bottom:16px}
 .store-type-settings select{max-width:360px;display:block}
-.buyer-account-bar{position:absolute;right:14px;top:10px;z-index:25;justify-content:flex-end!important;padding:0!important;background:transparent!important;min-height:0!important;border:0!important}
+.buyer-account-bar{position:static!important;flex:0 1 auto;width:auto;box-sizing:border-box;justify-content:flex-end!important;padding:0!important;background:transparent!important;min-height:0!important;border:0!important;margin:0 0 0 auto!important}
+.buyer-home .bar>.buyer-account-bar{grid-column:3;grid-row:1}
+.buyer-home .bar>.buyer-search-area{grid-column:2;grid-row:1;min-width:0}
+.buyer-home .bar>div:last-of-type{grid-column:3;grid-row:2;display:flex!important;flex-wrap:wrap;justify-content:flex-end}
 .buyer-account-bar .account-home{display:none!important}
 body:not(.buyer-home) .buyer-account-bar{position:static;padding:6px 14px!important}
 .buyer-home .brand .buyer-seller-link{display:none!important}
 body .pm-seller-switch{display:none!important}
 .buyer-home header .bar{padding-top:6px!important}
-.buyer-home header .brand{padding-right:104px;min-height:44px}
+.buyer-home header .brand{padding-right:0;min-height:44px}
 .buyer-home #ordersButton{display:none!important}
 .buyer-home .bar>div:last-child{gap:8px}
 .buyer-home .shop-mode-toolbar{border-bottom:1px solid #d1dcda;padding:10px 12px!important;gap:10px;justify-content:flex-end}
@@ -22,11 +23,13 @@ body .pm-seller-switch{display:none!important}
 .buyer-home .shop-mode-toolbar select{width:auto;min-width:160px;border:1px solid #b7c7c5;border-radius:5px;background:#fff;padding:8px;font:600 13px Arial,sans-serif}
 .buyer-home .shop-mode-toolbar>a{display:none!important}
 .app header .top{align-items:center;gap:12px}
-.app header .top>.pm-account-menu{margin-left:auto}
+.app header .top>.pm-account-menu{margin:0 0 0 auto!important;padding:0!important;max-height:none;overflow:visible}
 .app header .toolbar{gap:8px}
 .app header .toolbar button{min-height:38px}
 .seller-dashboard main>.hero,.seller-dashboard main>.seller-download-strip{display:none!important}
 .seller-dashboard .active-shop-name{font-size:20px;line-height:1.4;overflow-wrap:anywhere}
 .seller-dashboard header .toolbar button[onclick*="business-verification"],.seller-dashboard header .toolbar button[onclick*="ai-assistant"]{display:none!important}
-@media(min-width:951px){.buyer-home .buyer-account-bar{position:static!important}.buyer-home header .brand{padding-right:0}.buyer-home .bar>div:last-child{display:flex;flex-wrap:wrap;justify-content:flex-end;max-width:320px}}
+@media(min-width:951px){.buyer-home header .brand{padding-right:0}.buyer-home .bar>div:last-child{display:flex;flex-wrap:wrap;justify-content:flex-end;max-width:420px}}
 @media(max-width:700px){.app header .top{display:flex!important;flex-wrap:wrap!important}.app header .top>div:first-child{flex:1 1 60%;min-width:0}.app header .toolbar{display:flex!important;flex-wrap:wrap!important;width:100%!important;order:2}.app header .toolbar>button{flex:1}.app header .top>.pm-account-menu{order:1}.app header .toolbar>#switchToBuyer{display:none!important}.buyer-home .shop-mode-toolbar{justify-content:space-between}.buyer-home .shop-mode-toolbar label{width:100%;justify-content:space-between}.buyer-home .shop-mode-toolbar select{flex:1;max-width:220px}}
+@media(max-width:950px){.buyer-home header .bar{grid-template-columns:minmax(44px,1fr) auto!important}.buyer-home .bar>.brand{grid-column:1;grid-row:1}.buyer-home .bar>.buyer-account-bar{grid-column:2;grid-row:1}.buyer-home .bar>.buyer-search-area{grid-column:1/-1;grid-row:2}.buyer-home .bar>div:last-of-type{grid-column:1/-1;grid-row:3}}
+@media(max-width:700px){.buyer-home header .bar{grid-template-columns:44px minmax(0,1fr)!important;gap:6px!important}.buyer-home header .brand h1{display:none}.buyer-home .pm-account-items{gap:5px}.buyer-home .pm-account-items a,.buyer-home .pm-account-items button{padding:7px 8px!important;font-size:12px!important}.app header .top>.pm-account-menu{flex:1 0 100%;width:100%;margin-left:auto;order:-1}.app header .top>.pm-account-menu .pm-account-items{justify-content:flex-end}}

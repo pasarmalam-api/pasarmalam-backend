@@ -11,6 +11,7 @@
     return data;
   }
   async function load() {
+    if(!/^[1-9]\d*$/.test(id||'')){get('status').textContent='Open an order from your order list.';get('refresh').disabled=true;return;}
     if (!localStorage.getItem('pm_token')) {
       location.href = 'login.html?next=' + encodeURIComponent('bank-transfer.html?id=' + id);
       return;

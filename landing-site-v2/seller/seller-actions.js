@@ -1,4 +1,5 @@
 (function(){
+  if(window.PM_SELLER_AUTH_REQUIRED)return;
   const page=location.pathname.split('/').pop();
   const byId=id=>document.getElementById(id);
   const settingsLink=document.querySelector('nav a[href="settings.html"]');

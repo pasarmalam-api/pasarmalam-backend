@@ -17,7 +17,7 @@
     .trust{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.trust div{border:1px solid var(--line);border-radius:6px;background:#fafafa;padding:10px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
     .muted{color:var(--muted);font-size:13px}.stars{color:var(--gold);font-weight:900}.error{color:#be123c;font-weight:900}@media(max-width:760px){main{padding-bottom:150px}.grid,.trust{grid-template-columns:1fr}.bar{flex-wrap:wrap}.panel{margin-left:8px!important;margin-right:8px!important}.primary,.soft,.cart{min-height:42px;font-size:13px;white-space:normal}}
   </style>
-<script src="shop-status.js?v=1"></script><link rel="stylesheet" href="catalogue.css?v=3"><link rel="icon" type="image/png" href="pasarmalam-logo.png"><link rel="stylesheet" href="buyer-ui.css?v=20261009-auth"></head>
+<script src="shop-status.js?v=1"></script><link rel="stylesheet" href="catalogue.css?v=3"><link rel="icon" type="image/png" href="pasarmalam-logo.png"><link rel="stylesheet" href="buyer-ui.css?v=20261009-auth"><script src="page-context.js?v=audit1"></script></head>
 <body class="buyer-page buyer-product">
   <header>
     <div class="bar">
@@ -31,7 +31,7 @@
   </main>
   <script>
     const API_BASE="https://pasarmalam-backend.onrender.com";
-    const id=new URLSearchParams(location.search).get("id")||1;
+    const id=new URLSearchParams(location.search).get("id");
     let currentProduct=null;
     const money=v=>`RM${Number(v||0).toFixed(2)}`;
     async function api(p,o={}){
@@ -72,7 +72,7 @@
       if(!validateQty())return;
       location.href=`checkout.html?product_id=${currentProduct.id}&quantity=${selectedQty()}&variant=${encodeURIComponent(variant.value||"")}`;
     }
-    async function load(){
+    async function load(){if(!PMPageContext.require(id,'detail','product'))return;
       const products=(await api("/api/products")).products;
       const p=products.find(x=>String(x.id)===String(id));
       if(!p)throw new Error('Product not found. Please return to the catalogue.');
@@ -97,7 +97,7 @@
     }
     load().catch(e=>detail.innerHTML=`<p class="error">${e.message}</p>`);
   </script>
-<script src="badges.js?v=20261002"></script><script src="buyer-ui.js?v=store-types1"></script></body>
+<script src="badges.js?v=page-audit20261111"></script><script src="buyer-ui.js?v=page-audit20261111"></script></body>
 </html>
 
 

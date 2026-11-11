@@ -1,0 +1,32 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const read = p => fs.readFileSync('landing-site-v2/' + p, 'utf8');
+for (const file of ['buyer/buyer-ui.js', 'seller/seller-session.js']) {
+  const source = read(file);
+  new vm.Script(source, {filename: file});
+  assert.doesNotMatch(source, /createElement\('details'\)|createElement\('summary'\)/);
+  assert.match(source, /workspace-ui\.css\?v=account-actions2/);
+}
+const buyer = read('buyer/buyer-ui.js');
+assert.match(buyer, /items\.append\(link,action\)/);
+assert.match(buyer, /items\.append\(seller\)/);
+assert.match(buyer, /action\.onclick=window\.pmSignOut/);
+assert.match(buyer, /signup\.html\?next=/);
+assert.match(buyer, /\['login.html','signup.html','become-seller.html'\]\.includes\(page\)/);
+assert.match(buyer, /account-pages\.css\?v=1/);
+const pages = read('buyer/account-pages.css');
+assert.match(pages, /\.buyer-account-page input\[readonly\]/);
+assert.match(pages, /\.buyer-account-page #signIn/);
+assert.match(pages, /\.buyer-account-page \.field\{display:grid!important/);
+const seller = read('seller/seller-session.js');
+assert.match(seller, /accountItems\.append\(switchBuyer\)/);
+assert.match(seller, /accountItems\.append\(password\)/);
+assert.match(seller, /accountItems\.append\(logout\)/);
+const css = read('workspace-ui.css');
+assert.match(css, /\.pm-account-menu\{display:block/);
+assert.match(css, /\.pm-account-items\{display:flex;flex-wrap:wrap/);
+assert.doesNotMatch(css, /\.pm-account-items\{position:absolute/);
+assert.match(css, /\.buyer-home \.bar>\.buyer-account-bar\{grid-column:3;grid-row:1\}/);
+assert.match(css, /\.buyer-home \.bar>\.buyer-account-bar\{grid-column:2;grid-row:1\}/);
+console.log('PASS: account actions are non-collapsible, wrap in-flow, retain auth links and sign-out handlers.');

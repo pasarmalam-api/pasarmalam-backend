@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ms">
-<head><script src="shop-category.js?v=cosmetics1"></script><script src="seller-session.js?v=store-types1"></script>
+<head><script src="shop-category.js?v=cosmetics1"></script><script src="seller-session.js?v=page-audit20261111"></script>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Seller Registration</title><link rel="stylesheet" href="seller.css?v=role-switch2">
 <link rel="icon" type="image/jpeg" href="seller-logo.jpg"></head>
@@ -21,4 +21,4 @@ async function applySeller(){if(submittingSeller)return;try{
   await post("/api/auth/signup",{role:"seller",shop_category:$("shopCategory").value,store_type:$("storeType").value,name:$("sellerName").value.trim(),email:$("sellerEmail").value.trim(),password:$("sellerPassword").value,phone:$("sellerPhone").value.trim(),address:$("sellerAddress").value.trim(),shop_name:$("shopName").value.trim(),identity_type:$("identityType").value,identity_number:$("identityNumber").value.trim(),business_type:$("businessType").value,ssm_number:$("ssmNumber").value.trim(),bank_name:$("bankName").value.trim(),bank_account_name:$("bankAccountName").value.trim(),bank_account_number:$("bankAccountNumber").value.trim(),email_otp_token:sellerOtpToken});
   location.replace("thank-you.html");
 }catch(e){submittingSeller=false;setText("applyStatus",e.message)}}
-</script><script src="seller-actions.js?v=store-types1"></script><script src="badges.js?v=20261001c"></script></body></html>
+</script><script src="seller-actions.js?v=page-audit20261111"></script><script src="../seller-entry-language.js?v=1"></script><script src="badges.js?v=page-audit20261111"></script></body></html>

@@ -13,7 +13,7 @@
     });
     const result = await response.json();
     if (!response.ok) {
-      if (response.status === 401 || result.error === 'Login required') document.getElementById('signIn').hidden = false;
+      if (response.status === 401 || result.error === 'Login required') showEntry();
       throw new Error(result.error || 'Unable to load your account. Please retry.');
     }
     return result;
@@ -22,7 +22,19 @@
     localStorage.setItem('pm_token', data.token);
     localStorage.setItem('pm_user', JSON.stringify(data.user));
   }
+  function showEntry() {
+    form.hidden = true;
+    document.getElementById('heading').textContent = 'Seller Centre';
+    document.getElementById('registerSeller').hidden = false;
+    document.getElementById('sellerLogin').hidden = false;
+    const signIn = document.getElementById('signIn');
+    signIn.href = 'login.html?next=become-seller.html';
+    signIn.textContent = 'Continue with Buyer Account';
+    signIn.hidden = false;
+    status.textContent = 'Register a new seller account, or continue with your existing buyer account.';
+  }
   async function render(data) {
+    document.querySelectorAll('.seller-entry-actions a').forEach(link => { link.hidden = true; });
     if (data.seller_status === 'approved') {
       const session = await request('/api/auth/switch-role', {role:'seller'});
       if (!session.token) throw new Error('Seller access changed. Please refresh.');
@@ -53,7 +65,7 @@
   }
   async function load() {
     retry.hidden = true;
-    if (!localStorage.getItem('pm_token')) {status.textContent = 'Sign in to continue with your existing account.'; document.getElementById('signIn').hidden = false; return;}
+    if (!localStorage.getItem('pm_token')) {showEntry(); return;}
     try {
       const user = JSON.parse(localStorage.getItem('pm_user') || '{}');
       if (user.role === 'seller') saveSession(await request('/api/auth/switch-role', {role:'buyer'}));

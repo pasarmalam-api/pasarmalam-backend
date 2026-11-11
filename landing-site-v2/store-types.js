@@ -1,4 +1,5 @@
 (() => {
+  if(window.PM_SELLER_AUTH_REQUIRED)return;
   if(window.PMStoreTypesInitialized)return;
   window.PMStoreTypesInitialized=true;
   const types=[['retail','Retail'],['bulk','Bulk / Wholesale'],['factory','Factory Direct']];

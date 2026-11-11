@@ -53,13 +53,12 @@
         location.href=location.pathname.startsWith('/seller/')?'../buyer/index.html':'https://www.pasarmalamapp.com/buyer/login.html';
       }catch(error){alert(error.message);switchBuyer.disabled=false}
     };
-    const account=document.createElement('details');account.className='pm-account-menu';
-    const summary=document.createElement('summary');summary.textContent='Account';
+    const account=document.createElement('nav');account.className='pm-account-menu';account.setAttribute('aria-label','Account actions');
     const accountItems=document.createElement('div');accountItems.className='pm-account-items';
-    account.append(summary,accountItems);accountItems.append(switchBuyer);
+    account.append(accountItems);accountItems.append(switchBuyer);
     (document.querySelector('header .top')||document.querySelector('main'))?.append(account);
-    const sharedStyle=document.createElement('link');sharedStyle.rel='stylesheet';sharedStyle.href='../workspace-ui.css?v=store-types1';document.head.append(sharedStyle);
-    const storeTypes=document.createElement('script');storeTypes.src='../store-types.js?v=1';document.head.append(storeTypes);
+    const sharedStyle=document.createElement('link');sharedStyle.rel='stylesheet';sharedStyle.href='../workspace-ui.css?v=account-actions2';document.head.append(sharedStyle);
+    const storeTypes=document.createElement('script');storeTypes.src='../store-types.js?v=page-audit20261111';document.head.append(storeTypes);
     document.querySelectorAll('a[href],button[onclick]').forEach(el=>{
       const target=el.getAttribute('href')||el.getAttribute('onclick')||'';
       if(/(?:login|register)\.html/.test(target)&&active)el.hidden=true;

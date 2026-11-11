@@ -1,0 +1,37 @@
+PASARMALAM BUYER AND SELLER PAGE AUDIT
+11 November 2026, Malaysia time
+
+SCOPE AND RESULTS
+- Inspected all 54 HTML pages: 28 buyer and 26 seller.
+- Local page links and declared asset paths exist; no duplicate HTML IDs found.
+- Loaded all 54 pages in a browser at 390px width.
+- Rechecked all 54 at 360px and 1440px widths: no page-wide horizontal overflow or missing main content detected.
+- Protected pages were inspected in their signed-out state, not with a logged-in shop.
+- Four frontend regression suites passed: shared UI syntax, Account actions, seller entry, and page context.
+- 24 backend regression tests passed across factory orders, shop types and verified bank transfers.
+- Windows temporary-directory ACLs blocked the first backend run. The successful rerun used a workspace-only test folder with compatible permissions. No production database was used.
+
+FIXES
+- Removed fallback to an unrelated first order on tracking, confirmation and receipt pages.
+- Added explicit missing-order/product and sign-in states; removed the default product ID of 1.
+- Added error handling to tracking refreshes and disabled actions without a matching order.
+- Notifications now prompt guests to sign in instead of showing a JSON parser exception.
+- Seller-only store-type and action helpers stop when the seller sign-in gate is active.
+- Bank-transfer pages now include the shared Account/navigation controls and a missing-order guard.
+- Added missing language helpers to seller completion pages.
+- Added exact translations for common order filters and navigation; prevent automatic phrase translation from changing seller/product names in catalogue name/shop fields.
+- Bumped shared-script cache versions throughout the 54 pages so updated helpers are loaded together.
+- Preserved existing unrelated backend, admin and promotions work.
+
+LIMITS / REMAINING ACCEPTANCE CHECKS
+- This is a LOCAL audit, not a production deployment or release certification.
+- Browser phone sizes are responsive previews, not installed iOS/Android device tests.
+- A logged-in test buyer and approved seller are still needed for a full UI walkthrough of five-shop switching, product publishing/editing, stock changes, checkout, messages, returns and payouts.
+- No production orders, payments, messages or product changes were submitted during the audit.
+- Some older informational, support and policy copy remains incompletely translated or intentionally bilingual. The improved registration flow and common controls are translated; complete language coverage across every older page is not certified.
+- Android source uses the canonical marketplace, but a new Android build/release is still required. Its prior compile attempt was blocked by the Google Services dependency.
+
+LOCAL PREVIEWS
+Buyer: http://127.0.0.1:8773/buyer/index.html
+Seller: http://127.0.0.1:8773/seller/index.html
+Seller entry: http://127.0.0.1:8773/buyer/become-seller.html

@@ -113,6 +113,29 @@
   window.pmBuyerText=(ms,en)=>{dictionary.ms[en]=ms;dictionary.en[en]=en;return dictionary[currentLang()][en]||en;};
   function token(){return localStorage.getItem("pm_token")||""}
   function currentLang(){try{const stored=localStorage.getItem(LANG_KEY);localStorage.setItem(BUYER_LANG_VERSION_KEY,BUYER_LANG_VERSION);if(stored==="ms"||stored==="en"||stored==="zh")return stored;localStorage.setItem(LANG_KEY,"ms");return"ms"}catch(e){return"ms"}}
+  const pageCopy={
+    'Order type':['Jenis pesanan','订单类型'], 'All products':['Semua produk','全部商品'], 'All order types':['Semua jenis pesanan','全部订单类型'],
+    'Retail':['Runcit','零售'], 'Bulk / Wholesale':['Borong','批发'], 'Factory Direct':['Kilang Terus','工厂直销'],
+    'Phone Accessories':['Aksesori Telefon','手机配件'], 'Conversations':['Perbualan','会话'], 'Select a conversation':['Pilih perbualan','选择会话'],
+    'Message':['Mesej','消息'], 'Refresh':['Muat Semula','刷新'], 'Please sign in to use messages.':['Sila log masuk untuk menggunakan mesej.','请登录以使用消息功能。'],
+    'Please sign in to view your wishlist.':['Sila log masuk untuk melihat senarai hajat anda.','请登录以查看收藏夹。'],
+    'Mark all read':['Tandakan semua telah dibaca','全部标为已读'], 'Open an order from your order list.':['Buka pesanan daripada senarai pesanan anda.','请从订单列表打开订单。'],
+    'Choose a product from the catalogue.':['Pilih produk daripada katalog.','请从商品目录选择商品。'],
+    'View Orders':['Lihat Pesanan','查看订单'], 'Browse Products':['Lihat Produk','浏览商品'],
+    'No order found.':['Pesanan tidak dijumpai.','未找到订单。'], 'No receipt found.':['Resit tidak dijumpai.','未找到收据。'],
+    'Bank Transfer':['Pindahan Bank','银行转账'], 'Bulk Bank Transfer':['Pindahan Bank Pesanan Borong','批发订单银行转账'],
+    'View Order':['Lihat Pesanan','查看订单'], 'Refresh Status':['Muat Semula Status','刷新状态'],
+    'Transfer Details':['Maklumat Pindahan','转账详情'], 'Payment Confirmation':['Pengesahan Bayaran','付款确认'],
+    'Submit for Review':['Hantar untuk Semakan','提交审核'], 'Your bank transaction reference':['Rujukan transaksi bank anda','您的银行交易参考号'],
+    'Sign in to view notifications.':['Log masuk untuk melihat notifikasi.','请登录以查看通知。'],
+    'What Happens Next':['Langkah Seterusnya','后续流程'], 'Seller prepares order':['Penjual menyediakan pesanan','卖家准备订单'],
+    'After payment is confirmed, the seller packs and ships or prepares pickup.':['Selepas bayaran disahkan, penjual membungkus pesanan untuk penghantaran atau pengambilan.','付款确认后，卖家将打包发货或准备自提。'],
+    'Escrow protects buyer':['Perlindungan Bayaran Pembeli','买家付款保障'],
+    'Paid funds stay held until delivery/completion rules are met.':['Bayaran ditahan sehingga syarat penghantaran dan penyelesaian dipenuhi.','款项将保留至满足配送及完成条件。'],
+    'Return window':['Tempoh Pulangan','退货期限'],
+    'If the item has an issue, submit return/refund before the deadline.':['Jika terdapat masalah dengan barang, hantar permohonan pulangan atau bayaran balik sebelum tarikh akhir.','如商品有问题，请在期限内申请退货或退款。']
+  };
+  Object.entries(pageCopy).forEach(([key,values])=>{dictionary.en[key]=key;dictionary.ms[key]=values[0];dictionary.zh[key]=values[1];});
   function sourceMap(){const map={Pengecas:"Chargers","\u5145\u7535\u5668":"Chargers"};[dictionary.ms,dictionary.en,dictionary.zh].forEach(group=>Object.entries(group).forEach(([key,value])=>{map[value]=key}));return map}
   function cleanVisibleText(value){
     return String(value||"")
@@ -155,7 +178,7 @@
     document.documentElement.lang=lang;
     document.querySelectorAll("#langToggle,.buyer-lang-toggle").forEach(button=>{if(button.textContent!==labels[lang])button.textContent=labels[lang]});
     const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,{acceptNode(node){if(!node.nodeValue.trim())return NodeFilter.FILTER_REJECT;if(node.parentElement&&["SCRIPT","STYLE","TEXTAREA"].includes(node.parentElement.tagName))return NodeFilter.FILTER_REJECT;return NodeFilter.FILTER_ACCEPT;}});
-    const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
+    const nodes=[];while(walker.nextNode())if(!walker.currentNode.parentElement?.closest('.name,.shop'))nodes.push(walker.currentNode);
     nodes.forEach(node=>{const raw=node.nodeValue.trim(),next=translateText(raw,lang,lookup);if(next!==raw)node.nodeValue=node.nodeValue.replace(raw,next)});
     document.querySelectorAll("input[placeholder],textarea[placeholder]").forEach(el=>{const raw=el.getAttribute("placeholder"),key=lookup[raw]||raw,next=(dictionary[lang]&&dictionary[lang][key])||raw;if(next!==raw)el.setAttribute("placeholder",next)});
   }

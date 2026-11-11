@@ -59,7 +59,11 @@
     });
     return cleanVisibleText(text);
   }
+  Object.assign(dictionary.ms,{'Forgot password?':'Lupa kata laluan?'});
+  Object.assign(dictionary.zh,{'Forgot password?':'忘记密码？'});
+  dictionary.en['Forgot password?']='Forgot password?';
   function applyLanguage(){
+    if(window.PMSellerEntryLanguage){window.PMSellerEntryLanguage.apply();return;}
     const lang=currentLang(),lookup=sourceMap();
     document.documentElement.lang=lang;
     document.querySelectorAll(".seller-lang-toggle").forEach(button=>{if(button.textContent!==labels[lang])button.textContent=labels[lang]});

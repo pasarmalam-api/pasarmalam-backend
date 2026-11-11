@@ -16,12 +16,14 @@
     @media(max-width:480px){dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:12px}header{padding:12px;gap:10px}}
   </style>
 </head>
-<body>
-  <header><img src="pasarmalam-logo.png" alt="PasarMalam"><b>PasarMalam</b><a href="orders.html">Orders</a></header>
+<body class="buyer-page">
+  <header><div class="bar"><div class="brand"><a class="logo" href="index.html"><img src="pasarmalam-logo.png" alt="PasarMalam"></a><div><h2>PasarMalam</h2><div>Bank Transfer</div></div></div><a href="orders.html">Orders</a></div></header>
   <main><h1>Bulk Bank Transfer</h1><p id="status" role="status">Loading order...</p>
     <section id="bank" hidden><h2>Transfer Details</h2><dl id="details"></dl><p>Include the payment reference in your bank transfer. Your order will be prepared after admin confirms the deposit.</p></section>
     <section id="submission" hidden><h2>Payment Confirmation</h2><form id="transferForm"><label for="senderReference">Your bank transaction reference</label><input id="senderReference" maxlength="160" required autocomplete="off"><button id="submitReference">Submit for Review</button></form></section>
     <p id="message" role="status"></p><p><a id="orderLink" href="orders.html">View Order</a> &middot; <button id="refresh" type="button">Refresh Status</button></p>
   </main>
-  <script src="bank-transfer.js?v=factory1"></script>
+  <script src="bank-transfer.js?v=page-audit20261111"></script>
+  <link rel="stylesheet" href="buyer-ui.css?v=20261009-auth">
+  <script src="badges.js?v=page-audit20261111"></script><script src="buyer-ui.js?v=page-audit20261111"></script>
 </body></html>
