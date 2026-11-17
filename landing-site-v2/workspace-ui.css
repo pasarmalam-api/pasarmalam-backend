@@ -105,6 +105,13 @@ body.buyer-page.buyer-home{display:block!important;height:auto!important;min-hei
  .buyer-home header .bar>.buyer-search-area{grid-row:3}
  .buyer-home header .bar>div:last-of-type{grid-row:4}
 }
+/* The phone footer has its own row; product content never sits underneath it. */
+@media(max-width:760px){
+ body.buyer-page.buyer-home{display:grid!important;grid-template-rows:auto minmax(0,1fr) auto;height:100vh!important;height:100dvh!important;min-height:0!important;overflow:hidden!important;padding-bottom:0!important}
+ .buyer-page.buyer-home>header{grid-row:1;min-height:0;max-height:45vh;max-height:45dvh;overflow-y:auto}
+ .buyer-page.buyer-home>main{grid-row:2;min-height:0!important;height:100%!important;max-height:100%!important;overflow-y:auto!important;padding-bottom:16px!important;scroll-padding-block:12px}
+ .buyer-page.buyer-home>.buyer-navigation{grid-row:3;position:static!important;inset:auto!important;max-height:30vh;max-height:30dvh;overflow-y:auto;min-height:0;box-sizing:border-box}
+}
 @media(max-width:980px){
  .app{--seller-text-size:14px}
  .app>aside .brand{flex:1 0 100%;justify-content:flex-start}

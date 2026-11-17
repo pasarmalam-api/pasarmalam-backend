@@ -22,6 +22,14 @@ assert.match(ui, /new ResizeObserver\(reserveNavigation\)/);
 assert.match(ui, /--buyer-nav-height/);
 assert.match(css, /body\.buyer-page\.buyer-home\{display:block!important;height:auto!important/);
 assert.match(css, /padding-bottom:calc\(var\(--buyer-nav-height,80px\)/);
+const footerLayout=css.slice(css.indexOf('/* The phone footer has its own row;'));
+assert.match(footerLayout,/grid-template-rows:auto minmax\(0,1fr\) auto/);
+assert.match(footerLayout,/height:100dvh!important/);
+assert.match(footerLayout,/main\{grid-row:2;min-height:0!important/);
+assert.match(footerLayout,/buyer-navigation\{grid-row:3;position:static!important/);
+assert.match(footerLayout,/max-height:45dvh;overflow-y:auto/);
+assert.match(home,/reference-home20261117-footer2/);
+assert.match(ui,/workspace-ui\.css\?v=reference-home20261117-footer2/);
 const android = fs.readFileSync('../android-pasarmalam/app/src/main/java/com/pasarmalam/app/MainActivity.java', 'utf8');
 assert.match(android, /setOnApplyWindowInsetsListener/);
 for (const type of ['systemBars', 'displayCutout', 'ime']) {
@@ -29,4 +37,4 @@ for (const type of ['systemBars', 'displayCutout', 'ime']) {
 }
 assert.match(android, /return WindowInsets.CONSUMED/);
 assert.match(android, /content\.setFitsSystemWindows\(true\)/);
-console.log('PASS: adaptive phone chrome, short landscape fallback and Android system/keyboard insets.');
+console.log('PASS: adaptive phone chrome, separate footer rows, bounded product scrolling and Android system/keyboard insets.');

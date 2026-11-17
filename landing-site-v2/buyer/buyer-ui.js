@@ -23,7 +23,7 @@
   function init(){
     if(document.body.dataset.buyerUiReady)return;
     document.body.dataset.buyerUiReady='true';
-    const style=document.createElement('link');style.rel='stylesheet';style.href='../workspace-ui.css?v=reference-home20261117';document.head.append(style);
+    const style=document.createElement('link');style.rel='stylesheet';style.href='../workspace-ui.css?v=reference-home20261117-footer2';document.head.append(style);
     const page=location.pathname.split('/').pop()||'index.html';
     if(['login.html','signup.html','become-seller.html'].includes(page)){
       document.body.classList.add('buyer-account-page');
