@@ -9,14 +9,16 @@
     <button type="button" class="soft" id="useDefaultAddress">${t('Guna alamat lalai','Use default address')}</button>
     <div id="addressSearch" hidden></div><p id="addressSearchStatus" role="status" class="muted"></p>`;
   section.querySelector('h2').after(controls);
-  const extra = document.createElement('div');
-  extra.innerHTML = `<label for="addressUnit">${t('Unit / tingkat (pilihan)','Unit / floor (optional)')}</label><input id="addressUnit" autocomplete="address-line2" maxlength="120">
+  const extra = document.createElement('details');
+  extra.innerHTML = `<summary>${t('Butiran tambahan (pilihan)','Additional details (optional)')}</summary><label for="addressUnit">${t('Unit / tingkat (pilihan)','Unit / floor (optional)')}</label><input id="addressUnit" autocomplete="address-line2" maxlength="120">
     <button type="button" class="soft" id="saveDefaultAddress">${t('Simpan sebagai alamat lalai','Save as default address')}</button>`;
   address.after(extra);
   const regions=['Johor','Kedah','Kelantan','Melaka','Negeri Sembilan','Pahang','Pulau Pinang','Perak','Perlis','Selangor','Terengganu','Sabah','Sarawak','Kuala Lumpur','Labuan','Putrajaya'];
   const locality=document.createElement('div');locality.className='row';
   locality.innerHTML=`<label for="addressPostcode">${t('Poskod','Postcode')}<input id="addressPostcode" inputmode="numeric" autocomplete="postal-code" maxlength="5" pattern="[0-9]{5}" required></label><label for="addressCity">${t('Bandar','City')}<input id="addressCity" autocomplete="address-level2" maxlength="100" required></label><label for="addressState">${t('Negeri','State')}<select id="addressState" autocomplete="address-level1" required><option value="">${t('Pilih negeri','Select state')}</option>${regions.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></label>`;
   extra.before(locality);
+  locality.querySelectorAll('input,select').forEach(field=>field.removeAttribute('required'));
+  extra.append(locality);
   el('addressPostcode').addEventListener('input',()=>{el('addressPostcode').value=el('addressPostcode').value.replace(/[^0-9]/g,'').slice(0,5);});
   function fillParts(text,components=[]){
     const component=type=>{const c=components.find(c=>c.types.includes(type));return c?.longText||c?.long_name||'';};
@@ -28,20 +30,23 @@
   }
   fillParts(address.value);
   function validateAddress(){
-    if(!/^\d{5}$/.test(el('addressPostcode').value.trim()))throw new Error(t('Masukkan poskod 5 digit.','Enter a five-digit postcode.'));
-    if(el('addressCity').value.trim().length<2)throw new Error(t('Masukkan bandar.','Enter the city.'));
-    if(!el('addressState').value)throw new Error(t('Pilih negeri.','Select the state.'));
-    const street=address.value.replace(/\b\d{5}\b/g,'').replace(/Malaysia/gi,'').replaceAll(el('addressCity').value.trim(),'').replaceAll(el('addressState').value,'').replace(/[,\s]/g,'');
-    if(street.length<4)throw new Error(t('Masukkan nama jalan atau bangunan dan nombor rumah jika berkenaan.','Enter the street or building and house number where applicable.'));
     if(!el('buyerPhone').value.trim())throw new Error(t('Masukkan nombor telefon penerima.','Enter the recipient phone number.'));
+    if(el('shipping').value==='Ambil Sendiri')return true;
+    if(address.value.trim().length<4)throw new Error(t('Masukkan alamat penghantaran.','Enter the delivery address.'));
+    if(el('shipping').value==='EasyParcel'){
+      const text=address.value;
+      if(!/\b\d{5}\b/.test(text))throw new Error(t('Sertakan poskod 5 digit dalam alamat untuk kurier.','Include a five-digit postcode in the address for courier delivery.'));
+      if(!regions.some(r=>text.toLowerCase().includes(r.toLowerCase()))&&!/\b(penang|malacca)\b/i.test(text))throw new Error(t('Sertakan negeri dalam alamat untuk kurier.','Include the state in the address for courier delivery.'));
+    }
     return true;
   }
   window.pmValidateDeliveryAddress=validateAddress;
   function completeAddress(){
-    validateAddress();
-    let text=address.value.trim().replace(/\b\d{5}\b[\s\S]*$/,'').replace(/[,\s]+$/,'');
-    text=[text,el('addressPostcode').value.trim()+' '+el('addressCity').value.trim(),el('addressState').value,'Malaysia'].filter(Boolean).join(', ');
+    let text=address.value.trim();
+    const postcode=el('addressPostcode').value.trim(),city=el('addressCity').value.trim(),state=el('addressState').value;
+    for(const part of [postcode,city,state])if(part&&!text.toLowerCase().includes(part.toLowerCase()))text+=`, ${part}`;
     const changed=address.value!==text;address.value=text;base=text;if(changed)invalidate();
+    validateAddress();
   }
   const editor=document.createElement('div');editor.id='addressEditor';
   for(const child of [...section.children])if(child!==controls&&child.tagName!=='H2')editor.append(child);
@@ -49,7 +54,7 @@
   editor.prepend(el('addressSearch'),el('addressSearchStatus'));
   el('deliveryLocate').hidden=false;
   editor.insertBefore(el('deliveryLocate'),el('addressSearch'));
-  const done=document.createElement('button');done.type='button';done.className='primary';done.id='useAddress';done.textContent=t('Gunakan alamat ini','Use this address');editor.append(done);section.append(editor);
+  const done=document.createElement('button');done.type='button';done.className='soft';done.id='useAddress';done.textContent=t('Selesai','Done');editor.append(done);section.append(editor);
   function displayAddress(editing){
     window.pmAddressEditing=editing;editor.hidden=!editing;
     el('savedAddress').textContent=[currentUser().name,el('buyerPhone').value,address.value].filter(Boolean).join(' | ');
@@ -60,10 +65,13 @@
   const notice=document.createElement('p');notice.className='muted';notice.id='addressNotice';controls.append(notice);
   function showSavedAddress(){
     let valid=true;try{validateAddress();}catch(e){valid=false;}
-    notice.textContent=valid?'':t('Lengkapkan alamat penghantaran sebelum meneruskan.','Complete your delivery address before continuing.');
-    notice.hidden=valid;displayAddress(false);
+    notice.textContent=valid?'':t('Masukkan alamat dan nombor telefon penerima.','Enter the delivery address and recipient phone number.');
+    notice.hidden=valid;displayAddress(!valid);
   }
   showSavedAddress();
+  for(const field of [address,el('buyerPhone')])field.addEventListener('input',()=>{
+    try{validateAddress();notice.hidden=true;}catch(e){notice.textContent=e.message;notice.hidden=false;}
+  });
   let saved = currentUser().address || '', base = address.value, version = 0, loading;
   let savedLocation=null,profileReady=Promise.resolve();
   function restoreLocation(){
@@ -78,7 +86,7 @@
     el('useDefaultAddress').disabled = !saved;
   };
   drawDefault();
-  address.readOnly = !!saved;
+  address.readOnly = false;
   function invalidate() {
     version++;
     el('deliveryLat').value = ''; el('deliveryLng').value = '';
@@ -136,10 +144,15 @@
     await resolving;
   };
   let widget, selectedSearch = '', selecting = false;
-  el('changeAddress').onclick = async () => {
+  el('changeAddress').onclick = () => {
     notice.hidden=true;
     displayAddress(true);
-    address.readOnly = false; invalidate(); el('addressSearch').hidden = false;
+    address.readOnly = false;address.focus();
+  };
+  const searchButton=document.createElement('button');searchButton.type='button';searchButton.className='soft';searchButton.id='searchDeliveryAddress';searchButton.textContent=t('Cari alamat (pilihan)','Search address (optional)');
+  editor.prepend(searchButton);
+  searchButton.onclick = async () => {
+    el('addressSearch').hidden = false;
     status(t('Memuatkan carian Google...','Loading Google search...'));
     try {
       const g = await maps();
@@ -176,7 +189,7 @@
     if(widget){widget.requestedLanguage=localStorage.getItem('pasarmalam-lang')||'ms';widget.placeholder=t('Cari alamat di Malaysia','Search Malaysian addresses');}
   });
   el('useDefaultAddress').onclick = () => {
-    address.value=saved; base=saved; el('addressUnit').value=''; address.readOnly=true;
+    address.value=saved; base=saved; el('addressUnit').value=''; address.readOnly=false;
     fillParts(saved);invalidate();restoreLocation();status('');showSavedAddress();window.pmDeliveryInvalidate?.();
   };
   done.onclick=async()=>{
@@ -184,11 +197,8 @@
     done.disabled=true;
     try{
       completeAddress();
-      if(el('shipping').value!=='EasyParcel'&&el('shipping').value!=='Ambil Sendiri'&&!el('deliveryConfirmed').checked){
-        await geocode({address:address.value,componentRestrictions:{country:'MY'}},version,address.value);
-      }
       validateAddress();
-      showSavedAddress();status('');window.pmDeliveryInvalidate?.();
+      showSavedAddress();status('');
     }catch(e){status(e.message);}finally{done.disabled=false;renderSummary();}
   };
   el('addressUnit').addEventListener('input',()=>{
@@ -202,9 +212,8 @@
     const button=el('saveDefaultAddress');button.disabled=true;
     const value=address.value.trim();
     try {
-      await window.pmResolveDeliveryAddress();
       if(value!==address.value.trim())throw new Error(t('Sahkan semula lokasi penerima.','Confirm the recipient location again.'));
-      const point={address:value,lat:Number(el('deliveryLat').value),lng:Number(el('deliveryLng').value),confirmed:el('deliveryConfirmed').checked};
+      const point=el('deliveryConfirmed').checked&&el('deliveryLat').value&&el('deliveryLng').value?{address:value,lat:Number(el('deliveryLat').value),lng:Number(el('deliveryLng').value),confirmed:true}:null;
       const response=await api('/api/profile',{method:'POST',body:JSON.stringify({address:value,delivery_location:point})});
       saved=value;savedLocation=point;localStorage.setItem('pm_user',JSON.stringify({...currentUser(),...response.user,address:value,delivery_location:point}));drawDefault();
       status(t('Alamat lalai disimpan.','Default address saved.'));
@@ -226,7 +235,7 @@
     saved=data.user.address||'';drawDefault();
     try{savedLocation=typeof data.user.delivery_location==='string'?JSON.parse(data.user.delivery_location||'null'):data.user.delivery_location;}catch(e){savedLocation=null;}
     if(version===0){
-      address.value=saved;base=saved;address.readOnly=!!saved;
+      address.value=saved;base=saved;address.readOnly=false;
       fillParts(saved);showSavedAddress();
       restoreLocation();
       window.pmDeliveryInvalidate?.();

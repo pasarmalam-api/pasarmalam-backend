@@ -70,8 +70,8 @@
   const status = text => { get('deliveryStatus').textContent = text; };
   const valid = () => isPickup() || (quote && quote.expires_at * 1000 > Date.now());
   const originalSummary = renderSummary, originalPay = pay.onclick;
-  const syncPay = () => {let ready=true;try{baseReady();window.pmValidateDeliveryAddress?.();}catch(e){ready=false;}pay.disabled=paying||requesting||window.pmAddressEditing||!ready||!valid();};
-  window.pmDeliveryPendingLabel = () => needsAddress||window.pmAddressEditing
+  const syncPay = () => {let ready=true;try{baseReady();window.pmValidateDeliveryAddress?.();}catch(e){ready=false;}pay.disabled=paying||requesting||!ready||!valid();};
+  window.pmDeliveryPendingLabel = () => needsAddress
     ? t('Pilih alamat penghantaran', 'Choose delivery address')
     : requesting || queued ? t('Mengira caj penghantaran...', 'Calculating delivery...')
     : t('Penghantaran belum tersedia', 'Delivery unavailable');
@@ -191,7 +191,7 @@
   };
   window.pmLoadDelivery = async () => {
     queued = false;
-    if (isPickup() || !checkoutProduct || !checkoutItem || !address.value.trim() || window.pmAddressEditing) return;
+    if (isPickup() || !checkoutProduct || !checkoutItem || !address.value.trim()) return;
     if (requesting) return;
     requesting = true; needsAddress = false; get('deliveryQuote').disabled = true;renderSummary();
     const version = revision;
@@ -203,7 +203,7 @@
         try{await window.pmResolveDeliveryAddress?.();}
         catch(e){needsAddress=true;get('deliveryQuote').textContent=t('Pilih alamat penghantaran','Choose delivery address');throw e;}
         // Resolving or editing the address invalidates the old request; reset schedules the new one.
-        if(version!==revision||window.pmAddressEditing)return;
+        if(version!==revision)return;
       }
       const route = fields();
       if (!isParcel() && (!route.coordinates.lat || !route.coordinates.lng || !route.location_confirmed)) {
