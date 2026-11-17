@@ -30,6 +30,10 @@ assert.match(footerLayout,/buyer-navigation\{grid-row:3;position:static!importan
 assert.match(footerLayout,/max-height:45dvh;overflow-y:auto/);
 assert.match(home,/reference-home20261117-footer2/);
 assert.match(ui,/workspace-ui\.css\?v=reference-home20261117-footer2/);
+assert.match(css,/market-banner\{height:96px!important;max-height:96px!important/);
+assert.match(css,/market-banner\{height:56px!important;max-height:56px!important/);
+const cardMarkup=home.slice(home.indexOf('function drawProducts()'),home.indexOf('function drawProducts()')+3000);
+assert.ok(cardMarkup.indexOf('<p class="price">')<cardMarkup.indexOf('<div class="shop">'), 'Prices sit directly below titles, ahead of secondary seller information');
 const android = fs.readFileSync('../android-pasarmalam/app/src/main/java/com/pasarmalam/app/MainActivity.java', 'utf8');
 assert.match(android, /setOnApplyWindowInsetsListener/);
 for (const type of ['systemBars', 'displayCutout', 'ime']) {

@@ -90,7 +90,7 @@ body.buyer-page.buyer-home{display:block!important;height:auto!important;min-hei
  .buyer-home header .bar>.buyer-search-area{grid-column:1/-1;grid-row:2}
  .buyer-home header :is(.cart,.lang){font-size:12px!important;min-height:44px!important;padding:6px 8px!important;white-space:normal}
  .buyer-home .hero{margin:8px auto!important}
- .buyer-home .market-banner{height:auto!important;max-height:none!important;aspect-ratio:1672/941;object-fit:contain}
+ .buyer-home .market-banner{height:96px!important;max-height:96px!important;aspect-ratio:auto;object-fit:cover;object-position:center}
  .buyer-home .section{margin-top:12px!important}
  .buyer-home .head{padding-bottom:6px!important}
  .buyer-home .grid>.card .photo{height:auto!important;aspect-ratio:1!important}
@@ -101,6 +101,8 @@ body.buyer-page.buyer-home{display:block!important;height:auto!important;min-hei
  .buyer-home :is(.shop-status-slot,.listing-tags):empty{display:none!important}
 }
 @media(max-width:340px){
+ .buyer-home .market-banner{height:56px!important;max-height:56px!important}
+ .buyer-home .hero{margin:4px auto!important}
  .buyer-home header .bar>.buyer-account-bar{grid-column:1/-1;grid-row:2;width:100%}
  .buyer-home header .bar>.buyer-search-area{grid-row:3}
  .buyer-home header .bar>div:last-of-type{grid-row:4}
