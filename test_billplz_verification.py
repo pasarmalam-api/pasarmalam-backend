@@ -1,17 +1,18 @@
 import hashlib
 import hmac
-import tempfile
+import sqlite3
 import unittest
-from pathlib import Path
 from unittest.mock import patch
 import server
 
 
 class BillplzVerification(unittest.TestCase):
     def setUp(self):
-        temp=tempfile.TemporaryDirectory();self.addCleanup(temp.cleanup)
-        for key,value in [('DB_PATH',str(Path(temp.name)/'test.db')),('USE_POSTGRES',False),('BILLPLZ_API_KEY','fake'),('BILLPLZ_COLLECTION_ID','collection'),('BILLPLZ_X_SIGNATURE_KEY','')]:
+        database=sqlite3.connect(':memory:');database.row_factory=sqlite3.Row
+        self.addCleanup(database.close)
+        for key,value in [('USE_POSTGRES',False),('BILLPLZ_API_KEY','fake'),('BILLPLZ_COLLECTION_ID','collection'),('BILLPLZ_X_SIGNATURE_KEY',''),('BILLPLZ_CARD_API_KEY',''),('BILLPLZ_CARD_COLLECTION_ID',''),('BILLPLZ_CARD_X_SIGNATURE_KEY','')]:
             p=patch.object(server,key,value);p.start();self.addCleanup(p.stop)
+        connection=patch.object(server,'connect',return_value=database);connection.start();self.addCleanup(connection.stop)
         server.init_db()
         self.h=object.__new__(server.Handler);self.h.headers={}
         self.reply=patch.object(server,'send_json').start();self.addCleanup(patch.stopall)

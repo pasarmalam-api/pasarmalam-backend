@@ -110,7 +110,9 @@
     'Not rated yet':'暂无评分','Search products':'搜索商品'
   });
   Object.keys(dictionary.ms).forEach(key=>{dictionary.en[key]=key;});
-  window.pmBuyerText=(ms,en)=>{dictionary.ms[en]=ms;dictionary.en[en]=en;return dictionary[currentLang()][en]||en;};
+  let translationCache=null,languageObserver=null;
+  const languageObserverOptions={childList:true,subtree:true};
+  window.pmBuyerText=(ms,en)=>{if(dictionary.ms[en]!==ms||dictionary.en[en]!==en)translationCache=null;dictionary.ms[en]=ms;dictionary.en[en]=en;return dictionary[currentLang()][en]||en;};
   function token(){return localStorage.getItem("pm_token")||""}
   function currentLang(){try{const stored=localStorage.getItem(LANG_KEY);localStorage.setItem(BUYER_LANG_VERSION_KEY,BUYER_LANG_VERSION);if(stored==="ms"||stored==="en"||stored==="zh")return stored;localStorage.setItem(LANG_KEY,"ms");return"ms"}catch(e){return"ms"}}
   const pageCopy={
@@ -136,7 +138,14 @@
     'If the item has an issue, submit return/refund before the deadline.':['Jika terdapat masalah dengan barang, hantar permohonan pulangan atau bayaran balik sebelum tarikh akhir.','如商品有问题，请在期限内申请退货或退款。']
   };
   Object.entries(pageCopy).forEach(([key,values])=>{dictionary.en[key]=key;dictionary.ms[key]=values[0];dictionary.zh[key]=values[1];});
-  function sourceMap(){const map={Pengecas:"Chargers","\u5145\u7535\u5668":"Chargers"};[dictionary.ms,dictionary.en,dictionary.zh].forEach(group=>Object.entries(group).forEach(([key,value])=>{map[value]=key}));return map}
+  function sourceMap(){
+    if(!translationCache){
+      const map={Pengecas:"Chargers","\u5145\u7535\u5668":"Chargers"};
+      [dictionary.ms,dictionary.en,dictionary.zh].forEach(group=>Object.entries(group).forEach(([key,value])=>{map[value]=key}));
+      translationCache={lookup:map,canonical:Object.entries(map).filter(([value,source])=>(value.length>=5||source==='Stock')&&value!==source).sort((a,b)=>b[0].length-a[0].length),phrases:Object.keys(dictionary.ms).filter(phrase=>phrase.length>=5).sort((a,b)=>b.length-a.length)};
+    }
+    return translationCache.lookup;
+  }
   function cleanVisibleText(value){
     return String(value||"")
       .replace(/\s{2,}/g," ")
@@ -152,15 +161,16 @@
     let text=cleanVisibleText(value);
     const key=lookup[text]||text;
     if(lookup[text]||dictionary.en[text])return dictionary[lang][key]||key;
+    const counted=text.match(/^(.*?)\s+(\d+(?:\.\d+)?)$/);
+    if(counted){const label=lookup[counted[1]]||counted[1];if(dictionary[lang][label])return dictionary[lang][label]+' '+counted[2];}
     // Canonicalise translated phrases before switching languages again.
-    Object.entries(lookup).sort((a,b)=>b[0].length-a[0].length).forEach(([value,source])=>{
-      if((value.length>=5||source==='Stock')&&value!==source)text=text.split(value).join(source);
+    sourceMap();
+    translationCache.canonical.forEach(([value,source])=>{
+      if(text.includes(value))text=text.split(value).join(source);
     });
-    const phrases=Object.keys(dictionary.ms).sort((a,b)=>b.length-a.length);
-    phrases.forEach(phrase=>{
-      if(phrase.length<5)return;
+    translationCache.phrases.forEach(phrase=>{
       const translated=(dictionary[lang]&&dictionary[lang][phrase])||phrase;
-      if(translated!==phrase)text=text.split(phrase).join(translated);
+      if(translated!==phrase&&text.includes(phrase))text=text.split(phrase).join(translated);
     });
     if(lang==="ms"){
       text=text
@@ -174,13 +184,16 @@
     return cleanVisibleText(text).replace(/Ambil Hantariri/g,"Ambil Sendiri");
   }
   function applyLanguage(){
+    languageObserver?.disconnect();
+    try{
     const lang=currentLang(),lookup=sourceMap();
-    document.documentElement.lang=lang;
+    if(document.documentElement.lang!==lang)document.documentElement.lang=lang;
     document.querySelectorAll("#langToggle,.buyer-lang-toggle").forEach(button=>{if(button.textContent!==labels[lang])button.textContent=labels[lang]});
     const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,{acceptNode(node){if(!node.nodeValue.trim())return NodeFilter.FILTER_REJECT;if(node.parentElement&&["SCRIPT","STYLE","TEXTAREA"].includes(node.parentElement.tagName))return NodeFilter.FILTER_REJECT;return NodeFilter.FILTER_ACCEPT;}});
     const nodes=[];while(walker.nextNode())if(!walker.currentNode.parentElement?.closest('.name,.shop'))nodes.push(walker.currentNode);
     nodes.forEach(node=>{const raw=node.nodeValue.trim(),next=translateText(raw,lang,lookup);if(next!==raw)node.nodeValue=node.nodeValue.replace(raw,next)});
     document.querySelectorAll("input[placeholder],textarea[placeholder]").forEach(el=>{const raw=el.getAttribute("placeholder"),key=lookup[raw]||raw,next=(dictionary[lang]&&dictionary[lang][key])||raw;if(next!==raw)el.setAttribute("placeholder",next)});
+    }finally{languageObserver?.observe(document.documentElement,languageObserverOptions)}
   }
   function ensureLanguageButton(){
     const existing=document.querySelector("#langToggle,.buyer-lang-toggle");
@@ -261,6 +274,7 @@
   function init(){ensureLanguageButton();addSellerSwitch();addPolicyLink();applyLanguage();setupLiveNotifications();setTimeout(()=>{load();applyLanguage()},300)}
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init);else init();
   let languageTimer=0;
-  new MutationObserver(()=>{clearTimeout(languageTimer);languageTimer=setTimeout(applyLanguage,120)}).observe(document.documentElement,{childList:true,subtree:true});
+  languageObserver=new MutationObserver(()=>{clearTimeout(languageTimer);languageTimer=setTimeout(applyLanguage,120)});
+  languageObserver.observe(document.documentElement,languageObserverOptions);
 })();
 

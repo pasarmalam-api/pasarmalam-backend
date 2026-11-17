@@ -51,6 +51,9 @@ TOYYIBPAY_BASE_URL = "https://dev.toyyibpay.com" if TOYYIBPAY_MODE != "live" els
 BILLPLZ_API_KEY = os.environ.get("BILLPLZ_API_KEY", "")
 BILLPLZ_COLLECTION_ID = os.environ.get("BILLPLZ_COLLECTION_ID", "")
 BILLPLZ_X_SIGNATURE_KEY = os.environ.get("BILLPLZ_X_SIGNATURE_KEY", "")
+BILLPLZ_CARD_API_KEY = os.environ.get("BILLPLZ_CARD_API_KEY", "")
+BILLPLZ_CARD_COLLECTION_ID = os.environ.get("BILLPLZ_CARD_COLLECTION_ID", "")
+BILLPLZ_CARD_X_SIGNATURE_KEY = os.environ.get("BILLPLZ_CARD_X_SIGNATURE_KEY", "")
 BILLPLZ_MODE = os.environ.get("BILLPLZ_MODE", "sandbox").lower()
 BILLPLZ_BASE_URL = "https://www.billplz-sandbox.com" if BILLPLZ_MODE != "live" else "https://www.billplz.com"
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
@@ -1527,6 +1530,7 @@ class Handler(BaseHTTPRequestHandler):
                 "/api/payments/toyyibpay/status": lambda: self.toyyibpay_status(query),
                 "/api/payments/toyyibpay/return": lambda: self.toyyibpay_return(query),
                 "/api/payments/billplz/status": lambda: self.billplz_status(query),
+                "/api/payments/options": self.payment_options,
                 "/api/payments/bank-transfer": lambda: self.bank_transfer_details(query),
                 "/api/payments/billplz/return": lambda: self.billplz_return(query),
                 "/api/admin/users": self.admin_users,
@@ -3085,8 +3089,19 @@ class Handler(BaseHTTPRequestHandler):
     def create_toyyibpay_payment(self, data):
         return send_json(self, 503, {'error': 'Legacy ToyyibPay payments are disabled. Use the configured Billplz checkout.'})
 
+    def payment_options(self):
+        try:
+            key, collection, _ = billplz_profile(new_bill=True)
+            available = bool(key and collection)
+            card = available and bool(BILLPLZ_CARD_API_KEY and BILLPLZ_CARD_COLLECTION_ID)
+        except ValueError:
+            available, card = False, False
+        send_json(self, 200, {'online': {'available': available, 'card': card}})
+
+
     def create_billplz_payment(self, data):
-        if not BILLPLZ_API_KEY or not BILLPLZ_COLLECTION_ID:
+        profile_key, profile_collection, _ = billplz_profile(new_bill=True)
+        if not profile_key or not profile_collection:
             raise PermissionError("Set BILLPLZ_API_KEY and BILLPLZ_COLLECTION_ID in Render before accepting Billplz payments.")
         user = self.require_user("buyer")
         buyer_id = user["id"]
@@ -3114,7 +3129,7 @@ class Handler(BaseHTTPRequestHandler):
             self.attach_delivery(con, order_id, delivery_details)
 
         payload = {
-            "collection_id": BILLPLZ_COLLECTION_ID,
+            "collection_id": profile_collection,
             "email": buyer_email,
             "mobile": buyer_phone,
             "name": buyer_name,
@@ -3125,7 +3140,7 @@ class Handler(BaseHTTPRequestHandler):
             "reference_1_label": "Order ID",
             "reference_1": str(order_id),
         }
-        response = post_billplz("/api/v3/bills", payload)
+        response = post_billplz("/api/v3/bills", payload, api_key=profile_key)
         bill_id = response.get("id", "")
         checkout_url = response.get("url", "")
         if not bill_id or not checkout_url:
@@ -3199,8 +3214,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def billplz_callback(self, data):
         bill_id = str(data.get("id", data.get("billplz[id]", "")))
-        if BILLPLZ_X_SIGNATURE_KEY:
-            if not verify_billplz_signature(data, BILLPLZ_X_SIGNATURE_KEY):
+        with connect() as con:
+            payment = con.execute("SELECT raw_response FROM payments WHERE provider='Billplz' AND bill_code=?", (bill_id,)).fetchone()
+        if not payment:
+            raise ValueError('Bill does not match the order')
+        _, _, signature_key = billplz_profile(payment['raw_response'])
+        if signature_key:
+            if not verify_billplz_signature(data, signature_key):
                 raise PermissionError("Invalid Billplz callback signature")
         self.verify_billplz_bill(bill_id)
         send_json(self, 200, {"ok": True})
@@ -3209,16 +3229,17 @@ class Handler(BaseHTTPRequestHandler):
         if not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', str(bill_id)):
             raise ValueError('Invalid bill reference')
         with connect() as con:
-            row = con.execute("SELECT o.* FROM payments p JOIN orders o ON o.id=p.order_id WHERE p.provider='Billplz' AND p.bill_code=?", (bill_id,)).fetchone()
+            row = con.execute("SELECT o.*,p.raw_response AS gateway_response FROM payments p JOIN orders o ON o.id=p.order_id WHERE p.provider='Billplz' AND p.bill_code=?", (bill_id,)).fetchone()
         if not row or (requested_order_id and int(row['id']) != int(requested_order_id)):
             raise ValueError('Bill does not match the order')
         if user and user['role'] != 'admin' and (user['role'] != 'buyer' or row['buyer_id'] != user['id']):
             raise PermissionError('This payment belongs to another account')
-        if not BILLPLZ_API_KEY or not BILLPLZ_COLLECTION_ID:
+        profile_key, profile_collection, _ = billplz_profile(row['gateway_response'])
+        if not profile_key or not profile_collection:
             raise ValueError('Payment verification is temporarily unavailable')
-        result = get_billplz('/api/v3/bills/' + urllib.parse.quote(bill_id))
+        result = get_billplz('/api/v3/bills/' + urllib.parse.quote(bill_id), api_key=profile_key)
         expected = (Decimal(str(row['total'])) * 100).quantize(Decimal('1'))
-        if str(result.get('id')) != bill_id or str(result.get('collection_id')) != BILLPLZ_COLLECTION_ID:
+        if str(result.get('id')) != bill_id or str(result.get('collection_id')) != profile_collection:
             raise ValueError('Provider bill identity does not match')
         if Decimal(str(result.get('amount', -1))) != expected:
             raise ValueError('Provider bill amount does not match the order')
@@ -4174,18 +4195,39 @@ def post_toyyibpay(path, payload):
         raise ValueError(f"ToyyibPay returned non-JSON response: {cleaned}") from exc
 
 
-def billplz_auth_header():
-    token = base64.b64encode(f"{BILLPLZ_API_KEY}:".encode("utf-8")).decode("ascii")
+def billplz_profile(raw_response=None, new_bill=False):
+    original = (BILLPLZ_API_KEY, BILLPLZ_COLLECTION_ID, BILLPLZ_X_SIGNATURE_KEY)
+    card = (BILLPLZ_CARD_API_KEY, BILLPLZ_CARD_COLLECTION_ID, BILLPLZ_CARD_X_SIGNATURE_KEY)
+    if new_bill:
+        if bool(card[0]) != bool(card[1]):
+            raise ValueError('Card checkout configuration is incomplete')
+        if card[0] and card[1]:
+            if not card[2]:
+                raise ValueError('Card callback signature configuration is required')
+            return card
+        return original
+    stored = json.loads(raw_response or '{}').get('collection_id')
+    # Old bills keep using their original account after new checkout is migrated.
+    if stored and stored == card[1] and card[0] and card[1]:
+        return card
+    if not stored or stored == original[1]:
+        return original
+    raise ValueError('Payment account for this bill is not configured')
+
+
+def billplz_auth_header(api_key=None):
+    key = BILLPLZ_API_KEY if api_key is None else api_key
+    token = base64.b64encode(f"{key}:".encode("utf-8")).decode("ascii")
     return f"Basic {token}"
 
 
-def post_billplz(path, payload):
+def post_billplz(path, payload, api_key=None):
     body = urllib.parse.urlencode(payload).encode("utf-8")
     request = urllib.request.Request(
         BILLPLZ_BASE_URL + path,
         data=body,
         headers={
-            "Authorization": billplz_auth_header(),
+            "Authorization": billplz_auth_header(api_key),
             "Content-Type": "application/x-www-form-urlencoded",
             "Accept": "application/json",
             "User-Agent": "PasarMalam/1.0 (+https://pasarmalam-backend.onrender.com)",
@@ -4201,11 +4243,11 @@ def post_billplz(path, payload):
         raise ValueError(f"Billplz returned non-JSON response: {cleaned}") from exc
 
 
-def get_billplz(path):
+def get_billplz(path, api_key=None):
     request = urllib.request.Request(
         BILLPLZ_BASE_URL + path,
         headers={
-            "Authorization": billplz_auth_header(),
+            "Authorization": billplz_auth_header(api_key),
             "Accept": "application/json",
             "User-Agent": "PasarMalam/1.0 (+https://pasarmalam-backend.onrender.com)",
         },

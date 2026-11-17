@@ -1,0 +1,27 @@
+Public Bank card-enabled Billplz account
+
+Organisation: TANITOOLUWA VENTURES / 88870 / admin@pasarmalamapp.com
+Existing collection: 79cvkfsz (PASARMALAM RM1 CARD TEST)
+Visa/Mastercard was checked as enabled in Billplz on 17 November 2026.
+No new application, activation payment or collection was created.
+
+In Render -> pasarmalam-backend -> Environment, the account owner must add:
+  BILLPLZ_CARD_API_KEY = existing Billplz Secret Key from organisation 88870
+  BILLPLZ_CARD_COLLECTION_ID = 79cvkfsz
+  BILLPLZ_CARD_X_SIGNATURE_KEY = existing XSignature key from organisation 88870
+
+Enter secrets directly in Render. Do not paste them into chat or commit them.
+Do not replace the original BILLPLZ_API_KEY, BILLPLZ_COLLECTION_ID or
+BILLPLZ_X_SIGNATURE_KEY: they are still needed for older bills.
+The existing BILLPLZ_MODE must be live for production payments.
+
+Deploy the reviewed backend before activating this setup. Partial new
+configuration disables new online payments until all required fields are set.
+GET /api/payments/options reports only availability flags, never secrets.
+
+New retail online payments use the new account once configured; consumers
+choose FPX or Visa/Mastercard on Billplz's hosted payment page. Card details
+never go through PasarMalam. Historical bills retain their original profile.
+Factory and bulk orders remain mandatory TANITOOLUWA VENTURES Public Bank
+transfer orders and are rejected by the Billplz create-payment endpoint.
+QR, eWallets and BNPL have not been enabled by this change.

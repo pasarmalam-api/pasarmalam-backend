@@ -104,7 +104,7 @@
     langToggle.onclick=()=>{currentLang=currentLang==="ms"?"en":currentLang==="en"?"zh":"ms";localStorage.setItem("pasarmalam-lang",currentLang);localStorage.setItem(BUYER_LANG_VERSION_KEY,BUYER_LANG_VERSION);applyLang()};
     homeLogo.onclick=()=>location.href="index.html";
     cartButton.onclick=()=>location.href="cart.html";
-    function imgFor(p){const src=(p.images&&p.images[0])||p.image_url;return src?`<img src="${src}" alt="${p.name}" loading="lazy">`:(p.category||"P")[0]}
+    function imgFor(p){const src=(p.images&&p.images[0])||p.image_url;return src?`<img src="${src}" alt="${p.name}" loading="lazy" decoding="async">`:(p.category||"P")[0]}
     function drawCats(){cats.innerHTML=catsData.map(c=>`<button class="cat ${c===active?"active":""}" data-category="${c}" aria-pressed="${c===active}" onclick="selectCategory(this.dataset.category)">${c}</button>`).join("")}
     function selectCategory(category){
       if(!catsData.includes(category))return;
@@ -123,7 +123,12 @@
     async function loadProducts(){const request=++productRequest;const q=(search.value||"").trim();const params=new URLSearchParams();if(active&&active!=="All")params.set("category",active);if(q)params.set("q",q);try{const result=await api(`/api/products${params.toString()?`?${params}`:""}`);if(request!==productRequest)return;apiProducts=(result.products||[]).map(cleanProduct);drawProducts()}catch(e){console.log(e);drawProducts()}}
     let searchTimer=0;search.oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(loadProducts,250)};
     searchForm.onsubmit=e=>{e.preventDefault();location.href="category.html?"+new URLSearchParams({q:search.value.trim(),category:active})};
-    async function load(){try{await loadProducts();drawCart();drawOrders([]);drawPulangan([]);drawChat([]);if(userToken()){cart=(await api("/api/cart")).cart||[];drawCart();drawOrders((await api("/api/orders")).orders||[]);drawPulangan((await api("/api/returns")).returns||[]);drawChat((await api("/api/messages")).messages||[])}drawRates((await api("/api/logistics/rates")).rates||[]);drawUlasan((await api("/api/reviews")).reviews||[])}catch(e){console.log(e)}} 
+    async function load(){
+      drawCart();
+      const catalogue=loadProducts();
+      if(userToken())api("/api/cart").then(data=>{cart=data.cart||[];drawCart()}).catch(error=>console.log(error));
+      await catalogue;
+    }
     async function addCart(id,event){if(event)event.stopPropagation();if(!userToken())return requireSignIn();const product=apiProducts.find(p=>Number(p.id)===Number(id));if(PMShop.closed(product)){alert(PMShop.message());return}if(!product||Number(product.stock||0)<1){alert(currentLang==="ms"?"Stok habis. Produk ini tidak boleh ditambah ke troli.":currentLang==="zh"?"库存已空，无法加入购物车。":"Out of stock. This product cannot be added to cart.");return}if(product.variants?.length||["bulk","factory"].includes(product.selling_mode)){location.href="product.html?id="+encodeURIComponent(id);return}const button=event?.currentTarget;if(button)button.disabled=true;try{await api("/api/cart",{method:"POST",body:JSON.stringify({product_id:id,quantity:1})});location.href="cart.html"}catch(e){alert(e.message||"Unable to add item. Please try again.")}finally{if(button)button.disabled=false}}function drawCart(){cartButton.textContent=`${tr("cart")} ${cart.length}`;cartList.innerHTML=cart.length?cart.map(i=>`<div class="cart-line"><b>${i.name}</b><span class="muted"> ${i.shop}</span><br>Kuantiti ${i.quantity} | ${money(i.price)}</div>`).join(""):`<p class='muted'>${tr("emptyCart")}</p>`}
     checkoutBtn.onclick=async()=>{if(!userToken())return requireSignIn();const item=cart[0]||{product_id:apiProducts[0]?.id,quantity:1};if(!item.product_id)return alert("Tiada produk");const o=await api("/api/checkout",{method:"POST",body:JSON.stringify({product_id:item.product_id,quantity:item.quantity,address:checkoutAddress.value,logistics_method:checkoutShipping.value,payment_method:paymentMethod.value,buyer_name:"Buyer"})});alert(`Bayaran disahkan. Penjejakan ${o.tracking_no}. Escrow ${o.escrow_status}`);drawOrders((await api("/api/orders")).orders)}
     function drawOrders(rows){ordersList.innerHTML=rows.map(o=>`<div class="order-line"><b>PM-${o.id}</b> ${o.order_status} | ${o.payment_status} | Escrow ${o.escrow_status}<br><span class="muted">${o.logistics_method} ${o.tracking_no}</span></div>`).join("")||"<p class='muted'>Belum ada pesanan</p>"}
@@ -137,7 +142,7 @@
     applyLang();drawCats();load();
   </script>
 <link rel="stylesheet" href="../workspace-ui.css?v=reference-home20261117">
-<script src="badges.js?v=home-fit20261117"></script><script src="buyer-ui.js?v=reference-home20261117"></script></body>
+<script src="badges.js?v=buyer-speed20261117"></script><script src="buyer-ui.js?v=reference-home20261117"></script></body>
 </html>
 
 

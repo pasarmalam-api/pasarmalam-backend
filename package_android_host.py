@@ -11,7 +11,7 @@ parser.add_argument('--reviewed-layout', action='store_true')
 parser.add_argument('--seller-root', action='store_true')
 parser.add_argument('--cache-patch', action='store_true')
 args = parser.parse_args()
-layout_files = {'buyer/index.html', 'buyer/buyer-ui.js', 'seller/seller-session.js', 'workspace-ui.css'}
+layout_files = {'buyer/index.html', 'buyer/buyer-ui.js', 'buyer/badges.js', 'buyer/checkout.html', 'buyer/checkout-payment-methods.js', 'seller/seller-session.js', 'workspace-ui.css'}
 revision = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=ROOT, text=True).strip()
 paths = subprocess.check_output(
     ['git', 'ls-tree', '-r', '--name-only', 'HEAD', 'landing-site-v2/'], cwd=ROOT, text=True
