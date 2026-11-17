@@ -10,6 +10,14 @@ assert.match(responsive, /max-height:500px/);
 assert.match(responsive, /overflow-wrap:anywhere/);
 assert.match(responsive, /body\.seller-menu-locked\{overflow:auto!important\}/);
 assert.match(responsive, /body\.seller-menu-locked \.app \.seller-menu-backdrop/);
+const home = fs.readFileSync('landing-site-v2/buyer/index.html', 'utf8');
+const ui = fs.readFileSync('landing-site-v2/buyer/buyer-ui.js', 'utf8');
+assert.match(home, /buyer-ui\.js\?v=home-fit20261117/);
+assert.match(home, /workspace-ui\.css\?v=home-fit20261117/);
+assert.match(ui, /new ResizeObserver\(reserveNavigation\)/);
+assert.match(ui, /--buyer-nav-height/);
+assert.match(css, /body\.buyer-page\.buyer-home\{display:block!important;height:auto!important/);
+assert.match(css, /padding-bottom:calc\(var\(--buyer-nav-height,80px\)/);
 const android = fs.readFileSync('../android-pasarmalam/app/src/main/java/com/pasarmalam/app/MainActivity.java', 'utf8');
 assert.match(android, /setOnApplyWindowInsetsListener/);
 for (const type of ['systemBars', 'displayCutout', 'ime']) {

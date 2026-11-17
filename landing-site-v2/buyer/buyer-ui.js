@@ -21,7 +21,9 @@
     location.href='login.html?next='+encodeURIComponent(current+location.search);
   },true);
   function init(){
-    const style=document.createElement('link');style.rel='stylesheet';style.href='../workspace-ui.css?v=responsive20261117';document.head.append(style);
+    if(document.body.dataset.buyerUiReady)return;
+    document.body.dataset.buyerUiReady='true';
+    const style=document.createElement('link');style.rel='stylesheet';style.href='../workspace-ui.css?v=home-fit20261117';document.head.append(style);
     const page=location.pathname.split('/').pop()||'index.html';
     if(['login.html','signup.html','become-seller.html'].includes(page)){
       document.body.classList.add('buyer-account-page');
@@ -81,6 +83,10 @@
     const cartLink=document.createElement('a');cartLink.href='cart.html';cartLink.className='buyer-cart-link';cartLink.textContent='Cart';
     if(page==='cart.html')cartLink.setAttribute('aria-current','page');
     if(document.body.classList.contains('buyer-home')){
+      const reserveNavigation=()=>document.body.style.setProperty('--buyer-nav-height',Math.ceil(nav.getBoundingClientRect().height)+'px');
+      if('ResizeObserver' in window)new ResizeObserver(reserveNavigation).observe(nav);
+      window.addEventListener('resize',reserveNavigation);
+      reserveNavigation();
       document.querySelector('header .bar')?.append(account);
       document.getElementById('searchForm')?.parentElement?.classList.add('buyer-search-area');
       document.querySelector('#search')?.setAttribute('placeholder','Search products');
