@@ -33,3 +33,38 @@ body .pm-seller-switch{display:none!important}
 @media(max-width:700px){.app header .top{display:flex!important;flex-wrap:wrap!important}.app header .top>div:first-child{flex:1 1 60%;min-width:0}.app header .toolbar{display:flex!important;flex-wrap:wrap!important;width:100%!important;order:2}.app header .toolbar>button{flex:1}.app header .top>.pm-account-menu{order:1}.app header .toolbar>#switchToBuyer{display:none!important}.buyer-home .shop-mode-toolbar{justify-content:space-between}.buyer-home .shop-mode-toolbar label{width:100%;justify-content:space-between}.buyer-home .shop-mode-toolbar select{flex:1;max-width:220px}}
 @media(max-width:950px){.buyer-home header .bar{grid-template-columns:minmax(44px,1fr) auto!important}.buyer-home .bar>.brand{grid-column:1;grid-row:1}.buyer-home .bar>.buyer-account-bar{grid-column:2;grid-row:1}.buyer-home .bar>.buyer-search-area{grid-column:1/-1;grid-row:2}.buyer-home .bar>div:last-of-type{grid-column:1/-1;grid-row:3}}
 @media(max-width:700px){.buyer-home header .bar{grid-template-columns:44px minmax(0,1fr)!important;gap:6px!important}.buyer-home header .brand h1{display:none}.buyer-home .pm-account-items{gap:5px}.buyer-home .pm-account-items a,.buyer-home .pm-account-items button{padding:7px 8px!important;font-size:12px!important}.app header .top>.pm-account-menu{flex:1 0 100%;width:100%;margin-left:auto;order:-1}.app header .top>.pm-account-menu .pm-account-items{justify-content:flex-end}}
+
+/* Phone chrome grows with wrapped labels instead of overlapping the next row. */
+@media(max-width:980px){
+ .app{grid-template-columns:minmax(0,1fr)!important}
+ .app>aside{position:static!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;display:flex!important;flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px}
+ .app>aside .brand{flex:1 1 160px;min-width:0}
+ .app>aside :is(.seller-lang-toggle,.seller-menu-toggle){white-space:normal!important;height:auto!important;max-width:100%;min-height:44px!important}
+ .app>aside nav{position:static!important;inset:auto!important;flex:1 0 100%;width:100%;max-height:50vh!important;max-height:50dvh!important;margin:0;overflow:auto!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .app>aside nav a{min-width:0;white-space:normal;overflow-wrap:anywhere}
+ .app>aside.seller-menu-open nav{display:grid!important}
+ .app header{position:static!important;top:auto!important}
+ body.seller-menu-locked{overflow:auto!important}
+ body.seller-menu-locked .app .seller-menu-backdrop,.app .seller-menu-backdrop{display:none!important}
+ .app :is(.top,.toolbar,.panel-head){flex-wrap:wrap;gap:10px;min-width:0}
+ .app :is(.top,.toolbar,.panel-head)>*{min-width:0;max-width:100%}
+ .app :is(button,.soft,.primary){height:auto;white-space:normal!important;overflow-wrap:anywhere;line-height:1.4!important;padding-top:8px;padding-bottom:8px}
+ .app :is(input,select,textarea){max-width:100%;min-width:0}
+}
+@media(max-width:760px){
+ .buyer-home header .bar{grid-template-columns:minmax(0,1fr) minmax(0,4fr)!important}
+ .buyer-home .bar>.buyer-account-bar{min-width:0;max-width:100%}
+ .buyer-home .bar>.buyer-search-area{grid-column:1/-1;min-width:0}
+ .buyer-home .bar>div:last-of-type{min-width:0;display:flex!important;flex-wrap:wrap;justify-content:flex-end}
+ .buyer-page .pm-account-items{min-width:0;flex-wrap:wrap}
+ .buyer-page .pm-account-items :is(a,button){height:auto!important;min-height:44px!important;white-space:normal!important;overflow-wrap:anywhere}
+ .buyer-page .buyer-navigation{height:auto;min-width:0}
+ .buyer-page .buyer-navigation a{min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.4}
+ .buyer-page .sheet{max-height:calc(100dvh - 24px);max-width:100%;overflow:auto}
+}
+/* Short landscape windows need document scrolling, not a zero-height main pane. */
+@media(max-width:760px) and (max-height:500px){
+ body.buyer-page:is(.buyer-home,.buyer-product){height:auto!important;min-height:100dvh;display:block!important;overflow:auto!important;padding-bottom:calc(80px + env(safe-area-inset-bottom,0px))!important}
+ .buyer-page:is(.buyer-home,.buyer-product)>main{overflow:visible!important;min-height:120px}
+ .buyer-page:is(.buyer-home,.buyer-product)>.buyer-navigation{position:fixed!important;bottom:0;left:0;right:0}
+}

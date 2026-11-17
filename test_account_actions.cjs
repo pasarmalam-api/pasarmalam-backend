@@ -6,7 +6,7 @@ for (const file of ['buyer/buyer-ui.js', 'seller/seller-session.js']) {
   const source = read(file);
   new vm.Script(source, {filename: file});
   assert.doesNotMatch(source, /createElement\('details'\)|createElement\('summary'\)/);
-  assert.match(source, /workspace-ui\.css\?v=account-actions2/);
+  assert.match(source, /workspace-ui\.css\?v=responsive20261117/);
 }
 const buyer = read('buyer/buyer-ui.js');
 assert.match(buyer, /items\.append\(link,action\)/);

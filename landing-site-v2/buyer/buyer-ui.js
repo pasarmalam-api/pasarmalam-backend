@@ -21,7 +21,7 @@
     location.href='login.html?next='+encodeURIComponent(current+location.search);
   },true);
   function init(){
-    const style=document.createElement('link');style.rel='stylesheet';style.href='../workspace-ui.css?v=account-actions2';document.head.append(style);
+    const style=document.createElement('link');style.rel='stylesheet';style.href='../workspace-ui.css?v=responsive20261117';document.head.append(style);
     const page=location.pathname.split('/').pop()||'index.html';
     if(['login.html','signup.html','become-seller.html'].includes(page)){
       document.body.classList.add('buyer-account-page');
