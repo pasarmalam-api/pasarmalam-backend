@@ -22,8 +22,8 @@ old_top, old_methods = definitions(baseline)
 new_top, new_methods = definitions(working)
 replacements = []
 for old, new, names in [
-    (old_top, new_top, ('billplz_auth_header', 'post_billplz', 'get_billplz')),
-    (old_methods, new_methods, ('create_billplz_payment', 'billplz_callback', 'verify_billplz_bill')),
+    (old_top, new_top, ('billplz_auth_header', 'post_billplz', 'get_billplz') + (('billplz_profile',) if 'billplz_profile' in old_top else ())),
+    (old_methods, new_methods, ('create_billplz_payment', 'billplz_callback', 'verify_billplz_bill') + (('payment_options',) if 'payment_options' in old_methods else ())),
 ]:
     for name in names:
         before, after = old[name], new[name]

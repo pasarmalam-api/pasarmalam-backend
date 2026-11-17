@@ -4205,7 +4205,7 @@ def billplz_profile(raw_response=None, new_bill=False):
             if not card[2]:
                 raise ValueError('Card callback signature configuration is required')
             return card
-        return original
+        raise ValueError('Public Bank checkout is not configured; legacy collections cannot accept new orders')
     stored = json.loads(raw_response or '{}').get('collection_id')
     # Old bills keep using their original account after new checkout is migrated.
     if stored and stored == card[1] and card[0] and card[1]:

@@ -17,6 +17,10 @@ The existing BILLPLZ_MODE must be live for production payments.
 
 Deploy the reviewed backend before activating this setup. Partial new
 configuration disables new online payments until all required fields are set.
+The retired Affin profile is historical verification only. Missing Public Bank
+configuration now disables online checkout instead of falling back to Affin.
+Keep the old keys and organisation records until historical bills, disputes and
+refund obligations no longer need them. Do not delete transaction records.
 GET /api/payments/options reports only availability flags, never secrets.
 
 New retail online payments use the new account once configured; consumers

@@ -31,6 +31,14 @@ class BillplzCardProfile(BillplzVerification):
             self.h.verify_billplz_bill('bill-test', self.buyer)
         self.gateway.assert_not_called()
 
+    def test_retired_account_is_never_a_new_checkout_fallback(self):
+        with patch.multiple(server, BILLPLZ_CARD_API_KEY='', BILLPLZ_CARD_COLLECTION_ID='', BILLPLZ_CARD_X_SIGNATURE_KEY=''):
+            with self.assertRaisesRegex(ValueError, 'legacy collections cannot accept new orders'):
+                server.billplz_profile(new_bill=True)
+            self.assertEqual(server.billplz_profile(json.dumps({'collection_id': 'collection'})), ('fake', 'collection', ''))
+            self.h.payment_options()
+            self.assertEqual(self.reply.call_args.args[2], {'online': {'available': False, 'card': False}})
+
     def test_card_bill_uses_card_key_and_requires_card_signature(self):
         with server.connect() as con:
             con.execute('UPDATE payments SET raw_response=? WHERE order_id=?', (json.dumps({'collection_id': 'card-collection'}), self.oid))
