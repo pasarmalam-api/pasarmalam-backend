@@ -38,10 +38,10 @@ body .pm-seller-switch{display:none!important}
 @media(max-width:980px){
  body.seller-registration .app>aside{gap:6px;padding:8px 10px}
  body.seller-registration .app>aside .brand{flex:1 1 110px;min-width:90px;padding:0;border:0}
- body.seller-registration .app>aside .brand .logo{width:32px;height:32px;flex:none}
+ body.seller-registration .app>aside .brand .logo{width:42px!important;height:42px!important;flex:none}
  body.seller-registration .app>aside .brand h1{font-size:14px;line-height:1.2}
  body.seller-registration .app>aside :is(.seller-menu-toggle,.seller-lang-toggle){flex:0 1 auto;min-width:44px;margin:0;font-size:12px!important;padding:6px 8px!important}
- body.seller-registration .app header{padding:10px}
+ body.seller-registration .app header{padding:8px 10px}
  body.seller-registration .app header .top{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important}
  body.seller-registration .app header .top>div:first-of-type{grid-column:1/-1;grid-row:1}
  body.seller-registration .app header .top>.pm-account-menu,
@@ -51,11 +51,11 @@ body .pm-seller-switch{display:none!important}
  body.seller-registration .app header .top>#sellerBack{grid-row:2;grid-column:1}
  body.seller-registration .app header .top>button:not(#sellerBack){grid-row:2;grid-column:2}
  body.seller-registration .app header .top #switchToBuyer{grid-row:2;grid-column:3}
- body.seller-registration .app main{display:grid;gap:14px;max-width:900px;margin:0 auto;width:100%;padding:12px!important}
+ body.seller-registration .app main{display:grid;gap:10px;max-width:900px;margin:0 auto;width:100%;padding:10px!important}
  body.seller-registration .app .panel-head{display:flex!important;align-items:center;justify-content:space-between;flex-wrap:wrap}
- body.seller-registration .app .panel-head h3{font-size:17px!important;line-height:1.4!important}
+ body.seller-registration .app .panel-head h3{font-size:16px!important;line-height:1.35!important}
  body.seller-registration .app .panel-head .tag{width:auto;flex:none}
- body.seller-registration .app :is(input,select,textarea){min-height:46px;line-height:1.4;border-color:#b6c9c5;scroll-margin-block:16px}
+ body.seller-registration .app :is(input,select,textarea){min-height:44px;line-height:1.35;border-color:#b6c9c5;scroll-margin-block:16px}
  body.seller-registration .app input[aria-invalid='true']{border:2px solid #b42318}
  body.seller-registration .app textarea{min-height:92px;resize:vertical}
  body.seller-registration .app :is(#otpStatus,#applyStatus):not(:empty){padding:10px;background:#edf6f2;color:#174d49;line-height:1.5;overflow-wrap:anywhere}

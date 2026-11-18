@@ -1,7 +1,7 @@
 body.buyer-home.home-clean{background:#f3f5f6;color:#1f3034;letter-spacing:0}
 body.buyer-home.home-clean header .bar{display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:8px!important;padding:10px 12px!important}
 body.buyer-home.home-clean header .bar>.brand{grid-column:1!important;grid-row:1!important;display:flex;gap:8px;min-width:0;min-height:40px}
-body.buyer-home.home-clean header #homeLogo{width:36px!important;height:36px!important;min-width:36px!important}
+body.buyer-home.home-clean header #homeLogo{width:44px!important;height:44px!important;min-width:44px!important}
 body.buyer-home.home-clean header .brand h1{display:block!important;font-size:20px!important;line-height:1.25!important;white-space:nowrap}
 body.buyer-home.home-clean header .brand :is(.label,.version){display:none!important}
 body.buyer-home.home-clean header .bar>.home-header-tools{grid-column:2!important;grid-row:1!important;display:flex!important;gap:6px!important;align-items:center;min-width:0}
@@ -59,7 +59,7 @@ body.buyer-home.home-clean .buyer-navigation a[aria-current='page'] img{opacity:
 @media(max-width:340px){
  body.buyer-home.home-clean header .bar{padding:8px!important;gap:6px!important}
  body.buyer-home.home-clean header .brand{gap:6px}
- body.buyer-home.home-clean header #homeLogo{width:30px!important;height:30px!important;min-width:30px!important}
+ body.buyer-home.home-clean header #homeLogo{width:38px!important;height:38px!important;min-width:38px!important}
  body.buyer-home.home-clean header .brand h1{font-size:18px!important}
  body.buyer-home.home-clean #homeLanguage{width:48px}
  body.buyer-home.home-clean .market-banner{height:64px!important;max-height:64px!important}
@@ -148,6 +148,18 @@ body.buyer-home.home-clean .buyer-navigation a[aria-current='page']{background:#
 }
 /* Phones and tablets reserve a real row for navigation, including landscape. */
 @media(max-width:1024px){
+ body.buyer-home.home-clean{font-family:Arial,"Noto Sans",sans-serif}
+ body.buyer-home.home-clean header .bar{gap:6px!important;padding:6px 10px!important}
+ body.buyer-home.home-clean header .brand h1{font-size:18px!important}
+ body.buyer-home.home-clean .home-market-promo{min-height:72px;padding:8px 12px}
+ body.buyer-home.home-clean .home-promo-copy h2{font-size:18px!important}
+ body.buyer-home.home-clean #cats .cat{min-height:64px!important;gap:4px}
+ body.buyer-home.home-clean #cats .cat::before{height:32px;width:32px;background-size:19px}
+ body.buyer-home.home-clean .home-category-strip{margin-bottom:8px!important;padding-bottom:4px!important}
+ body.buyer-home.home-clean #products .photo{aspect-ratio:1.15!important}
+ body.buyer-home.home-clean #products .body{padding:8px!important;gap:3px}
+ body.buyer-home.home-clean #products .name{font-size:13px!important;line-height:1.35!important;min-height:35px!important}
+ body.buyer-home.home-clean #products .price{font-size:16px!important;margin:3px 0!important}
  body.buyer-page.buyer-home.home-clean{display:grid!important;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;height:100vh!important;height:100dvh!important;min-height:0!important;overflow:hidden!important;padding-bottom:0!important}
  body.buyer-page.buyer-home.home-clean>header{grid-row:1;max-height:45vh;max-height:45dvh;overflow-y:auto}
  body.buyer-page.buyer-home.home-clean>main{grid-row:2;min-width:0!important;width:100%!important;min-height:0!important;height:100%!important;max-height:100%!important;overflow-y:auto!important;padding-bottom:16px!important}
