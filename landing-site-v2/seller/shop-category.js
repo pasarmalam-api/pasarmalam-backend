@@ -19,10 +19,13 @@
   let readyResolve;
   const ready = new Promise(resolve => { readyResolve = resolve; });
   async function request(options) {
-    const response = await fetch('https://pasarmalam-backend.onrender.com/api/seller/category', {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    let response;
+    try { response = await fetch('https://pasarmalam-backend.onrender.com/api/seller/category', {
       ...options, headers: {'Content-Type':'application/json', Authorization:'Bearer ' + (localStorage.getItem('pm_token') || '')},
-      signal: AbortSignal.timeout(15000)
-    });
+      signal: controller.signal
+    }); } finally { clearTimeout(timer); }
     const data = await response.json();
     if (!response.ok || data.error) throw new Error(data.error || t('failed'));
     return data;

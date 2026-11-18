@@ -6,11 +6,17 @@
   const retry = document.getElementById('retry');
   let busy = false;
   async function request(path, data) {
-    const response = await fetch(api + path, {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
+    let response;
+    try { response = await fetch(api + path, {
       method: data === undefined ? 'GET' : 'POST',
       headers: {'Content-Type':'application/json', Authorization:'Bearer ' + (localStorage.getItem('pm_token') || '')},
-      body: data === undefined ? undefined : JSON.stringify(data), signal: AbortSignal.timeout(15000)
-    });
+      body: data === undefined ? undefined : JSON.stringify(data), signal: controller.signal
+    }); } catch (error) {
+      if (error.name === 'AbortError') throw new Error('Unable to load your account. Please retry.');
+      throw error;
+    } finally { clearTimeout(timer); }
     const result = await response.json();
     if (!response.ok) {
       if (response.status === 401 || result.error === 'Login required') showEntry();

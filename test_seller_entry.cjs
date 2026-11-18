@@ -22,7 +22,7 @@ async function scenario(token,data){
     document:{getElementById:id=>els[id],querySelectorAll:()=>[els.signIn,els.registerSeller,els.sellerLogin]},
     localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)},
     location:{pathname:'/buyer/become-seller.html',replace:p=>{redirect=p;}},
-    AbortSignal:{timeout(){}},Option:function(label,value){this.label=label;this.value=value;},
+    AbortController,setTimeout,clearTimeout,Option:function(label,value){this.label=label;this.value=value;},
     fetch:async(url,options)=>{requests.push({url,options});return {ok:true,json:async()=>url.endsWith('switch-role')?{token:'seller-token',user:{role:'seller'}}:data};}
   });
   await new Promise(resolve=>setImmediate(resolve));

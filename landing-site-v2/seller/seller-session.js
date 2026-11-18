@@ -33,6 +33,7 @@
   };
   function init(){
     document.body.classList.toggle('seller-dashboard',page==='index.html');
+    document.body.classList.toggle('seller-registration',page==='register.html');
     const active=signedIn();
     if(page==='register.html'&&localStorage.getItem('pm_token')&&user().role==='buyer'&&location.pathname.startsWith('/seller/')){
       location.replace('../buyer/become-seller.html');return;
@@ -57,7 +58,7 @@
     const accountItems=document.createElement('div');accountItems.className='pm-account-items';
     account.append(accountItems);accountItems.append(switchBuyer);
     (document.querySelector('header .top')||document.querySelector('main'))?.append(account);
-    const sharedStyle=document.createElement('link');sharedStyle.rel='stylesheet';sharedStyle.href='../workspace-ui.css?v=compact-home20261117';document.head.append(sharedStyle);
+    const sharedStyle=document.createElement('link');sharedStyle.rel='stylesheet';sharedStyle.href='../workspace-ui.css?v=compact-home20261117-registration2';document.head.append(sharedStyle);
     const storeTypes=document.createElement('script');storeTypes.src='../store-types.js?v=page-audit20261111';document.head.append(storeTypes);
     document.querySelectorAll('a[href],button[onclick]').forEach(el=>{
       const target=el.getAttribute('href')||el.getAttribute('onclick')||'';

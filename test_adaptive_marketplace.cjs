@@ -1,0 +1,17 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const read = path => fs.readFileSync('landing-site-v2/'+path,'utf8');
+const home = read('buyer/home-ui.css');
+const seller = read('workspace-ui.css');
+assert.match(home,/grid-template-columns:minmax\(0,1fr\);grid-template-rows:auto minmax\(0,1fr\) auto/);
+assert.match(home,/>main\{grid-row:2;min-width:0!important;width:100%!important/);
+assert.match(home,/home-clean>\.buyer-navigation\{grid-row:3;position:static!important/);
+assert.match(home,/@media\(min-width:761px\) and \(max-width:1024px\)/);
+assert.match(home,/#products\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)!important/);
+assert.match(home,/\(max-height:500px\) and \(orientation:landscape\)/);
+assert.match(seller,/seller-registration \.app header \.top\{display:grid!important;grid-template-columns:repeat\(3,minmax\(0,1fr\)\)!important/);
+assert.match(seller,/seller-registration \.app header \.top #switchToBuyer\{grid-row:2;grid-column:3\}/);
+assert.match(read('seller/seller-session.js'),/classList.toggle\('seller-registration',page==='register.html'\)/);
+assert.match(read('buyer/index.html'),/home-ui\.css\?v=market-home20261118-responsive2/);
+assert.match(read('seller/register.html'),/seller-session\.js\?v=compact-home20261117-registration2/);
+console.log('PASS: bounded phone/tablet grid, separate bottom-navigation row, landscape cards, compact seller header and refreshed asset URLs');

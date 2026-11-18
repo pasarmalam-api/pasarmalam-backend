@@ -1,0 +1,37 @@
+PasarMalam responsive UI check - 18 November 2026
+
+Status: local changes only. Not committed, pushed or deployed.
+Preview: http://127.0.0.1:8772/buyer/index.html
+Seller registration: http://127.0.0.1:8772/seller/register.html?lang=ms
+
+Browser viewport checks (not a native Android emulator):
+320x640, 360x740, 412x915, 480x800, 768x1024, 915x412.
+All checked buyer widths matched the page width with zero clipped product cards.
+Main content bottom matched bottom-navigation top at all six sizes.
+First product prices remained above navigation on initial entry.
+Landscape uses compact categories and images without the promotional banner.
+412x420 reduced-height check preserved a scrollable catalogue and separate footer.
+Buyer language switching checked in English, Malay and Chinese with no clipped cards.
+
+Seller registration header compacted from about 290px to 198px at 412px width.
+320px registration header measured 212px after compact action-label correction.
+Blank registration submission focused the owner-name field and displayed a Malay
+validation message. No OTP was sent and no test account was created.
+Seller Centre guest links checked for new registration, existing-buyer continuation
+and existing-seller sign-in. Authenticated seller dashboard was not tested here.
+
+Registration request reliability: 30-second cancellable requests, email-bound
+verification token, duplicate OTP prevention and focusable visible field errors.
+Older WebViews no longer require AbortSignal.timeout for seller onboarding.
+
+Passed:
+test_adaptive_marketplace.cjs
+test_home_ui.cjs
+test_responsive_chrome.cjs
+test_seller_registration_recovery.cjs
+test_seller_entry.cjs
+test_store_ui.cjs
+git diff --check (line-ending notices only)
+
+Remaining: deploy reviewed files, update any separate Android host, then test the
+released APK on physical Android/Huawei devices. Native emulator did not run.

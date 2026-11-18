@@ -146,3 +146,28 @@ body.buyer-home.home-clean .buyer-navigation a[aria-current='page']{background:#
  body.buyer-home.home-clean>main::-webkit-scrollbar-thumb{background:#c5d3cd;border-radius:4px}
  body.buyer-home.home-clean>main::-webkit-scrollbar-button{display:none}
 }
+/* Phones and tablets reserve a real row for navigation, including landscape. */
+@media(max-width:1024px){
+ body.buyer-page.buyer-home.home-clean{display:grid!important;grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;height:100vh!important;height:100dvh!important;min-height:0!important;overflow:hidden!important;padding-bottom:0!important}
+ body.buyer-page.buyer-home.home-clean>header{grid-row:1;max-height:45vh;max-height:45dvh;overflow-y:auto}
+ body.buyer-page.buyer-home.home-clean>main{grid-row:2;min-width:0!important;width:100%!important;min-height:0!important;height:100%!important;max-height:100%!important;overflow-y:auto!important;padding-bottom:16px!important}
+ body.buyer-page.buyer-home.home-clean>.buyer-navigation{grid-row:3;position:static!important;inset:auto!important;max-height:30vh;max-height:30dvh;overflow-y:auto;min-height:0}
+}
+@media(min-width:761px) and (max-width:1024px){body.buyer-home.home-clean #products{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+@media(max-width:1024px) and (max-height:500px) and (orientation:landscape){
+ body.buyer-home.home-clean header .bar{padding:4px 10px!important;gap:4px!important}
+ body.buyer-home.home-clean header .bar>.brand{min-height:34px}
+ body.buyer-home.home-clean :is(.home-account-toggle,#homeLanguage){height:34px;min-height:34px}
+ body.buyer-home.home-clean #search{height:36px;min-height:36px!important}
+ body.buyer-home.home-clean #searchButton{height:30px;min-height:30px!important}
+ body.buyer-home.home-clean #cartButton{height:36px!important;min-height:36px!important}
+ body.buyer-home.home-clean main .hero{display:none!important}
+ body.buyer-home.home-clean .home-category-strip{margin-bottom:6px!important;padding-block:0!important}
+ body.buyer-home.home-clean #cats .cat{min-height:36px!important;width:auto;min-width:64px;justify-content:center;font-size:11px!important;padding:4px!important}
+ body.buyer-home.home-clean #cats .cat::before{display:none}
+ body.buyer-home.home-clean .home-product-heading{margin-bottom:6px!important}
+ body.buyer-home.home-clean #products .photo{height:72px!important;aspect-ratio:auto!important}
+ body.buyer-home.home-clean #products .photo img{height:100%;object-fit:contain}
+ body.buyer-home.home-clean #products .body{padding:6px!important}
+ body.buyer-home.home-clean .buyer-navigation a{min-height:48px;gap:2px;padding:4px 2px!important}
+}

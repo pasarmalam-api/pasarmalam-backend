@@ -87,6 +87,11 @@
     'Meals':['Hidangan','餐食'], 'Street Food':['Makanan Jalanan','街头美食'], 'Food':['Makanan','食品'],
     'Drinks':['Minuman','饮料'], 'Groceries':['Barangan Runcit','日用品'], 'Cosmetics':['Kosmetik','化妆品']
   };
+  Object.assign(copy, {
+    'Registration is still loading. Please reload this page.':['Pendaftaran masih dimuatkan. Sila muat semula halaman ini.','注册页面仍在加载，请刷新页面。'],
+    'Request timed out. Check your connection and try again. If you submitted an application, try signing in before submitting again.':['Permintaan tamat masa. Semak sambungan dan cuba lagi. Jika permohonan telah dihantar, cuba log masuk dahulu sebelum menghantar semula.','请求超时，请检查网络后重试。如果已提交申请，请先尝试登录，避免重复提交。'],
+    'Valid email is required':['Masukkan alamat emel yang sah','请输入有效的电子邮箱地址']
+  });
   const reverse = new Map();
   Object.entries(copy).forEach(([key, values]) => {reverse.set(key,key); values.forEach(value => reverse.set(value,key));});
   function text(value, language) {
@@ -115,7 +120,7 @@
       const raw=node.nodeValue.trim(),translated=text(raw,language);
       if(raw&&translated!==raw)node.nodeValue=node.nodeValue.replace(raw,translated);
     }
-    document.querySelectorAll('[placeholder]').forEach(el=>{const raw=el.getAttribute('placeholder'),translated=text(raw,language);if(raw!==translated)el.setAttribute('placeholder',translated);});
+    document.querySelectorAll('[placeholder]').forEach(el=>{const raw=el.getAttribute('placeholder'),translated=text(raw,language);if(raw!==translated)el.setAttribute('placeholder',translated);if(el.hasAttribute('aria-label'))el.setAttribute('aria-label',translated);});
     const heading=document.getElementById('heading')||document.querySelector('header h2');
     if(heading)document.title=heading.textContent+' | PasarMalam';
   }
