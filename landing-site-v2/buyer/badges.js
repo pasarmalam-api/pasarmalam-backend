@@ -190,7 +190,7 @@
     if(document.documentElement.lang!==lang)document.documentElement.lang=lang;
     document.querySelectorAll("#langToggle,.buyer-lang-toggle").forEach(button=>{if(button.textContent!==labels[lang])button.textContent=labels[lang]});
     const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,{acceptNode(node){if(!node.nodeValue.trim())return NodeFilter.FILTER_REJECT;if(node.parentElement&&["SCRIPT","STYLE","TEXTAREA"].includes(node.parentElement.tagName))return NodeFilter.FILTER_REJECT;return NodeFilter.FILTER_ACCEPT;}});
-    const nodes=[];while(walker.nextNode())if(!walker.currentNode.parentElement?.closest('.name,.shop'))nodes.push(walker.currentNode);
+    const nodes=[];while(walker.nextNode())if(!walker.currentNode.parentElement?.closest('.name,.shop,[data-home-localized]'))nodes.push(walker.currentNode);
     nodes.forEach(node=>{const raw=node.nodeValue.trim(),next=translateText(raw,lang,lookup);if(next!==raw)node.nodeValue=node.nodeValue.replace(raw,next)});
     document.querySelectorAll("input[placeholder],textarea[placeholder]").forEach(el=>{const raw=el.getAttribute("placeholder"),key=lookup[raw]||raw,next=(dictionary[lang]&&dictionary[lang][key])||raw;if(next!==raw)el.setAttribute("placeholder",next)});
     }finally{languageObserver?.observe(document.documentElement,languageObserverOptions)}

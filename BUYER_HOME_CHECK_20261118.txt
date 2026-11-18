@@ -1,0 +1,41 @@
+Buyer home redesign - 18 November 2026
+
+Local preview: http://127.0.0.1:8768/buyer/index.html?preview=market-home20261118
+This report records local pre-deployment checks, not proof of live deployment.
+
+Marketplace-style presentation, retaining PasarMalam branding:
+- Compact brand, language/account controls, search and cart.
+- Small promotional strip using real catalogue images and product links.
+- Scrollable icon categories retaining the original category handlers.
+- Two-column phone feed with full linked product titles and clear prices.
+- Accessible cart/save icon controls, with original handlers retained.
+- One order-type filter for all products, retail, wholesale and factory direct.
+- Original MOQ rules, pricing, payment routing and authentication unchanged.
+- Home-owned labels separated from legacy automatic phrase translation.
+
+Browser checks with real catalogue responses:
+393x852, 360x740, 320x640, 280x653:
+  No horizontal document overflow.
+  Header, scrolling main and bottom navigation occupy separate regions.
+  First two product names/prices visible above the bottom menu.
+  Actual catalogue images load.
+740x360 landscape:
+  No horizontal document overflow; main remains scrollable above navigation.
+  Scrolling is needed to reach prices at this short height.
+1280x900 desktop:
+  Five-column feed, no horizontal document overflow.
+
+Main interactions verified:
+- Account dialog opens/closes; existing account and Seller Centre links retained.
+- Malay, English and Chinese selection updates home-owned labels correctly.
+- Search opens category.html with the search/category parameters.
+- Cart opens cart.html.
+- Product title opens product.html?id=90.
+- Category selection updates the active category.
+- Wholesale filter returned one product with minimum 10 units.
+- Factory filter returned no live products and showed the translated empty state.
+- No new browser console errors during the final interaction check.
+
+No cart writes, payment transactions or real orders were submitted for testing.
+Native Android/Huawei runtime testing is NOT complete: emulator acceleration is
+still unavailable. These browser checks do not replace a real-device test.

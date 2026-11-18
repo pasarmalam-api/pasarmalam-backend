@@ -1,0 +1,37 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const root = 'landing-site-v2/buyer/';
+const source = fs.readFileSync(root+'home-ui.js','utf8');
+const css = fs.readFileSync(root+'home-ui.css','utf8');
+const html = fs.readFileSync(root+'index.html','utf8');
+new vm.Script(source);
+assert.match(source,/dialog\.append\(dialogHead, account, language\)/,'Existing account actions are moved, not recreated or dropped');
+assert.match(source,/searchRow\.append\(search, cart\)/,'Existing search and cart handlers remain attached');
+assert.match(source,/language\.click\(\)/,'Language selector uses the shared language handler');
+assert.match(source,/dialog\.showModal\(\)/);
+assert.match(source,/toggle\.focus\(\)/,'Closing the account menu restores keyboard focus');
+assert.doesNotMatch(source,/localStorage\.(setItem|removeItem)|fetch\(/,'Home presentation never changes authentication or sends requests');
+assert.match(css,/-webkit-line-clamp:unset!important/,'Full product titles remain readable');
+assert.match(css,/home-product-heading select\{width:100%!important;min-width:0!important/);
+assert.match(html,/home-ui\.css\?v=market-home20261118/);
+assert.match(html,/home-ui\.js\?v=market-home20261118/);
+assert.match(source,/decorateCategories/);
+assert.match(source,/decoratePromo/);
+assert.match(source,/button\.setAttribute\('aria-label'/);
+assert.match(source,/filter\?\.setAttribute\('aria-label'/);
+assert.match(css,/\.name a\{color:inherit;text-decoration:none\}/);
+assert.match(css,/scroll-snap-type:x proximity/);
+assert.match(css,/\.home-promo-copy h2\{display:block!important/,'New banner text overrides the old hidden-hero rule');
+assert.match(css,/\.heart\{display:grid!important/,'Saved-item control overrides the legacy hidden rule');
+assert.match(css,/\.actions\{display:flex!important/,'Both card actions remain on one row');
+assert.match(css,/max-height:780px/,'Short phones get compact presentation spacing');
+assert.match(source,/sold\.dataset\.homeLocalized/,'Sales labels are owned by the selected home locale');
+assert.match(fs.readFileSync(root+'badges.js','utf8'),/closest\('\.name,\.shop,\[data-home-localized\]'\)/,'Legacy translation does not overwrite locale-owned labels');
+for(const name of ['house','layout-grid','message-circle','receipt-text','user-round','shopping-cart','search','x']){
+  const svg=fs.readFileSync(root+'icons/'+name+'.svg','utf8');
+  assert.match(svg,/<svg/);
+  assert.doesNotMatch(svg,/<script|https?:\/\/(?!www\.w3\.org)/);
+}
+assert.ok(fs.existsSync(root+'icons/LUCIDE-LICENSE.txt'));
+console.log('PASS: clean home presentation, account/search/cart/language handlers preserved, full titles and local licensed icons');

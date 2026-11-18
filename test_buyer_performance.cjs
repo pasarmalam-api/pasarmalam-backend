@@ -23,5 +23,5 @@ assert.match(load,/loadProducts\(\)/);
 assert.match(load,/\/api\/cart/);
 assert.doesNotMatch(load,/\/api\/(orders|returns|messages|reviews|logistics)/);
 assert.match(html,/decoding="async"/);
-assert.match(html,/badges\.js\?v=buyer-speed20261117/);
+assert.match(html,/badges\.js\?v=market-home20261118/);
 console.log('PASS: cached translation tables, observer isolation, translated counters and lean home requests.');
